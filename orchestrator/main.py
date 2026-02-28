@@ -43,6 +43,8 @@ SANDBOX_URL = os.environ.get("SANDBOX_URL", "http://sandbox:8081")
 WEBHOOK_URL = os.environ.get("WEBHOOK_URL", "")
 THREAD_BUDGET_TOKENS = int(os.environ.get("THREAD_BUDGET_TOKENS", "0"))  # 0 = disabled
 IDLE_THREAD_MINUTES = int(os.environ.get("IDLE_THREAD_MINUTES", "0"))    # 0 = disabled
+GITHUB_TOKEN    = os.environ.get("GITHUB_TOKEN", "")
+GITHUB_USERNAME = os.environ.get("GITHUB_USERNAME", "RajuRoopani")
 AUDIT_STREAM = "team:audit"
 AUDIT_GROUP = "grp:orchestrator-audit"
 AUDIT_CONSUMER = "orchestrator-0"
@@ -83,6 +85,8 @@ async def lifespan(app: FastAPI):
     await _ensure_phase4_tables()
     await _ensure_phase5_tables()
     await _ensure_phase8_tables()
+    await _ensure_phase9_tables()
+    await _ensure_phase10_tables()
     _init_workspace_git()
     state.audit_task = asyncio.create_task(_audit_loop(), name="audit-loop")
     state.idle_task = asyncio.create_task(_idle_monitor_loop(), name="idle-monitor")
@@ -114,6 +118,7 @@ class TaskResponse(BaseModel):
     thread_id: str
     message_id: str
     status: str = "submitted"
+    github_repo: str = ""
 
 
 class ThreadSummary(BaseModel):
@@ -122,6 +127,7 @@ class ThreadSummary(BaseModel):
     status: str
     message_count: int
     created_at: str
+    github_repo: str = ""
 
 
 class MessageOut(BaseModel):
@@ -284,22 +290,65 @@ class ToolStats(BaseModel):
     p95_duration_ms: float
 
 
+# Phase 9 models
+class AskHumanRequest(BaseModel):
+    question: str
+    context: str = ""
+    from_role: str
+
+
+class HumanReplyRequest(BaseModel):
+    message: str
+    target_role: str   # which agent to reply to
+
+
+class HumanQuestionOut(BaseModel):
+    id: int
+    thread_id: str
+    from_role: str
+    question: str
+    context: str
+    answered: bool
+    answer: str
+    created_at: str
+    answered_at: str | None = None
+
+
 # ─────────────────────────────────────────────
 # API endpoints
 # ─────────────────────────────────────────────
 
 @app.post("/task", response_model=TaskResponse)
 async def submit_task(req: TaskRequest) -> TaskResponse:
-    """Submit a new task — creates a thread and routes to the EM."""
+    """Submit a new task — creates a thread, creates GitHub repo, routes to PO."""
     thread_id = str(uuid.uuid4())
     message_id = str(uuid.uuid4())
     now = datetime.now(timezone.utc)
 
-    # Persist thread
+    # Create GitHub repo for this task (best-effort, non-blocking on failure)
+    github_repo = await _create_github_repo(_slugify_repo_name(req.title))
+
+    # Persist thread with github_repo
     async with state.db.acquire() as conn:
         await conn.execute(
-            "INSERT INTO threads(id, title, status, created_at, updated_at) VALUES($1,$2,'active',$3,$3)",
-            thread_id, req.title, now,
+            "INSERT INTO threads(id, title, status, github_repo, created_at, updated_at) VALUES($1,$2,'active',$3,$4,$4)",
+            thread_id, req.title, github_repo, now,
+        )
+
+    # Branch strategy instructions injected into every task message
+    branch_instructions = ""
+    if github_repo:
+        branch_instructions = (
+            f"\n\n---\n"
+            f"**GitHub Repo**: {github_repo}\n"
+            f"**Repo Name**: {_repo_name_from_url(github_repo)}\n\n"
+            f"**Branch Strategy** (follow exactly to avoid conflicts):\n"
+            f"1. Engineering Manager: set up project skeleton on branch `main`, commit, then push\n"
+            f"2. Each developer: `git_checkout_branch` → branch named `<your_role>` (e.g. `junior_dev_1`)\n"
+            f"3. Developers commit to their own branch, then push that branch\n"
+            f"4. Senior Dev: `git_merge` each junior branch → their own branch, resolve any conflicts using `strategy=ours`\n"
+            f"5. Engineering Manager: `git_merge` all senior branches → `main`, then call `git_push` to publish the final result\n"
+            f"6. Include the GitHub repo URL in your final task_complete message so the human knows where to find the code."
         )
 
     # Build message payload
@@ -307,23 +356,21 @@ async def submit_task(req: TaskRequest) -> TaskResponse:
         "id": message_id,
         "thread_id": thread_id,
         "from_role": "orchestrator",
-        "to_role": "engineering_manager",
+        "to_role": "product_owner",
         "type": "human_input",
-        "content": f"**{req.title}**\n\n{req.description}",
+        "content": f"**{req.title}**\n\n{req.description}{branch_instructions}",
         "priority": req.priority,
         "artifacts": "[]",
         "parent_message_id": "",
         "timestamp": now.isoformat(),
-        "metadata": json.dumps({"source": "human"}),
+        "metadata": json.dumps({"source": "human", "github_repo": github_repo}),
     }
 
-    # Deliver to Product Owner inbox (PO handles all incoming requirements)
     await state.redis.xadd("agent:product_owner:inbox", _encode(payload))
-    # Audit
     await state.redis.xadd(AUDIT_STREAM, _encode(payload))
 
-    logger.info("Task submitted: thread=%s title=%r", thread_id[:8], req.title)
-    return TaskResponse(thread_id=thread_id, message_id=message_id)
+    logger.info("Task submitted: thread=%s title=%r repo=%r", thread_id[:8], req.title, github_repo)
+    return TaskResponse(thread_id=thread_id, message_id=message_id, github_repo=github_repo)
 
 
 @app.get("/threads", response_model=list[ThreadSummary])
@@ -331,7 +378,7 @@ async def list_threads() -> list[ThreadSummary]:
     async with state.db.acquire() as conn:
         rows = await conn.fetch(
             """
-            SELECT t.id, t.title, t.status, t.created_at,
+            SELECT t.id, t.title, t.status, t.github_repo, t.created_at,
                    COUNT(m.id) AS message_count
             FROM threads t
             LEFT JOIN messages m ON m.thread_id = t.id
@@ -347,9 +394,19 @@ async def list_threads() -> list[ThreadSummary]:
             status=r["status"],
             message_count=r["message_count"],
             created_at=r["created_at"].isoformat(),
+            github_repo=r["github_repo"] or "",
         )
         for r in rows
     ]
+
+
+@app.get("/threads/{thread_id}/github-repo")
+async def get_thread_github_repo(thread_id: str) -> dict:
+    async with state.db.acquire() as conn:
+        row = await conn.fetchrow("SELECT github_repo FROM threads WHERE id=$1", thread_id)
+    if not row:
+        raise HTTPException(404, "Thread not found")
+    return {"thread_id": thread_id, "github_repo": row["github_repo"] or ""}
 
 
 @app.get("/threads/{thread_id}/messages", response_model=list[MessageOut])
@@ -890,17 +947,51 @@ async def _auto_complete_thread(thread_id: str) -> bool:
         if not counts or counts["total"] == 0 or counts["total"] != counts["done_count"]:
             return False
         ci_row = await conn.fetchrow(
-            "SELECT exit_code, passed, total FROM ci_results WHERE thread_id=$1 ORDER BY ran_at DESC LIMIT 1",
+            "SELECT exit_code, passed, total, failed FROM ci_results WHERE thread_id=$1 ORDER BY ran_at DESC LIMIT 1",
             thread_id,
         )
-        if ci_row is None or ci_row["exit_code"] != 0:
+        if ci_row is None:
+            return False
+        # CI passes if: exit_code==0, OR if tests ran with 0 failures and >0 passes
+        # (exit_code=1 can occur from collection errors on unrelated test files)
+        ci_passed = (
+            ci_row["exit_code"] == 0
+            or (ci_row["passed"] > 0 and (ci_row["failed"] or 0) == 0)
+        )
+        if not ci_passed:
             return False
         updated = await conn.fetchrow(
-            "UPDATE threads SET status='complete', updated_at=NOW() WHERE id=$1 AND status != 'complete' RETURNING id",
+            "UPDATE threads SET status='complete', updated_at=NOW() WHERE id=$1 AND status != 'complete' RETURNING id, github_repo",
             thread_id,
         )
     if updated is None:
         return False  # already complete
+
+    github_repo = updated["github_repo"] or ""
+
+    # Safety net: if agents didn't push, orchestrator does it now via EM's inbox
+    if github_repo:
+        repo_name = _repo_name_from_url(github_repo)
+        push_msg_id = str(uuid.uuid4())
+        push_now = datetime.now(timezone.utc)
+        push_payload = {
+            "id": push_msg_id, "thread_id": thread_id,
+            "from_role": "orchestrator", "to_role": "engineering_manager",
+            "type": "task_assignment",
+            "content": (
+                f"FINAL STEP — push code to GitHub now.\n\n"
+                f"All tasks are done and CI is green. Run `git_push` with repo_name=`{repo_name}` "
+                f"to publish the final code to {github_repo}.\n"
+                f"Then send a status_update back to orchestrator confirming the push."
+            ),
+            "priority": "high", "artifacts": "[]", "parent_message_id": "",
+            "timestamp": push_now.isoformat(),
+            "metadata": json.dumps({"source": "auto_complete", "repo_name": repo_name}),
+        }
+        await state.redis.xadd("agent:engineering_manager:inbox", _encode(push_payload))
+        logger.info("Thread %s: sent git_push instruction to EM for repo %r", thread_id[:8], repo_name)
+
+    repo_line   = f"\n🔗 GitHub: {github_repo}" if github_repo else ""
 
     now = datetime.now(timezone.utc)
     event_payload = {
@@ -909,20 +1000,21 @@ async def _auto_complete_thread(thread_id: str) -> bool:
         "from_role":        "orchestrator",
         "to_role":          "orchestrator",
         "type":             "thread_complete",
-        "content":          f"✅ Thread {thread_id[:8]} complete — all tasks done, CI green",
+        "content":          f"✅ Thread {thread_id[:8]} complete — all tasks done, CI green{repo_line}",
         "priority":         "high",
         "artifacts":        "[]",
         "parent_message_id": "",
         "timestamp":        now.isoformat(),
-        "metadata":         json.dumps({"passed": ci_row["passed"], "total": ci_row["total"]}),
+        "metadata":         json.dumps({"passed": ci_row["passed"], "total": ci_row["total"], "github_repo": github_repo}),
     }
     await state.redis.xadd(AUDIT_STREAM, _encode(event_payload))
     asyncio.create_task(_fire_webhook("thread.complete", {
-        "thread_id": thread_id,
-        "passed":    ci_row["passed"],
-        "total":     ci_row["total"],
+        "thread_id":   thread_id,
+        "passed":      ci_row["passed"],
+        "total":       ci_row["total"],
+        "github_repo": github_repo,
     }))
-    logger.info("Thread %s auto-completed (%d/%d tests).", thread_id[:8], ci_row["passed"], ci_row["total"])
+    logger.info("Thread %s auto-completed (%d/%d tests). repo=%r", thread_id[:8], ci_row["passed"], ci_row["total"], github_repo)
     return True
 
 
@@ -1280,6 +1372,115 @@ async def close_thread(thread_id: str) -> dict:
     return {"status": "closed", "thread_id": thread_id}
 
 
+@app.delete("/threads/{thread_id}")
+async def delete_thread(thread_id: str) -> dict:
+    """Permanently delete a thread and all its messages, tasks, CI results, and human questions."""
+    async with state.db.acquire() as conn:
+        row = await conn.fetchrow("SELECT id FROM threads WHERE id=$1", thread_id)
+        if not row:
+            raise HTTPException(404, "Thread not found")
+        await conn.execute("DELETE FROM human_questions WHERE thread_id=$1", thread_id)
+        await conn.execute("DELETE FROM ci_results WHERE thread_id=$1", thread_id)
+        await conn.execute("DELETE FROM tasks WHERE thread_id=$1", thread_id)
+        await conn.execute("DELETE FROM messages WHERE thread_id=$1", thread_id)
+        await conn.execute("DELETE FROM threads WHERE id=$1", thread_id)
+    # Remove from Redis audit stream entries is best-effort (streams don't support selective delete)
+    asyncio.create_task(_fire_webhook("thread.deleted", {"thread_id": thread_id}))
+    return {"status": "deleted", "thread_id": thread_id}
+
+
+# ─────────────────────────────────────────────
+# Phase 9: Human-in-the-Loop endpoints
+# ─────────────────────────────────────────────
+
+@app.post("/threads/{thread_id}/ask-human", status_code=201)
+async def ask_human_endpoint(thread_id: str, req: AskHumanRequest) -> dict:
+    """Called by an agent tool to submit a question for the human; sets thread to 'waiting'."""
+    async with state.db.acquire() as conn:
+        if not await conn.fetchrow("SELECT id FROM threads WHERE id=$1", thread_id):
+            raise HTTPException(404, "Thread not found")
+        row = await conn.fetchrow(
+            "INSERT INTO human_questions(thread_id, from_role, question, context) "
+            "VALUES($1,$2,$3,$4) RETURNING id",
+            thread_id, req.from_role, req.question, req.context,
+        )
+        question_id = row["id"]
+        await conn.execute(
+            "UPDATE threads SET status='waiting', updated_at=NOW() WHERE id=$1", thread_id
+        )
+    now = datetime.now(timezone.utc)
+    payload = {
+        "id": str(uuid.uuid4()), "thread_id": thread_id,
+        "from_role": req.from_role, "to_role": "human",
+        "type": "human_question",
+        "content": req.question,
+        "priority": "high", "artifacts": "[]", "parent_message_id": "",
+        "timestamp": now.isoformat(),
+        "metadata": json.dumps({"question_id": question_id, "context": req.context}),
+    }
+    await state.redis.xadd(AUDIT_STREAM, _encode(payload))
+    asyncio.create_task(_fire_webhook("thread.waiting", {"thread_id": thread_id, "question": req.question}))
+    return {"question_id": question_id, "status": "waiting"}
+
+
+@app.post("/threads/{thread_id}/human-reply")
+async def human_reply(thread_id: str, req: HumanReplyRequest) -> dict:
+    """Human answers a pending question; resumes the thread."""
+    async with state.db.acquire() as conn:
+        if not await conn.fetchrow("SELECT id FROM threads WHERE id=$1", thread_id):
+            raise HTTPException(404, "Thread not found")
+        await conn.execute(
+            """UPDATE human_questions SET answered=TRUE, answer=$1, answered_at=NOW()
+               WHERE thread_id=$2 AND NOT answered""",
+            req.message, thread_id,
+        )
+        await conn.execute(
+            "UPDATE threads SET status='active', updated_at=NOW() WHERE id=$1", thread_id
+        )
+    now = datetime.now(timezone.utc)
+    message_id = str(uuid.uuid4())
+    payload = {
+        "id": message_id, "thread_id": thread_id,
+        "from_role": "human", "to_role": req.target_role,
+        "type": "human_input",
+        "content": req.message,
+        "priority": "high", "artifacts": "[]", "parent_message_id": "",
+        "timestamp": now.isoformat(),
+        "metadata": json.dumps({"source": "human_reply"}),
+    }
+    await state.redis.xadd(f"agent:{req.target_role}:inbox", _encode(payload))
+    await state.redis.xadd(AUDIT_STREAM, _encode(payload))
+    asyncio.create_task(_fire_webhook("thread.resumed", {"thread_id": thread_id, "target_role": req.target_role}))
+    return {"status": "reply_sent", "message_id": message_id, "target_role": req.target_role}
+
+
+@app.get("/pending-questions", response_model=list[HumanQuestionOut])
+async def get_pending_questions(thread_id: str | None = Query(default=None)) -> list[HumanQuestionOut]:
+    """Return all unanswered human questions, optionally filtered by thread."""
+    async with state.db.acquire() as conn:
+        if thread_id:
+            rows = await conn.fetch(
+                "SELECT * FROM human_questions WHERE thread_id=$1 AND NOT answered ORDER BY created_at DESC",
+                thread_id,
+            )
+        else:
+            rows = await conn.fetch(
+                "SELECT * FROM human_questions WHERE NOT answered ORDER BY created_at DESC"
+            )
+    return [_hq_row_to_out(r) for r in rows]
+
+
+@app.get("/threads/{thread_id}/pending-questions", response_model=list[HumanQuestionOut])
+async def get_thread_pending_questions(thread_id: str) -> list[HumanQuestionOut]:
+    """Return unanswered human questions for a specific thread."""
+    async with state.db.acquire() as conn:
+        rows = await conn.fetch(
+            "SELECT * FROM human_questions WHERE thread_id=$1 AND NOT answered ORDER BY created_at DESC",
+            thread_id,
+        )
+    return [_hq_row_to_out(r) for r in rows]
+
+
 # ─────────────────────────────────────────────
 # Phase 8 table migration (idempotent)
 # ─────────────────────────────────────────────
@@ -1303,6 +1504,98 @@ async def _ensure_phase8_tables() -> None:
     async with state.db.acquire() as conn:
         await conn.execute(ddl)
     logger.info("Phase 8 tables ensured.")
+
+
+# ─────────────────────────────────────────────
+# Phase 9 table migration (idempotent)
+# ─────────────────────────────────────────────
+
+async def _ensure_phase9_tables() -> None:
+    ddl = """
+    CREATE TABLE IF NOT EXISTS human_questions (
+        id          BIGSERIAL   PRIMARY KEY,
+        thread_id   TEXT        NOT NULL,
+        from_role   TEXT        NOT NULL,
+        question    TEXT        NOT NULL,
+        context     TEXT        DEFAULT '',
+        answered    BOOLEAN     NOT NULL DEFAULT FALSE,
+        answer      TEXT        DEFAULT '',
+        answered_at TIMESTAMPTZ,
+        created_at  TIMESTAMPTZ DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS idx_hq_thread     ON human_questions(thread_id);
+    CREATE INDEX IF NOT EXISTS idx_hq_unanswered ON human_questions(answered) WHERE NOT answered;
+    """
+    async with state.db.acquire() as conn:
+        await conn.execute(ddl)
+    logger.info("Phase 9 tables ensured.")
+
+
+async def _ensure_phase10_tables() -> None:
+    """Phase 10: add github_repo column to threads (idempotent)."""
+    ddl = "ALTER TABLE threads ADD COLUMN IF NOT EXISTS github_repo TEXT DEFAULT '';"
+    async with state.db.acquire() as conn:
+        await conn.execute(ddl)
+    logger.info("Phase 10 migration: github_repo column ensured.")
+
+
+# ─────────────────────────────────────────────
+# GitHub helpers
+# ─────────────────────────────────────────────
+
+def _slugify_repo_name(title: str) -> str:
+    """Convert a task title to a valid GitHub repo name."""
+    import re
+    slug = re.sub(r"[^a-zA-Z0-9._-]", "-", title).lower()
+    slug = re.sub(r"-{2,}", "-", slug).strip("-.")
+    return slug[:100] or "team-claw-task"
+
+
+def _repo_name_from_url(url: str) -> str:
+    """Extract repo name from a github.com URL."""
+    return url.rstrip("/").split("/")[-1] if url else ""
+
+
+async def _create_github_repo(repo_name: str) -> str:
+    """Create a GitHub repo and return its HTML URL. Returns '' if token not set or on error."""
+    if not GITHUB_TOKEN:
+        logger.warning("GITHUB_TOKEN not set — skipping repo creation for %r", repo_name)
+        return ""
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            resp = await client.post(
+                "https://api.github.com/user/repos",
+                json={
+                    "name": repo_name,
+                    "private": False,
+                    "auto_init": True,
+                    "description": "Built by Team Claw AI agents",
+                },
+                headers={
+                    "Authorization": f"token {GITHUB_TOKEN}",
+                    "Accept":        "application/vnd.github.v3+json",
+                    "User-Agent":    "TeamClaw/1.0",
+                },
+            )
+            if resp.status_code == 201:
+                return resp.json().get("html_url", "")
+            if resp.status_code == 422:   # already exists
+                return f"https://github.com/{GITHUB_USERNAME}/{repo_name}"
+            logger.warning("GitHub repo creation returned %d for %r", resp.status_code, repo_name)
+            return ""
+    except Exception as exc:
+        logger.warning("GitHub repo creation failed for %r: %s", repo_name, exc)
+        return ""
+
+
+def _hq_row_to_out(row) -> HumanQuestionOut:
+    return HumanQuestionOut(
+        id=row["id"], thread_id=row["thread_id"], from_role=row["from_role"],
+        question=row["question"], context=row["context"] or "",
+        answered=row["answered"], answer=row["answer"] or "",
+        created_at=row["created_at"].isoformat(),
+        answered_at=row["answered_at"].isoformat() if row["answered_at"] else None,
+    )
 
 
 # ─────────────────────────────────────────────

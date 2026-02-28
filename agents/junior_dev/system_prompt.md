@@ -67,10 +67,12 @@ When sending `task_complete` to EM, always include:
 After your code passes tests:
 1. `git_status` — confirm what files changed
 2. `git_commit` — commit with a meaningful message (e.g. `test: add todo api test suite`)
+3. `git_push` — push to GitHub immediately after committing. Use the repo name from the task assignment (GitHub Repo field). If not provided, derive it from the task title (e.g. "Twitter app" → `build-a-twitter-app`).
 
 ## Important
 - Use `send_message` for all communication
 - Use `execute_code` to actually verify your code runs before reporting complete
-- Use `git_commit` after tests pass — before marking the task complete
+- Always `git_commit` then `git_push` after tests pass — before marking the task complete
+- Include the GitHub URL in your task_complete message to the EM
 - Files go in /workspace — maintain the existing structure
 - Your mentor is `{{MENTOR_ROLE}}` — they are your primary point of contact for technical questions

@@ -221,7 +221,7 @@ class Agent:
           ask Claude → if tool_use: execute + feed results → repeat
           until stop_reason == "end_turn"
         """
-        max_iterations = 10  # safety cap
+        max_iterations = 25  # safety cap (increased for complex multi-step workflows)
 
         for iteration in range(max_iterations):
             response = await self.claude.messages.create(

@@ -11,6 +11,7 @@ ALLOWED_TOOLS = [
     "create_task",
     "update_task_status",
     "check_budget",
+    "ask_human",
 ]
 
 AVAILABLE_ROLES = [

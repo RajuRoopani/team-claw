@@ -360,6 +360,123 @@ _CHECK_BUDGET_SCHEMA = {
     },
 }
 
+_ASK_HUMAN_SCHEMA = {
+    "name": "ask_human",
+    "description": (
+        "Pause the current task and ask the human a question when you need clarification "
+        "that cannot be resolved from the codebase, requirements, or teammates. "
+        "Use sparingly — only when genuinely blocked. "
+        "After calling this tool, send a status_update to your manager summarizing "
+        "current progress, then stop processing. You will receive a new message when "
+        "the human replies."
+    ),
+    "input_schema": {
+        "type": "object",
+        "required": ["question", "thread_id"],
+        "properties": {
+            "question":  {"type": "string", "description": "The specific question for the human."},
+            "context":   {"type": "string", "description": "Background that helps the human answer."},
+            "thread_id": {"type": "string", "description": "Current thread ID from the incoming message."},
+        },
+    },
+}
+
+_GIT_DIFF_SCHEMA = {
+    "name": "git_diff",
+    "description": (
+        "Show git diff for the /workspace repository. "
+        "By default shows unstaged working-tree changes. "
+        "Use staged=true for staged (cached) changes. "
+        "Use base/target to compare specific commits (e.g. base='HEAD~1'). "
+        "Useful before committing or when reviewing code changes."
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "staged": {"type": "boolean",  "description": "Show staged changes (git diff --cached)."},
+            "base":   {"type": "string",   "description": "Base ref/commit (e.g. HEAD~1, abc1234)."},
+            "target": {"type": "string",   "description": "Target ref/commit (default: working tree)."},
+            "path":   {"type": "string",   "description": "Restrict diff to this file/directory path."},
+        },
+    },
+}
+
+_GIT_CHECKOUT_BRANCH_SCHEMA = {
+    "name": "git_checkout_branch",
+    "description": (
+        "Create and switch to a git branch in /workspace. "
+        "Use your own role name as the branch (e.g. 'junior_dev_1', 'senior_dev_2'). "
+        "Always call this before starting work on a task so your commits don't "
+        "conflict with other developers' work on the same repo."
+    ),
+    "input_schema": {
+        "type": "object",
+        "required": ["branch_name"],
+        "properties": {
+            "branch_name": {
+                "type": "string",
+                "description": "Branch name to create/switch to (e.g. 'junior_dev_1', 'feature/auth').",
+            },
+        },
+    },
+}
+
+_GIT_MERGE_SCHEMA = {
+    "name": "git_merge",
+    "description": (
+        "Merge a branch into the current HEAD branch in /workspace. "
+        "Used by Senior Devs to merge junior branches, and by the Engineering Manager "
+        "to merge all feature branches into main before the final git_push. "
+        "If there are conflicts, use strategy='ours' to keep your version or "
+        "strategy='theirs' to accept the incoming branch."
+    ),
+    "input_schema": {
+        "type": "object",
+        "required": ["branch_name"],
+        "properties": {
+            "branch_name": {
+                "type": "string",
+                "description": "Name of the branch to merge into the current branch.",
+            },
+            "strategy": {
+                "type": "string",
+                "enum": ["", "ours", "theirs"],
+                "description": "Conflict resolution strategy: 'ours' keeps current branch, 'theirs' accepts incoming.",
+            },
+        },
+    },
+}
+
+_GIT_PUSH_SCHEMA = {
+    "name": "git_push",
+    "description": (
+        "Push committed workspace code to a GitHub repository under the configured account. "
+        "Creates the GitHub repo automatically if it doesn't exist. "
+        "Call this after git_commit when a task or feature is complete, so the work is "
+        "published to GitHub for the human to review. "
+        "Use a descriptive repo_name based on the task (e.g. 'todo-app-planner', 'auth-service'). "
+        "Requires GITHUB_TOKEN to be set in the environment."
+    ),
+    "input_schema": {
+        "type": "object",
+        "required": ["repo_name"],
+        "properties": {
+            "repo_name": {
+                "type": "string",
+                "description": "GitHub repository name (lowercase, hyphens). Created if it doesn't exist.",
+            },
+            "branch": {
+                "type": "string",
+                "description": "Branch to push to (default: 'main').",
+            },
+            "private": {
+                "type": "boolean",
+                "description": "Make the repository private (default: false).",
+            },
+        },
+    },
+}
+
 _EDIT_FILE_SCHEMA = {
     "name": "edit_file",
     "description": (
@@ -388,6 +505,7 @@ ALL_SCHEMAS = {
     "git_commit":          _GIT_COMMIT_SCHEMA,
     "git_status":          _GIT_STATUS_SCHEMA,
     "git_log":             _GIT_LOG_SCHEMA,
+    "git_diff":            _GIT_DIFF_SCHEMA,
     "write_memory":        _WRITE_MEMORY_SCHEMA,
     "read_memory":         _READ_MEMORY_SCHEMA,
     "list_memories":       _LIST_MEMORIES_SCHEMA,
@@ -400,6 +518,10 @@ ALL_SCHEMAS = {
     "find_files":          _FIND_FILES_SCHEMA,
     "check_budget":        _CHECK_BUDGET_SCHEMA,
     "edit_file":           _EDIT_FILE_SCHEMA,
+    "ask_human":              _ASK_HUMAN_SCHEMA,
+    "git_push":               _GIT_PUSH_SCHEMA,
+    "git_checkout_branch":    _GIT_CHECKOUT_BRANCH_SCHEMA,
+    "git_merge":              _GIT_MERGE_SCHEMA,
 }
 
 
@@ -470,6 +592,16 @@ async def execute_tool(
             return await _exec_check_budget(inputs)
         elif name == "edit_file":
             return _exec_edit_file(inputs)
+        elif name == "ask_human":
+            return await _exec_ask_human(inputs, agent_role=agent_role)
+        elif name == "git_diff":
+            return _exec_git_diff(inputs)
+        elif name == "git_push":
+            return _exec_git_push(inputs)
+        elif name == "git_checkout_branch":
+            return _exec_git_checkout_branch(inputs)
+        elif name == "git_merge":
+            return _exec_git_merge(inputs)
         else:
             return {"error": f"Unknown tool: {name}"}
     except Exception as exc:
@@ -839,4 +971,212 @@ def _exec_edit_file(inputs: dict) -> dict:
         "status": "edited",
         "path": str(path.relative_to(WORKSPACE_ROOT)),
         "line_delta": delta,
+    }
+
+
+async def _exec_ask_human(inputs: dict, *, agent_role: str = "") -> dict:
+    import httpx
+    url = _orchestrator_url()
+    try:
+        async with httpx.AsyncClient(timeout=5) as client:
+            resp = await client.post(
+                f"{url}/threads/{inputs['thread_id']}/ask-human",
+                json={
+                    "question":  inputs["question"],
+                    "context":   inputs.get("context", ""),
+                    "from_role": agent_role,
+                },
+            )
+            resp.raise_for_status()
+            data = resp.json()
+        return {
+            "status": "question_submitted",
+            "question_id": data["question_id"],
+            "message": (
+                "Your question has been sent to the human. "
+                "Send a status_update to your manager summarizing current progress, "
+                "then stop — you will receive a new message when the human replies."
+            ),
+        }
+    except Exception as exc:
+        return {"error": f"ask_human failed: {exc}"}
+
+
+def _exec_git_diff(inputs: dict) -> dict:
+    import subprocess
+    cmd = ["git", "-C", str(WORKSPACE_ROOT), "diff"]
+    if inputs.get("staged"):
+        cmd.append("--cached")
+    base = inputs.get("base", "")
+    if base:
+        cmd.append(base)
+        target = inputs.get("target", "")
+        if target:
+            cmd.append(target)
+    cmd.append("--")
+    path = inputs.get("path", "")
+    if path:
+        cmd.append(path)
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
+        diff = result.stdout
+        if not diff.strip():
+            return {"diff": "(no changes)", "lines_changed": 0}
+        lines = diff.splitlines()
+        if len(lines) > 500:
+            diff = "\n".join(lines[:500]) + f"\n... [{len(lines)-500} more lines truncated]"
+        changed = len([l for l in lines if l.startswith(("+", "-")) and not l.startswith(("+++", "---"))])
+        return {"diff": diff, "lines_changed": changed}
+    except subprocess.TimeoutExpired:
+        return {"error": "git diff timed out"}
+    except Exception as exc:
+        return {"error": f"git diff failed: {exc}"}
+
+
+def _exec_git_checkout_branch(inputs: dict) -> dict:
+    import subprocess
+    import re
+    branch = inputs.get("branch_name", "").strip()
+    if not branch:
+        return {"error": "branch_name is required"}
+    # Sanitise: allow slashes (for feature/xxx style), strip unsafe chars
+    branch = re.sub(r"[^a-zA-Z0-9._/\-]", "-", branch)
+    result = subprocess.run(
+        ["git", "-C", str(WORKSPACE_ROOT), "checkout", "-B", branch],
+        capture_output=True, text=True, timeout=10,
+    )
+    if result.returncode != 0:
+        return {"error": f"git checkout failed: {result.stderr[:300]}"}
+    return {"status": "switched", "branch": branch}
+
+
+def _exec_git_merge(inputs: dict) -> dict:
+    import subprocess
+    branch = inputs.get("branch_name", "").strip()
+    if not branch:
+        return {"error": "branch_name is required"}
+    strategy = inputs.get("strategy", "").strip()
+    cmd = ["git", "-C", str(WORKSPACE_ROOT), "merge", "--no-edit"]
+    if strategy == "ours":
+        cmd += ["-X", "ours"]
+    elif strategy == "theirs":
+        cmd += ["-X", "theirs"]
+    cmd.append(branch)
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+    if result.returncode != 0:
+        # Check for conflicts
+        status = subprocess.run(
+            ["git", "-C", str(WORKSPACE_ROOT), "status", "--short"],
+            capture_output=True, text=True,
+        )
+        conflicts = [l for l in status.stdout.splitlines() if l.startswith("UU")]
+        return {
+            "error": f"Merge failed: {result.stderr[:400]}",
+            "conflicting_files": conflicts[:10],
+            "tip": "Use strategy='ours' to keep your changes or strategy='theirs' to accept theirs.",
+        }
+    return {
+        "status": "merged",
+        "branch_merged": branch,
+        "output": result.stdout[:300],
+    }
+
+
+def _exec_git_push(inputs: dict) -> dict:
+    import subprocess
+    import urllib.request
+    import urllib.error
+    import json
+    import os
+    import re
+
+    token    = os.environ.get("GITHUB_TOKEN", "").strip()
+    username = os.environ.get("GITHUB_USERNAME", "RajuRoopani").strip()
+
+    if not token:
+        return {"error": "GITHUB_TOKEN is not set. Ask an admin to configure it."}
+
+    repo_name = inputs.get("repo_name", "").strip()
+    if not repo_name:
+        return {"error": "repo_name is required"}
+
+    # Sanitise: lowercase, only hyphens/dots/underscores allowed, max 100 chars
+    repo_name = re.sub(r"[^a-zA-Z0-9._-]", "-", repo_name).lower()
+    repo_name = re.sub(r"-{2,}", "-", repo_name).strip("-.")[:100]
+
+    branch  = inputs.get("branch", "main")
+    private = bool(inputs.get("private", False))
+    ws      = str(WORKSPACE_ROOT)
+
+    # ── 1. Ensure workspace has at least one commit ─────────────────
+    log_check = subprocess.run(
+        ["git", "-C", ws, "log", "--oneline", "-1"],
+        capture_output=True, text=True,
+    )
+    if log_check.returncode != 0 or not log_check.stdout.strip():
+        return {"error": "No commits in /workspace. Run git_commit first before pushing."}
+
+    # ── 2. Create GitHub repo (idempotent — 422 means already exists) ─
+    api_payload = json.dumps({
+        "name": repo_name, "private": private,
+        "auto_init": False,
+        "description": "Built by Team Claw AI agents",
+    }).encode()
+    api_headers = {
+        "Authorization": f"token {token}",
+        "Content-Type":  "application/json",
+        "Accept":        "application/vnd.github.v3+json",
+        "User-Agent":    "TeamClaw/1.0",
+    }
+    repo_url = f"https://github.com/{username}/{repo_name}"
+    created  = False
+    try:
+        req = urllib.request.Request(
+            "https://api.github.com/user/repos",
+            data=api_payload, headers=api_headers, method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            rdata    = json.loads(resp.read())
+            repo_url = rdata.get("html_url", repo_url)
+            created  = True
+    except urllib.error.HTTPError as e:
+        if e.code == 422:   # repo already exists — fine
+            pass
+        elif e.code == 401:
+            return {"error": "GITHUB_TOKEN is invalid or expired."}
+        elif e.code == 403:
+            return {"error": "GITHUB_TOKEN lacks 'repo' scope. Regenerate with full repo permissions."}
+        else:
+            try:
+                body = e.read().decode()[:300]
+            except Exception:
+                body = ""
+            return {"error": f"GitHub API error {e.code}: {body}"}
+    except Exception as exc:
+        return {"error": f"GitHub API call failed: {exc}"}
+
+    # ── 3. Push directly to URL (no persistent remote credential stored) ─
+    remote_url = f"https://{token}@github.com/{username}/{repo_name}.git"
+    env = {**os.environ, "GIT_TERMINAL_PROMPT": "0"}
+
+    push = subprocess.run(
+        ["git", "-C", ws, "push", remote_url, f"HEAD:{branch}", "--force-with-lease"],
+        capture_output=True, text=True, timeout=60, env=env,
+    )
+    if push.returncode != 0:
+        # First push to a brand-new repo has no upstream to lease against — force
+        push = subprocess.run(
+            ["git", "-C", ws, "push", remote_url, f"HEAD:{branch}", "--force"],
+            capture_output=True, text=True, timeout=60, env=env,
+        )
+    if push.returncode != 0:
+        err = push.stderr.replace(token, "***")[:500]   # redact token from logs
+        return {"error": f"git push failed: {err}"}
+
+    return {
+        "status":   "pushed",
+        "repo_url": repo_url,
+        "branch":   branch,
+        "created":  created,
+        "message":  f"{'Created and pushed' if created else 'Pushed'} to {repo_url} (branch: {branch})",
     }

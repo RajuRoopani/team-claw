@@ -3,25 +3,33 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Team Claw — Live Dashboard</title>
+<title>Team Claw — Engineering Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   :root {
     --bg:       #0d1117;
     --surface:  #161b22;
+    --surface2: #21262d;
     --border:   #30363d;
     --text:     #c9d1d9;
     --muted:    #8b949e;
     --accent:   #58a6ff;
+    --green:    #56d364;
+    --amber:    #f59e0b;
+    --red:      #ff7b72;
 
-    --c-orchestrator:      #8b949e;
-    --c-product_owner:     #d2a8ff;
-    --c-engineering_manager: #ffa657;
-    --c-architect:         #79c0ff;
-    --c-senior_dev_1:      #56d364;
-    --c-senior_dev_2:      #3fb950;
-    --c-junior_dev_1:      #ffa198;
-    --c-junior_dev_2:      #ff7b72;
-    --c-system:            #484f58;
+    --c-orchestrator:         #8b949e;
+    --c-product_owner:        #d2a8ff;
+    --c-engineering_manager:  #ffa657;
+    --c-architect:            #79c0ff;
+    --c-senior_dev_1:         #56d364;
+    --c-senior_dev_2:         #3fb950;
+    --c-junior_dev_1:         #ffa198;
+    --c-junior_dev_2:         #ff7b72;
+    --c-human:                #58a6ff;
+    --c-system:               #484f58;
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -29,19 +37,21 @@
   body {
     background: var(--bg);
     color: var(--text);
-    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
     font-size: 13px;
     height: 100vh;
     display: grid;
-    grid-template-rows: 48px 1fr;
-    grid-template-columns: 220px 1fr 230px;
+    grid-template-rows: 52px 1fr;
+    grid-template-columns: 210px 1fr 290px;
     grid-template-areas:
       "header header header"
-      "sidebar feed agents";
+      "sidebar feed panel";
     overflow: hidden;
   }
 
-  /* ── Header ── */
+  /* ══════════════════════════════
+     HEADER
+  ══════════════════════════════ */
   header {
     grid-area: header;
     background: var(--surface);
@@ -49,371 +59,1059 @@
     display: flex;
     align-items: center;
     padding: 0 16px;
-    gap: 16px;
+    gap: 14px;
+    z-index: 10;
   }
-  header .logo { font-size: 16px; font-weight: 700; color: var(--accent); letter-spacing: 1px; }
-  header .status { font-size: 11px; color: var(--muted); }
-  header .status.live::before { content: "⬤ "; color: #56d364; }
-  header .stats { margin-left: auto; font-size: 11px; color: var(--muted); display: flex; gap: 16px; }
-  header .stats span { color: var(--text); font-weight: 600; }
 
-  /* ── Sidebar (threads) ── */
+  .logo { font-size: 15px; font-weight: 700; color: var(--accent); letter-spacing: 1px; white-space: nowrap; }
+
+  .conn-pill {
+    display: flex; align-items: center; gap: 5px;
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: 10px; padding: 2px 8px; font-size: 10px; color: var(--muted);
+  }
+  .conn-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--border); }
+  .conn-dot.live { background: var(--green); box-shadow: 0 0 4px var(--green); }
+
+  /* Task progress */
+  .hdr-progress { display: flex; align-items: center; gap: 8px; flex: 1; max-width: 220px; }
+  .hdr-progress-track { flex: 1; height: 5px; background: var(--border); border-radius: 3px; overflow: hidden; }
+  .hdr-progress-fill  { height: 100%; background: var(--green); transition: width 0.6s ease; border-radius: 3px; width: 0%; }
+  .hdr-progress-label { font-size: 11px; color: var(--muted); white-space: nowrap; }
+
+  .hdr-divider { width: 1px; height: 20px; background: var(--border); flex-shrink: 0; }
+
+  /* Stats row */
+  .hdr-stats { display: flex; gap: 14px; font-size: 11px; color: var(--muted); align-items: center; }
+  .hdr-stat { display: flex; align-items: center; gap: 4px; }
+  .hdr-stat .v { color: var(--text); font-weight: 600; }
+  .hdr-stat .ci-ok  { color: var(--green); }
+  .hdr-stat .ci-err { color: var(--red);   }
+
+  /* Action buttons */
+  .hdr-actions { margin-left: auto; display: flex; gap: 6px; align-items: center; }
+  .hdr-btn {
+    background: var(--surface2); border: 1px solid var(--border); color: var(--muted);
+    padding: 4px 10px; border-radius: 6px; cursor: pointer; font-size: 11px; font-family: inherit;
+    white-space: nowrap; transition: all 0.12s;
+  }
+  .hdr-btn:hover { border-color: var(--accent); color: var(--text); }
+  #questions-bell { position: relative; }
+  #questions-badge {
+    display: none; position: absolute; top: -5px; right: -5px;
+    background: var(--amber); color: #0d1117; font-size: 9px; font-weight: 700;
+    border-radius: 8px; padding: 1px 5px; min-width: 14px; text-align: center; line-height: 14px;
+  }
+  #questions-badge.visible { display: block; }
+
+  /* ══════════════════════════════
+     SIDEBAR (threads)
+  ══════════════════════════════ */
   #sidebar {
     grid-area: sidebar;
     background: var(--surface);
     border-right: 1px solid var(--border);
     overflow-y: auto;
-    padding: 8px 0;
+    display: flex;
+    flex-direction: column;
   }
-  #sidebar h3 { padding: 4px 12px 8px; font-size: 11px; text-transform: uppercase; color: var(--muted); letter-spacing: 0.8px; }
+
+  .sidebar-hdr {
+    padding: 10px 12px 6px;
+    font-size: 10px; text-transform: uppercase; color: var(--muted);
+    letter-spacing: 0.8px; font-weight: 600; border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
   .thread-item {
-    padding: 8px 12px;
-    cursor: pointer;
+    padding: 8px 12px; cursor: pointer;
     border-left: 3px solid transparent;
     transition: background 0.1s;
   }
-  .thread-item:hover { background: rgba(88,166,255,0.06); }
-  .thread-item.active { border-left-color: var(--accent); background: rgba(88,166,255,0.1); }
-  .thread-item .t-title { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .thread-item .t-meta { font-size: 10px; color: var(--muted); margin-top: 2px; }
-  .thread-item .t-count { float: right; background: var(--border); color: var(--muted); border-radius: 10px; padding: 1px 6px; font-size: 10px; }
+  .thread-item:hover  { background: rgba(88,166,255,0.05); }
+  .thread-item.active { border-left-color: var(--accent); background: rgba(88,166,255,0.08); }
+  .thread-item.complete { border-left-color: var(--green); }
+  .thread-item.closed   { border-left-color: var(--border); opacity: 0.55; }
+  .thread-item.waiting  { border-left-color: var(--amber); }
 
-  /* ── Feed ── */
+  .t-title {
+    font-size: 11px; color: var(--text);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.4;
+  }
+  .thread-item.complete .t-title::before { content: "✅ "; }
+  .thread-item.closed   .t-title::before { content: "🔒 "; }
+  .thread-item.waiting  .t-title::before { content: "⏸ "; }
+
+  .t-meta {
+    font-size: 10px; color: var(--muted); margin-top: 3px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .t-badge {
+    font-size: 9px; background: var(--border); color: var(--muted);
+    border-radius: 8px; padding: 1px 6px;
+  }
+  .thread-item.waiting .t-meta { color: var(--amber); }
+  .t-github {
+    display: inline-flex; align-items: center; gap: 3px;
+    font-size: 9px; color: var(--accent); text-decoration: none;
+    border: 1px solid var(--accent); border-radius: 6px; padding: 1px 5px;
+    margin-top: 4px; opacity: 0.85;
+  }
+  .t-github:hover { opacity: 1; }
+
+  /* Delete thread button (shown on hover) */
+  .t-delete-btn {
+    display: none; background: none; border: none; cursor: pointer;
+    color: var(--muted); font-size: 12px; padding: 0 2px; line-height: 1;
+    border-radius: 3px; transition: color 0.1s, background 0.1s;
+    flex-shrink: 0;
+  }
+  .thread-item:hover .t-delete-btn { display: inline-block; }
+  .t-delete-btn:hover { color: var(--red); background: rgba(255,123,114,0.12); }
+
+  /* ══════════════════════════════
+     MAIN FEED
+  ══════════════════════════════ */
   #feed {
     grid-area: feed;
-    overflow-y: auto;
-    padding: 12px 16px;
+    overflow: hidden;
     display: flex;
     flex-direction: column;
-    gap: 6px;
   }
-  #feed-header {
-    position: sticky;
-    top: 0;
-    background: var(--bg);
-    padding: 4px 0 8px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    z-index: 10;
-  }
-  #feed-title { font-size: 13px; font-weight: 600; }
-  #filter-bar { margin-left: auto; display: flex; gap: 4px; }
-  .filter-btn {
+
+  #feed-toolbar {
     background: var(--surface);
-    border: 1px solid var(--border);
-    color: var(--muted);
-    padding: 2px 8px;
-    border-radius: 12px;
-    cursor: pointer;
-    font-size: 11px;
-    font-family: inherit;
+    border-bottom: 1px solid var(--border);
+    padding: 8px 14px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+  }
+
+  .toolbar-row1 { display: flex; align-items: center; gap: 8px; }
+  #feed-title   { font-size: 13px; font-weight: 700; color: var(--text); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  #budget-bar-wrap {
+    display: none; align-items: center; gap: 8px; font-size: 10px; color: var(--muted);
+  }
+  #budget-bar-wrap.visible { display: flex; }
+  #budget-track { flex: 1; height: 3px; background: var(--border); border-radius: 2px; overflow: hidden; }
+  #budget-fill  { height: 100%; width: 0%; background: var(--green); transition: width 0.4s; border-radius: 2px; }
+  #budget-label { white-space: nowrap; min-width: 110px; text-align: right; font-size: 10px; }
+
+  /* Agent filter chips */
+  .toolbar-row2 { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; }
+  .chip-label   { font-size: 10px; color: var(--muted); margin-right: 2px; white-space: nowrap; }
+  .agent-chip {
+    background: var(--bg); border: 1px solid var(--border); color: var(--muted);
+    padding: 2px 8px; border-radius: 10px; cursor: pointer; font-size: 10px; font-family: inherit;
+    transition: all 0.1s; white-space: nowrap;
+  }
+  .agent-chip:hover { border-color: var(--accent); color: var(--text); }
+  .agent-chip.active { font-weight: 600; color: var(--bg); border-color: transparent; }
+
+  /* Type filter chips */
+  .toolbar-row3 { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
+  .filter-btn {
+    background: var(--bg); border: 1px solid var(--border); color: var(--muted);
+    padding: 2px 8px; border-radius: 10px; cursor: pointer; font-size: 10px; font-family: inherit;
+    transition: all 0.1s;
   }
   .filter-btn.active { border-color: var(--accent); color: var(--accent); }
-
-  .msg-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 8px 10px;
-    border-left: 3px solid var(--border);
-    animation: slideIn 0.15s ease;
-  }
-  .msg-card.new { animation: highlight 1.2s ease; }
-  @keyframes slideIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
-  @keyframes highlight { 0% { background: rgba(88,166,255,0.12); } 100% { background: var(--surface); } }
-
-  .msg-header { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; flex-wrap: wrap; }
-  .msg-icon { font-size: 13px; }
-  .msg-from { font-weight: 700; font-size: 12px; }
-  .msg-arrow { color: var(--muted); font-size: 11px; }
-  .msg-to { font-size: 12px; }
-  .msg-type { margin-left: auto; font-size: 10px; color: var(--muted); background: var(--bg); padding: 1px 6px; border-radius: 8px; border: 1px solid var(--border); }
-  .msg-time { font-size: 10px; color: var(--muted); }
-  .msg-body { font-size: 12px; line-height: 1.5; color: var(--text); white-space: pre-wrap; word-break: break-word; max-height: 200px; overflow-y: auto; }
-  .msg-body.collapsed { max-height: 60px; cursor: pointer; }
-  .msg-body.collapsed::after { content: " …more"; color: var(--accent); }
-
-  /* Role colors applied to border-left and from name */
-  .role-orchestrator       .msg-from, .role-orchestrator       { border-left-color: var(--c-orchestrator); }
-  .role-product_owner      .msg-from, .role-product_owner      { border-left-color: var(--c-product_owner); }
-  .role-engineering_manager .msg-from, .role-engineering_manager { border-left-color: var(--c-engineering_manager); }
-  .role-architect          .msg-from, .role-architect          { border-left-color: var(--c-architect); }
-  .role-senior_dev_1       .msg-from, .role-senior_dev_1       { border-left-color: var(--c-senior_dev_1); }
-  .role-senior_dev_2       .msg-from, .role-senior_dev_2       { border-left-color: var(--c-senior_dev_2); }
-  .role-junior_dev_1       .msg-from, .role-junior_dev_1       { border-left-color: var(--c-junior_dev_1); }
-  .role-junior_dev_2       .msg-from, .role-junior_dev_2       { border-left-color: var(--c-junior_dev_2); }
-  .role-system             .msg-from, .role-system             { border-left-color: var(--c-system); }
-
-  .role-orchestrator       .msg-from { color: var(--c-orchestrator); }
-  .role-product_owner      .msg-from { color: var(--c-product_owner); }
-  .role-engineering_manager .msg-from { color: var(--c-engineering_manager); }
-  .role-architect          .msg-from { color: var(--c-architect); }
-  .role-senior_dev_1       .msg-from { color: var(--c-senior_dev_1); }
-  .role-senior_dev_2       .msg-from { color: var(--c-senior_dev_2); }
-  .role-junior_dev_1       .msg-from { color: var(--c-junior_dev_1); }
-  .role-junior_dev_2       .msg-from { color: var(--c-junior_dev_2); }
-  .role-system             .msg-from { color: var(--c-system); }
-
-  /* ── Agents panel ── */
-  #agents-panel {
-    grid-area: agents;
-    background: var(--surface);
-    border-left: 1px solid var(--border);
-    padding: 8px;
-    overflow-y: auto;
-  }
-  #agents-panel h3 { font-size: 11px; text-transform: uppercase; color: var(--muted); letter-spacing: 0.8px; padding: 4px 4px 8px; }
-  .agent-row { display: flex; align-items: center; gap: 6px; padding: 5px 4px; border-radius: 4px; }
-  .agent-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--border); flex-shrink: 0; }
-  .agent-dot.online { background: #56d364; }
-  .agent-dot.active { background: #ffa657; animation: pulse 0.8s infinite alternate; }
-  @keyframes pulse { from { opacity: 1; } to { opacity: 0.4; } }
-  .agent-name { font-size: 11px; color: var(--muted); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .agent-count { font-size: 10px; color: var(--muted); }
-
-  /* ── Agent dot states ── */
-  .agent-dot.stale  { background: #ffa657; }
-  .agent-dot.online { background: #56d364; }
-
-  /* ── Cost panel ── */
-  .panel-divider { border: none; border-top: 1px solid var(--border); margin: 8px 4px; }
-  .cost-row { display: flex; align-items: center; gap: 4px; padding: 4px 4px; font-size: 10px; }
-  .cost-role { color: var(--muted); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 10px; }
-  .cost-tokens { color: var(--text); font-size: 10px; }
-  .cost-usd { color: #56d364; font-size: 10px; min-width: 44px; text-align: right; }
-  .cost-total { display: flex; justify-content: space-between; padding: 4px 4px; font-size: 11px; font-weight: 600; color: var(--text); }
-
-  /* ── CI panel ── */
-  .ci-row { display: flex; align-items: center; gap: 4px; padding: 4px 4px; font-size: 10px; border-bottom: 1px solid var(--border); }
-  .ci-badge { font-size: 12px; flex-shrink: 0; }
-  .ci-counts { color: var(--text); flex: 1; }
-  .ci-time { color: var(--muted); font-size: 9px; }
-
-  /* ── Kanban tasks panel ── */
-  .task-row { padding: 5px 4px; border-bottom: 1px solid var(--border); }
-  .task-title { font-size: 10px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .task-meta { display: flex; gap: 4px; margin-top: 2px; align-items: center; }
-  .task-assignee { font-size: 9px; color: var(--muted); flex: 1; }
-  .task-status {
-    font-size: 9px; padding: 1px 5px; border-radius: 8px; border: 1px solid var(--border);
-    color: var(--muted);
-  }
-  .task-status.pending     { border-color: var(--border); }
-  .task-status.in_progress { border-color: #ffa657; color: #ffa657; }
-  .task-status.review      { border-color: #79c0ff; color: #79c0ff; }
-  .task-status.done        { border-color: #56d364; color: #56d364; }
-
-  /* ── Tool activity panel ── */
-  .tool-row { display: flex; align-items: center; gap: 4px; padding: 4px 4px; font-size: 10px; border-bottom: 1px solid var(--border); }
-  .tool-agent { color: var(--muted); width: 70px; flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .tool-name { color: var(--text); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .tool-duration { color: var(--muted); font-size: 9px; min-width: 32px; text-align: right; }
-  .tool-status-ok  { color: #56d364; font-size: 11px; }
-  .tool-status-err { color: #ff7b72; font-size: 11px; }
-  .tool-stats-row { display: flex; align-items: center; gap: 4px; padding: 3px 4px; font-size: 9px; border-bottom: 1px solid var(--border); }
-  .tool-stats-name { color: var(--accent); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .tool-stats-calls { color: var(--text); min-width: 26px; text-align: right; }
-  .tool-stats-sr { min-width: 34px; text-align: right; }
-  .tool-stats-avg { color: var(--muted); min-width: 36px; text-align: right; }
-
-  /* ── Thread close button ── */
+  .filter-spacer { flex: 1; }
   #close-thread-btn {
-    display: none;
-    background: var(--surface); border: 1px solid #ff7b72; color: #ff7b72;
-    padding: 2px 8px; border-radius: 12px; cursor: pointer; font-size: 11px; font-family: inherit;
+    display: none; background: var(--bg); border: 1px solid var(--red); color: var(--red);
+    padding: 2px 9px; border-radius: 10px; cursor: pointer; font-size: 10px; font-family: inherit;
   }
   #close-thread-btn:hover { background: rgba(255,123,114,0.1); }
 
-  /* ── Wiki panel ── */
-  .wiki-article { padding: 5px 4px; border-bottom: 1px solid var(--border); cursor: pointer; }
-  .wiki-article:hover { background: rgba(88,166,255,0.06); }
-  .wiki-title { font-size: 11px; color: var(--accent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .wiki-author { font-size: 9px; color: var(--muted); }
-  #wiki-modal {
-    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7);
-    z-index: 100; align-items: center; justify-content: center;
+  /* Waiting banner */
+  #waiting-banner {
+    display: none; flex-shrink: 0;
+    background: rgba(245,158,11,0.08); border-bottom: 1px solid rgba(245,158,11,0.25);
+    padding: 12px 14px; gap: 10px; flex-direction: column;
   }
-  #wiki-modal.open { display: flex; }
-  #wiki-modal-inner {
-    background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
-    padding: 20px; max-width: 640px; width: 90%; max-height: 80vh; overflow-y: auto;
+  #waiting-banner.visible { display: flex; }
+  .wb-header { display: flex; align-items: center; gap: 8px; }
+  .wb-icon   { font-size: 16px; }
+  .wb-title  { font-size: 12px; font-weight: 700; color: var(--amber); flex: 1; }
+  .wb-agent  { font-size: 10px; color: var(--muted); }
+  .wb-question { font-size: 12px; color: var(--text); line-height: 1.5; }
+  .wb-context  { font-size: 11px; color: var(--muted); font-style: italic; line-height: 1.4; }
+  .wb-reply-row { display: flex; gap: 8px; align-items: flex-end; }
+  .wb-textarea {
+    flex: 1; background: var(--surface); border: 1px solid var(--amber);
+    border-radius: 6px; color: var(--text); font-family: inherit; font-size: 12px;
+    padding: 7px 10px; resize: none; height: 60px; outline: none;
+    transition: border-color 0.15s;
   }
-  #wiki-modal-title { font-size: 16px; font-weight: 700; margin-bottom: 12px; color: var(--accent); }
-  #wiki-modal-body { font-size: 12px; line-height: 1.6; white-space: pre-wrap; }
-  #wiki-modal-close { float: right; cursor: pointer; color: var(--muted); font-size: 18px; line-height: 1; }
-
-  /* ── Standup modal ── */
-  #standup-modal {
-    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7);
-    z-index: 100; align-items: flex-start; justify-content: center; padding-top: 40px;
+  .wb-textarea:focus { border-color: var(--accent); }
+  .wb-send-btn {
+    background: var(--amber); color: #000; border: none; border-radius: 6px;
+    padding: 8px 14px; font-size: 12px; font-weight: 700; cursor: pointer;
+    font-family: inherit; white-space: nowrap; transition: opacity 0.15s;
   }
-  #standup-modal.open { display: flex; }
-  #standup-modal-inner {
-    background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
-    padding: 20px; max-width: 720px; width: 95%; max-height: 80vh; overflow-y: auto;
+  .wb-send-btn:hover { opacity: 0.85; }
+  .wb-send-btn:disabled { opacity: 0.4; cursor: default; }
+  .wb-status { font-size: 10px; color: var(--muted); margin-top: 2px; }
+
+  /* Feed scroll area */
+  #msg-list {
+    flex: 1; overflow-y: auto; padding: 12px 14px;
+    display: flex; flex-direction: column; gap: 5px;
   }
-  #standup-modal-close { float: right; cursor: pointer; color: var(--muted); font-size: 18px; line-height: 1; }
-  .standup-section { margin-bottom: 16px; }
-  .standup-section h4 { font-size: 12px; font-weight: 700; color: var(--accent); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
-  .standup-row { font-size: 11px; color: var(--text); padding: 3px 0; border-bottom: 1px solid var(--border); display: flex; gap: 8px; }
-  .standup-row:last-child { border-bottom: none; }
-  .standup-label { color: var(--muted); flex: 1; }
-  .standup-value { color: var(--text); font-weight: 600; }
-  .standup-none { font-size: 11px; color: var(--muted); font-style: italic; }
-  .standup-btn {
-    background: var(--surface); border: 1px solid var(--border); color: var(--muted);
-    padding: 3px 10px; border-radius: 4px; cursor: pointer; font-size: 11px; font-family: inherit;
+  .empty { text-align: center; color: var(--muted); padding: 48px 20px; font-size: 12px; line-height: 1.8; }
+
+  /* ══════════════════════════════
+     MESSAGE CARDS
+  ══════════════════════════════ */
+  .msg-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    border-left: 3px solid var(--border);
+    padding: 9px 12px;
+    animation: slideIn 0.15s ease;
+    transition: border-color 0.12s;
   }
-  .standup-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .msg-card:hover { border-top-color: var(--accent); border-right-color: var(--accent); border-bottom-color: var(--accent); }
+  .msg-card.new { animation: highlight 1.5s ease; }
 
-  /* ── Thread budget bar ── */
-  #budget-bar-wrap {
-    display: none; align-items: center; gap: 8px; padding: 4px 0;
-    font-size: 10px; color: var(--muted);
+  @keyframes slideIn  { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:none; } }
+  @keyframes highlight{ 0%{ background:rgba(88,166,255,0.1); } 100%{ background:var(--surface); } }
+
+  /* Type-specific accent colour overrides */
+  .msg-card.type-task_assignment  { border-left-color: var(--c-engineering_manager); }
+  .msg-card.type-review_request   { border-left-color: var(--c-architect); }
+  .msg-card.type-review_feedback  { border-left-color: var(--c-architect); }
+  .msg-card.type-task_complete    { border-left-color: var(--green); }
+  .msg-card.type-blocker          { border-left-color: var(--red); }
+  .msg-card.type-human_question   { border-left-color: var(--amber); }
+  .msg-card.type-human_input      { border-left-color: var(--c-human); }
+  .msg-card.type-ci_result        { border-left-color: var(--green); }
+  .msg-card.type-acceptance_result{ border-left-color: var(--purple, #d2a8ff); }
+
+  /* Role-specific left border colour */
+  .msg-card.role-orchestrator        { border-left-color: var(--c-orchestrator); }
+  .msg-card.role-product_owner       { border-left-color: var(--c-product_owner); }
+  .msg-card.role-engineering_manager { border-left-color: var(--c-engineering_manager); }
+  .msg-card.role-architect           { border-left-color: var(--c-architect); }
+  .msg-card.role-senior_dev_1        { border-left-color: var(--c-senior_dev_1); }
+  .msg-card.role-senior_dev_2        { border-left-color: var(--c-senior_dev_2); }
+  .msg-card.role-junior_dev_1        { border-left-color: var(--c-junior_dev_1); }
+  .msg-card.role-junior_dev_2        { border-left-color: var(--c-junior_dev_2); }
+  .msg-card.role-human               { border-left-color: var(--c-human); }
+
+  .msg-header { display: flex; align-items: center; gap: 6px; margin-bottom: 7px; flex-wrap: wrap; }
+
+  .msg-icon { font-size: 14px; flex-shrink: 0; line-height: 1; }
+
+  .msg-from { font-weight: 700; font-size: 12px; }
+  .role-orchestrator        .msg-from { color: var(--c-orchestrator); }
+  .role-product_owner       .msg-from { color: var(--c-product_owner); }
+  .role-engineering_manager .msg-from { color: var(--c-engineering_manager); }
+  .role-architect           .msg-from { color: var(--c-architect); }
+  .role-senior_dev_1        .msg-from { color: var(--c-senior_dev_1); }
+  .role-senior_dev_2        .msg-from { color: var(--c-senior_dev_2); }
+  .role-junior_dev_1        .msg-from { color: var(--c-junior_dev_1); }
+  .role-junior_dev_2        .msg-from { color: var(--c-junior_dev_2); }
+  .role-human               .msg-from { color: var(--c-human); }
+
+  .msg-arrow { color: var(--muted); font-size: 11px; }
+  .msg-to    { font-size: 11px; color: var(--muted); }
+
+  .msg-type-badge {
+    margin-left: auto; font-size: 9px; color: var(--muted);
+    background: var(--bg); padding: 2px 6px; border-radius: 6px;
+    border: 1px solid var(--border); text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap;
   }
-  #budget-bar-wrap.visible { display: flex; }
-  #budget-track {
-    flex: 1; height: 4px; background: var(--border); border-radius: 2px; overflow: hidden;
+  /* Coloured type badges for key types */
+  .badge-task_assignment  { border-color: var(--c-engineering_manager); color: var(--c-engineering_manager); }
+  .badge-task_complete    { border-color: var(--green); color: var(--green); }
+  .badge-blocker          { border-color: var(--red); color: var(--red); }
+  .badge-review_request   { border-color: var(--accent); color: var(--accent); }
+  .badge-human_question   { border-color: var(--amber); color: var(--amber); }
+  .badge-acceptance_result{ border-color: #d2a8ff; color: #d2a8ff; }
+
+  .msg-time { font-size: 10px; color: var(--muted); white-space: nowrap; }
+
+  /* Message body */
+  .msg-body {
+    font-size: 12px; line-height: 1.65; color: var(--text);
+    word-break: break-word; overflow-y: auto; max-height: 320px;
   }
-  #budget-fill { height: 100%; width: 0%; background: #56d364; transition: width 0.4s, background 0.4s; border-radius: 2px; }
-  #budget-label { white-space: nowrap; min-width: 100px; text-align: right; }
+  .msg-body.collapsed { max-height: 68px; overflow: hidden; cursor: pointer; position: relative; }
+  .msg-body.collapsed::after {
+    content: "▼ show more"; display: block; color: var(--accent); font-size: 10px; margin-top: 4px;
+  }
 
-  /* ── Empty state ── */
-  .empty { text-align: center; color: var(--muted); padding: 40px 20px; font-size: 12px; }
+  /* Inline markdown styles */
+  .msg-body h1,.msg-body h2,.msg-body h3 { color: var(--accent); font-weight: 700; margin: 8px 0 4px; line-height: 1.3; }
+  .msg-body h1 { font-size: 14px; }
+  .msg-body h2 { font-size: 13px; }
+  .msg-body h3 { font-size: 12px; }
+  .msg-body strong { color: var(--text); font-weight: 700; }
+  .msg-body em { font-style: italic; color: var(--muted); }
+  .msg-body code {
+    background: var(--bg); border: 1px solid var(--border); border-radius: 3px;
+    padding: 0 4px; font-size: 11px; color: #f78166; font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  }
+  .msg-body pre {
+    background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+    padding: 10px 12px; margin: 6px 0; overflow-x: auto; font-size: 11px; line-height: 1.5;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  }
+  .msg-body pre code { background: none; border: none; padding: 0; color: var(--text); }
+  .msg-body ul,.msg-body ol { padding-left: 20px; margin: 4px 0; }
+  .msg-body li { margin: 2px 0; line-height: 1.5; }
+  .msg-body blockquote {
+    border-left: 3px solid var(--border); padding-left: 10px; color: var(--muted); margin: 6px 0;
+  }
+  .msg-body p { margin: 4px 0; }
+  .msg-body hr { border: none; border-top: 1px solid var(--border); margin: 8px 0; }
+  .msg-body a { color: var(--accent); text-decoration: none; }
+  .msg-body a:hover { text-decoration: underline; }
+  .msg-body table { border-collapse: collapse; width: 100%; font-size: 11px; margin: 6px 0; }
+  .msg-body th,.msg-body td { border: 1px solid var(--border); padding: 4px 8px; text-align: left; }
+  .msg-body th { background: var(--surface2); font-weight: 600; color: var(--accent); }
 
-  /* ── Completed thread ── */
-  .thread-item.complete .t-title::before { content: "✅ "; }
-  .thread-item.complete .t-meta { color: #56d364; }
+  /* ══════════════════════════════
+     RIGHT PANEL
+  ══════════════════════════════ */
+  #panel {
+    grid-area: panel;
+    background: var(--surface);
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
 
-  /* ── Closed thread ── */
-  .thread-item.closed .t-title::before { content: "🔒 "; }
-  .thread-item.closed .t-meta { color: var(--muted); }
-  .thread-item.closed .t-title { opacity: 0.6; }
+  .panel-tabs {
+    display: flex; flex-shrink: 0;
+    background: var(--bg); border-bottom: 1px solid var(--border);
+  }
+  .panel-tab {
+    flex: 1; padding: 10px 4px; text-align: center; font-size: 11px; color: var(--muted);
+    cursor: pointer; border-bottom: 2px solid transparent;
+    font-family: inherit; background: none; border-left: none; border-right: none; border-top: none;
+    transition: all 0.1s; white-space: nowrap;
+  }
+  .panel-tab:hover { color: var(--text); }
+  .panel-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
 
-  /* ── CI sparkline ── */
-  .ci-sparkline { display: flex; gap: 3px; align-items: center; padding: 4px 4px 6px; flex-wrap: wrap; }
-  .ci-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; cursor: default; }
-  .ci-dot.pass { background: #56d364; }
-  .ci-dot.fail { background: #ff7b72; }
-  .ci-dot.unknown { background: var(--border); }
+  .panel-body { flex: 1; overflow-y: auto; padding: 10px 10px; display: none; }
+  .panel-body.active { display: block; }
 
-  /* ── Toast notifications ── */
+  .panel-section { margin-bottom: 14px; }
+  .panel-section-title {
+    font-size: 10px; text-transform: uppercase; color: var(--muted);
+    letter-spacing: 0.8px; padding-bottom: 7px; font-weight: 600;
+    border-bottom: 1px solid var(--border); margin-bottom: 8px;
+  }
+
+  /* ── Kanban ── */
+  .kanban-summary { display: flex; gap: 6px; margin-bottom: 10px; }
+  .kanban-summary-col {
+    flex: 1; text-align: center; background: var(--bg);
+    border: 1px solid var(--border); border-radius: 6px; padding: 6px 4px;
+  }
+  .kanban-summary-num  { font-size: 18px; font-weight: 700; line-height: 1.2; }
+  .kanban-summary-lbl  { font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; }
+  .ksn-pending { color: var(--muted); }
+  .ksn-wip     { color: var(--amber); }
+  .ksn-review  { color: var(--accent); }
+  .ksn-done    { color: var(--green); }
+
+  .kanban-col { margin-bottom: 10px; }
+  .kanban-col-header {
+    font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;
+    padding: 0 2px 6px; display: flex; align-items: center; gap: 5px;
+  }
+  .kcol-pending .kanban-col-header { color: var(--muted); }
+  .kcol-wip     .kanban-col-header { color: var(--amber); }
+  .kcol-review  .kanban-col-header { color: var(--accent); }
+  .kcol-done    .kanban-col-header { color: var(--green); }
+  .kcol-count {
+    background: var(--border); border-radius: 8px; padding: 0 5px;
+    font-size: 9px; color: var(--muted);
+  }
+
+  .task-card {
+    background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+    padding: 8px 10px; margin-bottom: 5px; transition: border-color 0.1s;
+  }
+  .task-card:hover { border-color: var(--accent); }
+  .task-card-title { font-size: 11px; color: var(--text); line-height: 1.4; margin-bottom: 6px; }
+  .task-card-footer { display: flex; align-items: center; gap: 4px; }
+  .task-assignee-chip {
+    font-size: 9px; padding: 1px 6px; border-radius: 8px;
+    border: 1px solid var(--border); color: var(--muted); white-space: nowrap;
+  }
+
+  /* ── Agent cards (Team tab) ── */
+  .agent-card {
+    background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+    padding: 10px 11px; margin-bottom: 7px;
+  }
+  .agent-card-hdr { display: flex; align-items: center; gap: 7px; margin-bottom: 5px; }
+  .a-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--border); flex-shrink: 0; }
+  .a-dot.online { background: var(--green); }
+  .a-dot.stale  { background: var(--amber); animation: pulse 1s infinite alternate; }
+  @keyframes pulse { from{opacity:1} to{opacity:0.3} }
+  .a-name  { font-size: 12px; font-weight: 700; flex: 1; }
+  .a-count { font-size: 10px; color: var(--muted); }
+  .a-model { font-size: 9px; color: var(--muted); background: var(--border); border-radius: 4px; padding: 1px 5px; }
+  .a-activity {
+    font-size: 11px; color: var(--muted); line-height: 1.45;
+    overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  }
+  .a-last { font-size: 10px; color: var(--border); margin-top: 3px; }
+
+  /* Delegation list */
+  .delegation-item {
+    display: flex; align-items: flex-start; gap: 6px; padding: 7px 0;
+    border-bottom: 1px solid var(--border); font-size: 11px;
+  }
+  .delegation-item:last-child { border-bottom: none; }
+  .d-from { font-weight: 700; white-space: nowrap; min-width: 78px; }
+  .d-arrow { color: var(--muted); flex-shrink: 0; padding-top: 1px; }
+  .d-to   { color: var(--muted); white-space: nowrap; }
+  .d-task { color: var(--text); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-left: 4px; }
+
+  /* ── Stats tab ── */
+  .stat-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 5px 2px; border-bottom: 1px solid var(--border); font-size: 11px;
+  }
+  .stat-row:last-child { border-bottom: none; }
+  .stat-label { color: var(--muted); }
+  .stat-val   { color: var(--text); font-weight: 600; }
+  .stat-val.g { color: var(--green); }
+  .stat-val.r { color: var(--red); }
+  .stat-val.a { color: var(--amber); }
+
+  .cost-row  { display:flex; align-items:center; gap:4px; padding:4px 2px; font-size:10px; border-bottom:1px solid var(--border); }
+  .cost-row:last-child { border-bottom:none; }
+  .cost-role { color:var(--muted); flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .cost-toks { color:var(--text); min-width:38px; text-align:right; }
+  .cost-usd  { color:var(--green); min-width:48px; text-align:right; font-weight:600; }
+  .cost-total{ display:flex; justify-content:space-between; padding:5px 2px; font-size:11px; font-weight:700; color:var(--text); }
+
+  .ci-sparkline { display:flex; gap:3px; align-items:center; padding:6px 2px 8px; flex-wrap:wrap; }
+  .ci-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; cursor:default; }
+  .ci-dot.pass { background:var(--green); }
+  .ci-dot.fail { background:var(--red); }
+
+  .tool-row  { display:flex; align-items:center; gap:4px; padding:4px 2px; border-bottom:1px solid var(--border); font-size:10px; }
+  .tool-row:last-child { border-bottom:none; }
+  .tool-name { color:var(--accent); flex:1; overflow:hidden; text-overflow:ellipsis; }
+  .tool-calls{ color:var(--text); min-width:26px; text-align:right; }
+  .tool-sr   { min-width:34px; text-align:right; }
+  .tool-avg  { color:var(--muted); min-width:38px; text-align:right; }
+
+  /* Wiki */
+  .wiki-item { padding:6px 2px; border-bottom:1px solid var(--border); cursor:pointer; }
+  .wiki-item:last-child { border-bottom:none; }
+  .wiki-item:hover { background:rgba(88,166,255,0.05); }
+  .wiki-item-title { font-size:11px; color:var(--accent); }
+  .wiki-item-meta  { font-size:9px; color:var(--muted); }
+
+  /* ══════════════════════════════
+     MODALS
+  ══════════════════════════════ */
+  .modal-overlay {
+    display:none; position:fixed; inset:0; background:rgba(0,0,0,0.75);
+    z-index:200; align-items:flex-start; justify-content:center; padding-top:40px;
+  }
+  .modal-overlay.open { display:flex; }
+  .modal-box {
+    background:var(--surface); border:1px solid var(--border); border-radius:10px;
+    padding:22px; width:90%; max-height:82vh; overflow-y:auto; box-shadow:0 8px 32px rgba(0,0,0,0.5);
+  }
+  .modal-box.wide { max-width:700px; }
+  .modal-box.narrow { max-width:520px; }
+  .modal-hdr {
+    display:flex; align-items:center; justify-content:space-between; margin-bottom:18px;
+  }
+  .modal-title { font-size:16px; font-weight:700; }
+  .modal-close { cursor:pointer; color:var(--muted); font-size:20px; line-height:1; padding:2px; }
+  .modal-close:hover { color:var(--text); }
+
+  /* Questions modal */
+  .question-card {
+    border:1px solid var(--border); border-left:3px solid var(--amber);
+    border-radius:8px; padding:14px; margin-bottom:14px;
+  }
+  .q-meta  { font-size:10px; color:var(--muted); margin-bottom:7px; }
+  .q-text  { font-size:13px; font-weight:600; color:var(--text); margin-bottom:6px; line-height:1.4; }
+  .q-ctx   { font-size:11px; color:var(--muted); border-left:2px solid var(--border); padding-left:9px; margin-bottom:12px; white-space:pre-wrap; }
+  .q-form  { display:flex; flex-direction:column; gap:8px; }
+  .q-form textarea {
+    background:var(--bg); border:1px solid var(--border); color:var(--text);
+    padding:9px 11px; border-radius:6px; font-family:inherit; font-size:12px;
+    resize:vertical; min-height:72px; line-height:1.5;
+  }
+  .q-form textarea:focus { outline:none; border-color:var(--accent); }
+  .q-actions { display:flex; gap:8px; align-items:center; }
+  .q-reply-btn {
+    background:var(--amber); color:#0d1117; border:none; padding:6px 16px;
+    border-radius:6px; cursor:pointer; font-size:12px; font-weight:700; font-family:inherit;
+  }
+  .q-reply-btn:hover { background:#fbbf24; }
+  .q-select {
+    background:var(--bg); border:1px solid var(--border); color:var(--text);
+    padding:5px 8px; border-radius:6px; font-size:11px; font-family:inherit;
+  }
+  .q-status { font-size:10px; color:var(--muted); }
+
+  /* Standup modal */
+  .standup-section { margin-bottom:16px; }
+  .standup-section h4 { font-size:12px; font-weight:700; color:var(--accent); margin-bottom:8px; text-transform:uppercase; letter-spacing:0.5px; }
+  .standup-row { font-size:11px; padding:4px 0; border-bottom:1px solid var(--border); display:flex; gap:8px; }
+  .standup-row:last-child { border-bottom:none; }
+  .standup-label { color:var(--muted); flex:1; }
+  .standup-value { color:var(--text); font-weight:600; }
+  .standup-none  { font-size:11px; color:var(--muted); font-style:italic; padding:4px 0; }
+  .standup-pub-btn {
+    background:var(--surface2); border:1px solid var(--border); color:var(--muted);
+    padding:5px 14px; border-radius:6px; cursor:pointer; font-size:11px; font-family:inherit;
+  }
+  .standup-pub-btn:hover { border-color:var(--accent); color:var(--accent); }
+
+  /* Wiki modal */
+  .wiki-modal-title { font-size:16px; font-weight:700; color:var(--accent); margin-bottom:12px; }
+  .wiki-modal-body  { font-size:12px; line-height:1.6; white-space:pre-wrap; }
+
+  /* ══════════════════════════════
+     TOASTS
+  ══════════════════════════════ */
   #toast-container {
-    position: fixed; bottom: 16px; right: 16px;
-    display: flex; flex-direction: column; gap: 6px; z-index: 300;
+    position:fixed; bottom:16px; right:16px;
+    display:flex; flex-direction:column; gap:6px; z-index:400; pointer-events:none;
   }
   .toast {
-    background: var(--surface); border: 1px solid var(--border);
-    border-left: 3px solid var(--accent);
-    border-radius: 6px; padding: 10px 14px;
-    font-size: 12px; max-width: 320px; line-height: 1.4;
-    animation: toastIn 0.2s ease; opacity: 1; transition: opacity 0.4s ease;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    background:var(--surface); border:1px solid var(--border); border-left:3px solid var(--accent);
+    border-radius:8px; padding:11px 15px; font-size:12px; max-width:340px; line-height:1.4;
+    animation:toastIn 0.2s ease; box-shadow:0 4px 20px rgba(0,0,0,0.45);
+    pointer-events:auto;
   }
-  @keyframes toastIn { from { transform: translateX(20px); opacity: 0; } to { transform: none; opacity: 1; } }
-  .toast.success { border-left-color: #56d364; }
-  .toast.error   { border-left-color: #ff7b72; }
-  .toast.info    { border-left-color: #79c0ff; }
-  .toast.warning { border-left-color: #ffa657; }
+  @keyframes toastIn { from{transform:translateX(20px);opacity:0} to{transform:none;opacity:1} }
+  .toast.success { border-left-color:var(--green); }
+  .toast.error   { border-left-color:var(--red);   }
+  .toast.info    { border-left-color:var(--accent); }
+  .toast.warning { border-left-color:var(--amber);  }
 
-  ::-webkit-scrollbar { width: 4px; }
-  ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  /* Scrollbar */
+  ::-webkit-scrollbar { width:4px; height:4px; }
+  ::-webkit-scrollbar-track { background:transparent; }
+  ::-webkit-scrollbar-thumb { background:var(--border); border-radius:2px; }
+
+  /* ══════════════════════════════
+     CHAT INPUT BAR
+  ══════════════════════════════ */
+  #chat-bar {
+    flex-shrink: 0;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    padding: 10px 14px;
+  }
+
+  .chat-collapsed {
+    display: flex; align-items: center; gap: 8px; cursor: text;
+  }
+  .chat-avatar {
+    width: 24px; height: 24px; border-radius: 50%;
+    background: rgba(88,166,255,0.12); border: 1.5px solid var(--c-human);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; flex-shrink: 0;
+  }
+  .chat-placeholder {
+    flex: 1; background: var(--bg); border: 1px solid var(--border);
+    border-radius: 20px; padding: 7px 15px;
+    font-size: 12px; color: var(--muted); cursor: text;
+    font-family: inherit; transition: border-color 0.12s;
+  }
+  .chat-placeholder:hover { border-color: var(--accent); color: var(--text); }
+
+  #chat-expanded { display: none; }
+  #chat-expanded.open { display: flex; flex-direction: column; gap: 8px; }
+
+  .chat-input-row { display: flex; gap: 8px; align-items: center; }
+  .chat-input-label {
+    font-size: 10px; color: var(--muted); white-space: nowrap;
+    min-width: 34px; text-align: right;
+  }
+
+  .chat-title-input {
+    flex: 1; background: var(--bg); border: 1px solid var(--border);
+    color: var(--text); padding: 7px 10px; border-radius: 6px;
+    font-size: 12px; font-family: inherit; transition: border-color 0.12s;
+  }
+  .chat-title-input:focus { outline: none; border-color: var(--c-human); }
+
+  .chat-desc-input {
+    flex: 1; background: var(--bg); border: 1px solid var(--border);
+    color: var(--text); padding: 7px 10px; border-radius: 6px;
+    font-size: 12px; font-family: inherit; resize: vertical;
+    min-height: 58px; line-height: 1.5; transition: border-color 0.12s;
+  }
+  .chat-desc-input:focus { outline: none; border-color: var(--c-human); }
+
+  .chat-footer-row { display: flex; align-items: center; gap: 8px; }
+
+  .chat-priority-select {
+    background: var(--bg); border: 1px solid var(--border); color: var(--muted);
+    padding: 5px 8px; border-radius: 6px; font-size: 11px; font-family: inherit;
+  }
+  .chat-hint { font-size: 10px; color: var(--border); flex: 1; }
+
+  .chat-cancel-btn {
+    background: transparent; border: 1px solid var(--border); color: var(--muted);
+    padding: 5px 12px; border-radius: 6px; cursor: pointer;
+    font-size: 11px; font-family: inherit;
+  }
+  .chat-cancel-btn:hover { border-color: var(--text); color: var(--text); }
+
+  .chat-send-btn {
+    background: var(--c-human); border: none; color: #0d1117;
+    padding: 6px 16px; border-radius: 6px; cursor: pointer;
+    font-size: 12px; font-weight: 700; font-family: inherit;
+    transition: background 0.12s; white-space: nowrap;
+  }
+  .chat-send-btn:hover { background: #79baff; }
+  .chat-send-btn:disabled { opacity: 0.5; cursor: default; }
+
+  /* ══════════════════════════════
+     HOME / LANDING VIEW
+  ══════════════════════════════ */
+  #home-view {
+    position: fixed; inset: 0; z-index: 100;
+    background: var(--bg);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    padding: 24px;
+    transition: opacity 0.3s ease, transform 0.3s ease;
+  }
+  #home-view.hiding {
+    opacity: 0; transform: translateY(-12px); pointer-events: none;
+  }
+  #home-view.hidden { display: none; }
+
+  .home-logo {
+    font-family: 'Inter', sans-serif;
+    font-size: 13px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase;
+    color: var(--accent); margin-bottom: 40px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .home-logo-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--green); box-shadow: 0 0 8px var(--green);
+    animation: pulse 2s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  .home-card {
+    width: 100%; max-width: 680px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 40px 44px;
+    box-shadow: 0 24px 80px rgba(0,0,0,0.5);
+  }
+
+  .home-heading {
+    font-family: 'Inter', sans-serif;
+    font-size: 26px; font-weight: 700;
+    color: var(--text); margin-bottom: 6px; line-height: 1.2;
+  }
+  .home-sub {
+    font-size: 13px; color: var(--muted); margin-bottom: 32px; font-weight: 400;
+  }
+
+  .home-field { margin-bottom: 16px; }
+  .home-label {
+    display: block; font-size: 11px; font-weight: 600; letter-spacing: 0.5px;
+    text-transform: uppercase; color: var(--muted); margin-bottom: 6px;
+  }
+  .home-title-input {
+    width: 100%; background: var(--bg); border: 1.5px solid var(--border);
+    color: var(--text); padding: 11px 14px; border-radius: 8px;
+    font-size: 14px; font-family: 'Inter', sans-serif; font-weight: 500;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .home-title-input:focus {
+    outline: none; border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(88,166,255,0.12);
+  }
+  .home-desc-input {
+    width: 100%; background: var(--bg); border: 1.5px solid var(--border);
+    color: var(--text); padding: 11px 14px; border-radius: 8px;
+    font-size: 13px; font-family: 'Inter', sans-serif;
+    resize: vertical; min-height: 110px; line-height: 1.6;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .home-desc-input:focus {
+    outline: none; border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(88,166,255,0.12);
+  }
+
+  .home-footer { display: flex; align-items: center; gap: 12px; margin-top: 24px; }
+
+  .home-priority {
+    background: var(--bg); border: 1.5px solid var(--border); color: var(--muted);
+    padding: 9px 12px; border-radius: 8px; font-size: 12px;
+    font-family: 'Inter', sans-serif; cursor: pointer;
+  }
+
+  .home-submit-btn {
+    flex: 1; background: var(--accent); border: none; color: #0d1117;
+    padding: 11px 28px; border-radius: 8px; cursor: pointer;
+    font-size: 14px; font-weight: 700; font-family: 'Inter', sans-serif;
+    transition: background 0.15s, transform 0.1s, box-shadow 0.15s;
+    letter-spacing: 0.2px;
+  }
+  .home-submit-btn:hover {
+    background: #79baff;
+    box-shadow: 0 4px 20px rgba(88,166,255,0.35);
+    transform: translateY(-1px);
+  }
+  .home-submit-btn:active { transform: translateY(0); }
+  .home-submit-btn:disabled { opacity: 0.5; cursor: default; transform: none; box-shadow: none; }
+
+  .home-hint {
+    font-size: 11px; color: var(--border); margin-top: 10px; text-align: center;
+  }
+
+  .home-examples {
+    margin-top: 28px; display: flex; flex-wrap: wrap; gap: 8px;
+  }
+  .home-example-label {
+    width: 100%; font-size: 10px; font-weight: 600; letter-spacing: 0.5px;
+    text-transform: uppercase; color: var(--border); margin-bottom: 2px;
+  }
+  .home-chip {
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--muted); padding: 5px 12px; border-radius: 20px;
+    font-size: 11px; font-family: 'Inter', sans-serif; cursor: pointer;
+    transition: border-color 0.12s, color 0.12s;
+    white-space: nowrap;
+  }
+  .home-chip:hover { border-color: var(--accent); color: var(--text); }
+
+  /* dashboard link in top-right of home */
+  .home-dash-link {
+    position: fixed; top: 18px; right: 22px;
+    background: var(--surface); border: 1px solid var(--border);
+    color: var(--muted); padding: 6px 14px; border-radius: 8px;
+    font-size: 11px; font-family: 'Inter', sans-serif; font-weight: 500;
+    cursor: pointer; transition: border-color 0.12s, color 0.12s;
+    text-decoration: none;
+  }
+  .home-dash-link:hover { border-color: var(--accent); color: var(--text); }
 </style>
 </head>
 <body>
 
-<header>
-  <div class="logo">⚙ TEAM CLAW</div>
-  <div class="status" id="conn-status">connecting…</div>
-  <div class="stats">
-    <span id="stat-msgs">0</span> messages &nbsp;
-    <span id="stat-threads">0</span> threads &nbsp;
-    <span id="stat-agents">0</span> active agents &nbsp;
-    $<span id="stat-cost">0.0000</span> est. cost
+<!-- ══ HOME / LANDING VIEW ═════════════════════════════════════════════ -->
+<div id="home-view">
+  <a class="home-dash-link" onclick="hidHomeView()">Dashboard →</a>
+  <div class="home-logo">
+    <span class="home-logo-dot"></span>
+    Team Claw
   </div>
-  <button class="standup-btn" onclick="openStandupModal()" style="margin-left:8px">📋 Standup</button>
-</header>
+  <div class="home-card">
+    <div class="home-heading" id="home-heading">What do you want to build?</div>
+    <div class="home-sub" id="home-sub">Describe your task and the AI dev team will take it from here.</div>
 
-<nav id="sidebar">
-  <h3>Threads</h3>
-  <div id="thread-list"><div class="empty">No threads yet</div></div>
-</nav>
-
-<main id="feed">
-  <div id="feed-header">
-    <span id="feed-title">All Messages</span>
-    <div id="filter-bar">
-      <button class="filter-btn active" data-filter="all">All</button>
-      <button class="filter-btn" data-filter="task">Tasks</button>
-      <button class="filter-btn" data-filter="code">Code</button>
-      <button class="filter-btn" data-filter="status">Status</button>
-      <button id="close-thread-btn" onclick="closeCurrentThread()">🔒 Close</button>
+    <!-- Steer mode: shows which thread is being steered -->
+    <div id="home-steer-ctx" style="display:none;margin-bottom:20px;">
+      <div id="home-steer-thread" style="padding:9px 13px;background:var(--bg);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:8px;font-size:13px;color:var(--text);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
     </div>
-  </div>
-  <div id="budget-bar-wrap">
-    <div id="budget-track"><div id="budget-fill"></div></div>
-    <span id="budget-label">—</span>
-  </div>
-  <div id="msg-list"><div class="empty">Waiting for messages…</div></div>
-</main>
 
-<aside id="agents-panel">
-  <h3>Agents</h3>
-  <div id="agent-list"></div>
+    <!-- New-task mode only: title field -->
+    <div id="home-title-wrap" class="home-field">
+      <label class="home-label" for="home-title">Task title</label>
+      <input class="home-title-input" id="home-title" type="text"
+        placeholder="e.g. Build a URL shortener API"
+        autocomplete="off" />
+    </div>
 
-  <hr class="panel-divider">
-  <h3 style="padding:4px 4px 6px;font-size:11px;text-transform:uppercase;color:var(--muted);letter-spacing:0.8px;">Token Cost</h3>
-  <div id="cost-list"><div style="font-size:10px;color:var(--muted);padding:4px">Loading…</div></div>
+    <div class="home-field">
+      <label class="home-label" id="home-desc-label" for="home-desc">Description <span style="font-weight:400;text-transform:none;letter-spacing:0">(optional — more detail = better results)</span></label>
+      <textarea class="home-desc-input" id="home-desc"
+        placeholder="Describe the requirements, tech stack preferences, endpoints, tests needed, etc…"></textarea>
+    </div>
+    <div class="home-footer">
+      <select class="home-priority" id="home-priority">
+        <option value="normal">Normal</option>
+        <option value="high">High priority</option>
+        <option value="low">Low priority</option>
+      </select>
+      <button class="home-submit-btn" id="home-submit-btn" onclick="homeSubmitTask()">
+        Launch Task →
+      </button>
+    </div>
+    <div class="home-hint" id="home-hint">⌘ ↵ to submit · or click the button</div>
 
-  <hr class="panel-divider">
-  <h3 style="padding:4px 4px 6px;font-size:11px;text-transform:uppercase;color:var(--muted);letter-spacing:0.8px;">CI Results</h3>
-  <div id="ci-sparkline" class="ci-sparkline"></div>
-  <div id="ci-list"><div style="font-size:10px;color:var(--muted);padding:4px">No runs yet</div></div>
-
-  <hr class="panel-divider">
-  <h3 style="padding:4px 4px 6px;font-size:11px;text-transform:uppercase;color:var(--muted);letter-spacing:0.8px;">Tasks</h3>
-  <div id="task-list"><div style="font-size:10px;color:var(--muted);padding:4px">No tasks yet</div></div>
-
-  <hr class="panel-divider">
-  <h3 style="padding:4px 4px 6px;font-size:11px;text-transform:uppercase;color:var(--muted);letter-spacing:0.8px;">Team Wiki</h3>
-  <div id="wiki-list"><div style="font-size:10px;color:var(--muted);padding:4px">No articles yet</div></div>
-
-  <hr class="panel-divider">
-  <h3 style="padding:4px 4px 6px;font-size:11px;text-transform:uppercase;color:var(--muted);letter-spacing:0.8px;">Tool Activity</h3>
-  <div id="tool-activity-list"><div style="font-size:10px;color:var(--muted);padding:4px">No tool calls yet</div></div>
-  <div id="tool-stats-list" style="margin-top:6px"></div>
-</aside>
-
-<!-- Toast container -->
-<div id="toast-container"></div>
-
-<!-- Wiki article modal -->
-<div id="wiki-modal">
-  <div id="wiki-modal-inner">
-    <span id="wiki-modal-close" onclick="closeWikiModal()">✕</span>
-    <div id="wiki-modal-title"></div>
-    <div id="wiki-modal-body"></div>
+    <div class="home-examples" id="home-examples">
+      <span class="home-example-label">Try an example</span>
+      <span class="home-chip" onclick="fillExample('Build a REST API for a task manager', 'Create a FastAPI app with POST /tasks, GET /tasks, PATCH /tasks/{id}, DELETE /tasks/{id}. In-memory storage, Pydantic models, pytest tests.')">Task Manager API</span>
+      <span class="home-chip" onclick="fillExample('Build a password generator API', 'FastAPI endpoint POST /generate — accepts length (default 16) and include_symbols (default true) query params. Returns {\"password\": string}. Add pytest tests.')">Password Generator</span>
+      <span class="home-chip" onclick="fillExample('Build a currency converter API', 'FastAPI app with GET /convert?from=USD&to=EUR&amount=100. Use hardcoded exchange rates. Full test suite.')">Currency Converter</span>
+      <span class="home-chip" onclick="fillExample('Build a simple blog API', 'REST API for blog posts: CRUD endpoints, author field, tags support, search by title. FastAPI + pytest.')">Blog API</span>
+    </div>
   </div>
 </div>
 
-<!-- Standup modal -->
-<div id="standup-modal">
-  <div id="standup-modal-inner">
-    <span id="standup-modal-close" onclick="closeStandupModal()">✕</span>
-    <div style="font-size:16px;font-weight:700;color:var(--accent);margin-bottom:16px">📋 Daily Standup</div>
-    <div id="standup-content"><div class="empty">Loading…</div></div>
-    <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
-      <button class="standup-btn" onclick="publishStandup()" id="standup-publish-btn">Publish to Wiki</button>
-      <span id="standup-publish-status" style="font-size:10px;color:var(--muted)"></span>
+<!-- ══ HEADER ══════════════════════════════════════════════════════════ -->
+<header>
+  <div class="logo">⚙ TEAM CLAW</div>
+  <div class="conn-pill">
+    <span class="conn-dot" id="conn-dot"></span>
+    <span id="conn-status">connecting…</span>
+  </div>
+
+  <div class="hdr-divider"></div>
+
+  <div class="hdr-progress">
+    <div class="hdr-progress-track"><div class="hdr-progress-fill" id="hdr-progress-fill"></div></div>
+    <span class="hdr-progress-label" id="hdr-progress-label">— tasks</span>
+  </div>
+
+  <div class="hdr-divider"></div>
+
+  <div class="hdr-stats">
+    <div class="hdr-stat"><span>msgs</span>&nbsp;<span class="v" id="stat-msgs">0</span></div>
+    <div class="hdr-stat"><span>threads</span>&nbsp;<span class="v" id="stat-threads">0</span></div>
+    <div class="hdr-stat" id="stat-ci-wrap" style="display:none">
+      CI <span id="stat-ci">—</span>
     </div>
+    <div class="hdr-stat">$<span class="v" id="stat-cost">0.0000</span></div>
+  </div>
+
+  <div class="hdr-actions">
+    <button class="hdr-btn" id="new-task-btn" onclick="showHomeView()" style="border-color:var(--accent);color:var(--accent);font-weight:600">＋ New Task</button>
+    <button class="hdr-btn" onclick="openStandupModal()">📋 Standup</button>
+    <button class="hdr-btn" id="questions-bell" onclick="openQuestionsModal()">
+      🔔 Questions
+      <span id="questions-badge"></span>
+    </button>
+  </div>
+</header>
+
+<!-- ══ SIDEBAR ══════════════════════════════════════════════════════════ -->
+<nav id="sidebar">
+  <div class="sidebar-hdr">Threads</div>
+  <div id="thread-list"><div class="empty" style="padding:20px 12px;text-align:left;font-size:11px">No threads yet</div></div>
+</nav>
+
+<!-- ══ FEED ══════════════════════════════════════════════════════════════ -->
+<main id="feed">
+  <div id="feed-toolbar">
+    <div class="toolbar-row1">
+      <span id="feed-title">All Messages</span>
+      <button id="close-thread-btn" onclick="closeCurrentThread()">🔒 Close</button>
+    </div>
+    <div id="budget-bar-wrap">
+      <div id="budget-track"><div id="budget-fill"></div></div>
+      <span id="budget-label">—</span>
+    </div>
+    <div class="toolbar-row2" id="agent-filters">
+      <span class="chip-label">By agent:</span>
+      <!-- populated by JS -->
+    </div>
+    <div class="toolbar-row3" id="type-filters">
+      <span class="chip-label">Show:</span>
+      <button class="filter-btn active" data-filter="all">All</button>
+      <button class="filter-btn" data-filter="planning">Planning</button>
+      <button class="filter-btn" data-filter="delegation">Delegation</button>
+      <button class="filter-btn" data-filter="code">Code &amp; Review</button>
+      <button class="filter-btn" data-filter="status">Status</button>
+      <button class="filter-btn" data-filter="human">Human</button>
+    </div>
+  </div>
+  <!-- ══ WAITING BANNER ══ -->
+  <div id="waiting-banner">
+    <div class="wb-header">
+      <span class="wb-icon">⏸</span>
+      <span class="wb-title">Thread paused — waiting for your input</span>
+      <span class="wb-agent" id="wb-agent"></span>
+    </div>
+    <div class="wb-question" id="wb-question"></div>
+    <div class="wb-context" id="wb-context" style="display:none"></div>
+    <div class="wb-reply-row">
+      <textarea class="wb-textarea" id="wb-reply" placeholder="Type your answer and press Enter to send…"></textarea>
+      <button class="wb-send-btn" id="wb-send-btn" onclick="sendWaitingReply()">Reply ↩</button>
+    </div>
+    <div class="wb-status" id="wb-status"></div>
+  </div>
+
+  <div id="msg-list"><div class="empty">Waiting for messages…<br><span style="font-size:10px;color:var(--border)">Submit a task below to get started</span></div></div>
+
+  <!-- ══ CHAT INPUT BAR ══ -->
+  <div id="chat-bar">
+    <!-- collapsed pill -->
+    <div class="chat-collapsed" id="chat-collapsed" onclick="openChat()">
+      <div class="chat-avatar">👤</div>
+      <div class="chat-placeholder" id="chat-placeholder">Guide the team or start a new task…</div>
+    </div>
+    <!-- expanded form — new-task fields (hidden in steer mode) -->
+    <div id="chat-expanded">
+      <div class="chat-input-row" id="chat-title-row">
+        <span class="chat-input-label">Title</span>
+        <input class="chat-title-input" id="chat-title" type="text"
+          placeholder="e.g. Build a login page with OAuth" autocomplete="off" />
+      </div>
+      <div class="chat-input-row" style="align-items:flex-start">
+        <span class="chat-input-label" id="chat-desc-label" style="padding-top:7px">Desc</span>
+        <textarea class="chat-desc-input" id="chat-desc"
+          placeholder="Describe what you need in detail — this becomes the team's spec…"></textarea>
+      </div>
+      <div class="chat-footer-row">
+        <select class="chat-priority-select" id="chat-priority">
+          <option value="normal">Normal</option>
+          <option value="high">High priority</option>
+          <option value="low">Low priority</option>
+        </select>
+        <span class="chat-hint">⌘↵ to send · Esc to cancel</span>
+        <button class="chat-cancel-btn" onclick="closeChat()">Cancel</button>
+        <button class="chat-send-btn" id="chat-send-btn" onclick="submitTask()">Send Task →</button>
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- ══ RIGHT PANEL ══════════════════════════════════════════════════════ -->
+<aside id="panel">
+  <div class="panel-tabs">
+    <button class="panel-tab active" data-tab="work"  onclick="switchTab('work')">📋 Work</button>
+    <button class="panel-tab"        data-tab="team"  onclick="switchTab('team')">👥 Team</button>
+    <button class="panel-tab"        data-tab="stats" onclick="switchTab('stats')">📈 Stats</button>
+  </div>
+
+  <!-- Work tab: Kanban board -->
+  <div class="panel-body active" id="tab-work">
+    <!-- Task summary row -->
+    <div class="kanban-summary" id="kanban-summary">
+      <div class="kanban-summary-col"><div class="kanban-summary-num ksn-pending" id="ksn-pending">0</div><div class="kanban-summary-lbl">Todo</div></div>
+      <div class="kanban-summary-col"><div class="kanban-summary-num ksn-wip"     id="ksn-wip">0</div><div class="kanban-summary-lbl">In Progress</div></div>
+      <div class="kanban-summary-col"><div class="kanban-summary-num ksn-review"  id="ksn-review">0</div><div class="kanban-summary-lbl">Review</div></div>
+      <div class="kanban-summary-col"><div class="kanban-summary-num ksn-done"    id="ksn-done">0</div><div class="kanban-summary-lbl">Done</div></div>
+    </div>
+    <div id="kanban-board"><div style="font-size:10px;color:var(--muted);padding:4px 2px">No tasks yet</div></div>
+
+    <div class="panel-section">
+      <div class="panel-section-title">Team Wiki</div>
+      <div id="wiki-list"><div style="font-size:10px;color:var(--muted)">No articles yet</div></div>
+    </div>
+  </div>
+
+  <!-- Team tab: agent status + delegation -->
+  <div class="panel-body" id="tab-team">
+    <div class="panel-section">
+      <div class="panel-section-title">Agent Status</div>
+      <div id="agent-cards"></div>
+    </div>
+    <div class="panel-section">
+      <div class="panel-section-title">Delegation Chain</div>
+      <div id="delegation-list"><div style="font-size:10px;color:var(--muted)">No delegations yet</div></div>
+    </div>
+  </div>
+
+  <!-- Stats tab -->
+  <div class="panel-body" id="tab-stats">
+    <div class="panel-section">
+      <div class="panel-section-title">Token Cost</div>
+      <div id="cost-list"><div style="font-size:10px;color:var(--muted)">Loading…</div></div>
+    </div>
+    <div class="panel-section">
+      <div class="panel-section-title">CI Results</div>
+      <div id="ci-sparkline" class="ci-sparkline"></div>
+      <div id="ci-list"><div style="font-size:10px;color:var(--muted)">No runs yet</div></div>
+    </div>
+    <div class="panel-section">
+      <div class="panel-section-title">Tool Usage</div>
+      <div id="tool-stats-list"><div style="font-size:10px;color:var(--muted)">No data yet</div></div>
+    </div>
+  </div>
+</aside>
+
+<!-- ══ TOAST CONTAINER ══════════════════════════════════════════════════ -->
+<div id="toast-container"></div>
+
+<!-- ══ QUESTIONS MODAL ══════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="questions-modal">
+  <div class="modal-box wide">
+    <div class="modal-hdr">
+      <div class="modal-title" style="color:var(--amber)">🔔 Pending Questions</div>
+      <span class="modal-close" onclick="closeQuestionsModal()">✕</span>
+    </div>
+    <div id="questions-content"><div class="empty">No pending questions — all clear! ✅</div></div>
+  </div>
+</div>
+
+<!-- ══ STANDUP MODAL ══════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="standup-modal">
+  <div class="modal-box wide">
+    <div class="modal-hdr">
+      <div class="modal-title">📋 Daily Standup</div>
+      <span class="modal-close" onclick="closeStandupModal()">✕</span>
+    </div>
+    <div id="standup-content"><div class="empty">Loading…</div></div>
+    <div style="margin-top:14px;display:flex;gap:10px;align-items:center">
+      <button class="standup-pub-btn" onclick="publishStandup()" id="standup-pub-btn">Publish to Wiki</button>
+      <span id="standup-pub-status" style="font-size:10px;color:var(--muted)"></span>
+    </div>
+  </div>
+</div>
+
+<!-- ══ WIKI MODAL ══════════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="wiki-modal">
+  <div class="modal-box wide">
+    <div class="modal-hdr">
+      <div class="wiki-modal-title" id="wiki-modal-title"></div>
+      <span class="modal-close" onclick="closeWikiModal()">✕</span>
+    </div>
+    <div class="wiki-modal-body" id="wiki-modal-body"></div>
   </div>
 </div>
 
 <script>
-const TYPE_ICONS = {
-  task_assignment:  '📋',
+// ══════════════════════════════════════════════════════════
+// Constants & state
+// ══════════════════════════════════════════════════════════
+
+const ALL_AGENTS = [
+  'product_owner','engineering_manager','architect',
+  'senior_dev_1','senior_dev_2','junior_dev_1','junior_dev_2'
+];
+
+const ROLE_COLOR = {
+  orchestrator:        'var(--c-orchestrator)',
+  product_owner:       'var(--c-product_owner)',
+  engineering_manager: 'var(--c-engineering_manager)',
+  architect:           'var(--c-architect)',
+  senior_dev_1:        'var(--c-senior_dev_1)',
+  senior_dev_2:        'var(--c-senior_dev_2)',
+  junior_dev_1:        'var(--c-junior_dev_1)',
+  junior_dev_2:        'var(--c-junior_dev_2)',
+  human:               'var(--c-human)',
+};
+
+const ROLE_MODEL = {
+  product_owner:       'opus-4',
+  engineering_manager: 'opus-4',
+  architect:           'opus-4',
+  senior_dev_1:        'sonnet-4',
+  senior_dev_2:        'sonnet-4',
+  junior_dev_1:        'haiku-4',
+  junior_dev_2:        'haiku-4',
+};
+
+const TYPE_ICON = {
+  task_assignment:  '🎯',
   question:         '❓',
   answer:           '💡',
   review_request:   '🔍',
@@ -422,79 +1120,244 @@ const TYPE_ICONS = {
   blocker:          '🚧',
   task_complete:    '✅',
   requirement:      '📌',
-  acceptance_result:'🎯',
+  acceptance_result:'🎖',
   human_input:      '👤',
   agent_reply:      '🤖',
-};
-const TYPE_FILTER = {
-  task:   ['task_assignment','task_complete','requirement','acceptance_result'],
-  code:   ['review_request','review_feedback'],
-  status: ['status_update','blocker','question','answer'],
+  human_question:   '🔔',
+  ci_result:        '🧪',
+  thread_complete:  '🏁',
 };
 
-let allMessages = [];
-let threads = {};           // id -> {id, title, count, status}
-let agentActivity = {};
-let agentHeartbeat = {};    // role -> {status, last_seen} from /agents
-let currentFilter = 'all';
-let currentThread = null;
-let totalMsgs = 0;
-let sseSource = null;
+const TYPE_LABEL = {
+  task_assignment:  'Delegation',
+  question:         'Question',
+  answer:           'Answer',
+  review_request:   'Review Request',
+  review_feedback:  'Review',
+  status_update:    'Status',
+  blocker:          'Blocker',
+  task_complete:    'Done',
+  requirement:      'Requirement',
+  acceptance_result:'Acceptance',
+  human_input:      'Human',
+  agent_reply:      'Reply',
+  human_question:   'Needs Input',
+  ci_result:        'CI',
+};
 
-// ── Toast notifications ──
+const TYPE_FILTER_MAP = {
+  planning:   ['requirement','acceptance_result','human_input'],
+  delegation: ['task_assignment','task_complete','status_update'],
+  code:       ['review_request','review_feedback','ci_result'],
+  status:     ['blocker','question','answer','agent_reply'],
+  human:      ['human_input','human_question'],
+};
+
+// App state
+let allMessages    = [];
+let threads        = {};          // id → {id, title, count, status}
+let agentHeartbeat = {};          // role → {status, last_seen}
+let agentActivity  = {};          // role → message count
+let agentLastMsg   = {};          // role → {content, type, time}
+let delegations    = [];          // [{from, to, task, time}]
+let allTasks       = [];          // latest tasks from /tasks
+let currentFilter  = 'all';
+let currentAgent   = 'all';       // agent chip filter
+let currentThread  = null;
+let totalMsgs      = 0;
+let sseSource      = null;
+let pendingCount   = 0;
+let pendingQuestions = [];
+let activeTab      = 'work';
+
+// ══════════════════════════════════════════════════════════
+// Markdown renderer (no external deps)
+// ══════════════════════════════════════════════════════════
+
+function renderMarkdown(raw) {
+  if (!raw) return '';
+  let s = raw;
+
+  // Fenced code blocks
+  s = s.replace(/```(\w*)\n?([\s\S]*?)```/g, (_, lang, code) =>
+    `<pre><code>${escHtml(code.trim())}</code></pre>`
+  );
+  // Inline code
+  s = s.replace(/`([^`\n]+)`/g, (_, c) => `<code>${escHtml(c)}</code>`);
+
+  // Headers
+  s = s.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+  s = s.replace(/^## (.+)$/gm,  '<h2>$1</h2>');
+  s = s.replace(/^# (.+)$/gm,   '<h1>$1</h1>');
+
+  // HR
+  s = s.replace(/^---+$/gm, '<hr>');
+
+  // Bold / italic
+  s = s.replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>');
+  s = s.replace(/\*\*(.+?)\*\*/g,     '<strong>$1</strong>');
+  s = s.replace(/\*(.+?)\*/g,         '<em>$1</em>');
+  s = s.replace(/__(.+?)__/g,          '<strong>$1</strong>');
+  s = s.replace(/_([^_\n]+)_/g,        '<em>$1</em>');
+
+  // Links (sanitise: only http/https)
+  s = s.replace(/\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g,
+    '<a href="$2" target="_blank" rel="noopener">$1</a>');
+
+  // Blockquotes
+  s = s.replace(/^> (.+)$/gm, '<blockquote>$1</blockquote>');
+
+  // Unordered lists
+  s = s.replace(/(^[\*\-] .+(?:\n[\*\-] .+)*)/gm, blk => {
+    const items = blk.split('\n').map(l => `<li>${l.replace(/^[\*\-] /, '')}</li>`).join('');
+    return `<ul>${items}</ul>`;
+  });
+
+  // Ordered lists
+  s = s.replace(/(^\d+\. .+(?:\n\d+\. .+)*)/gm, blk => {
+    const items = blk.split('\n').map(l => `<li>${l.replace(/^\d+\. /, '')}</li>`).join('');
+    return `<ol>${items}</ol>`;
+  });
+
+  // Paragraphs: blank-line separated blocks not already wrapped in tags
+  const lines = s.split('\n');
+  const out = [];
+  let para = [];
+  for (const line of lines) {
+    if (/^<(h[1-3]|pre|ul|ol|li|blockquote|hr)/.test(line.trim())) {
+      if (para.length) { out.push(`<p>${para.join('<br>')}</p>`); para = []; }
+      out.push(line);
+    } else if (line.trim() === '') {
+      if (para.length) { out.push(`<p>${para.join('<br>')}</p>`); para = []; }
+    } else {
+      para.push(line);
+    }
+  }
+  if (para.length) out.push(`<p>${para.join('<br>')}</p>`);
+  return out.join('\n');
+}
+
+function escHtml(s) {
+  return String(s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ══════════════════════════════════════════════════════════
+// Toast
+// ══════════════════════════════════════════════════════════
+
 function showToast(message, type='info', duration=5000) {
   const el = document.createElement('div');
   el.className = `toast ${type}`;
   el.textContent = message;
   document.getElementById('toast-container').appendChild(el);
-  setTimeout(() => { el.style.opacity = '0'; setTimeout(() => el.remove(), 400); }, duration);
+  setTimeout(() => {
+    el.style.opacity = '0'; el.style.transform = 'translateX(20px)';
+    el.style.transition = 'all 0.35s ease';
+    setTimeout(() => el.remove(), 350);
+  }, duration);
 }
 
-function roleClass(role) {
-  return 'role-' + (role || 'system').replace(/-/g,'_');
+// ══════════════════════════════════════════════════════════
+// Tab switching
+// ══════════════════════════════════════════════════════════
+
+function switchTab(name) {
+  activeTab = name;
+  document.querySelectorAll('.panel-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+  document.querySelectorAll('.panel-body').forEach(b => b.classList.toggle('active', b.id === `tab-${name}`));
+  if (name === 'team')  renderAgentCards();
+  if (name === 'stats') { loadMetrics(); loadCIResults(); loadToolStats(); }
+  if (name === 'work')  loadTasks();
 }
+
+// ══════════════════════════════════════════════════════════
+// Agent chip filters
+// ══════════════════════════════════════════════════════════
+
+function initAgentChips() {
+  const bar = document.getElementById('agent-filters');
+  // Keep the label
+  const label = bar.querySelector('.chip-label');
+  bar.innerHTML = '';
+  bar.appendChild(label);
+
+  const allChip = document.createElement('button');
+  allChip.className = 'agent-chip active';
+  allChip.style.setProperty('--chip-color', 'var(--text)');
+  allChip.style.background = 'var(--surface2)';
+  allChip.style.color       = 'var(--text)';
+  allChip.style.borderColor = 'var(--border)';
+  allChip.textContent = 'All';
+  allChip.dataset.agent = 'all';
+  allChip.addEventListener('click', () => setAgentFilter('all'));
+  bar.appendChild(allChip);
+
+  ALL_AGENTS.forEach(role => {
+    const color = ROLE_COLOR[role] || 'var(--muted)';
+    const chip = document.createElement('button');
+    chip.className    = 'agent-chip';
+    chip.textContent  = role.replace(/_/g,' ').replace('engineering manager','EM').replace('product owner','PO').replace('senior dev','Sr').replace('junior dev','Jr');
+    chip.dataset.agent = role;
+    chip.style.setProperty('--chip-color', color);
+    chip.addEventListener('click', () => setAgentFilter(role));
+    bar.appendChild(chip);
+  });
+}
+
+function setAgentFilter(agent) {
+  currentAgent = agent;
+  document.querySelectorAll('.agent-chip').forEach(c => {
+    const isActive = c.dataset.agent === agent;
+    c.classList.toggle('active', isActive);
+    if (isActive) {
+      const col = c.style.getPropertyValue('--chip-color') || 'var(--text)';
+      c.style.background   = col;
+      c.style.color        = '#0d1117';
+      c.style.borderColor  = col;
+    } else {
+      c.style.background  = 'var(--bg)';
+      c.style.color       = 'var(--muted)';
+      c.style.borderColor = 'var(--border)';
+    }
+  });
+  rerender();
+}
+
+// ══════════════════════════════════════════════════════════
+// Message helpers
+// ══════════════════════════════════════════════════════════
 
 function formatTime(ts) {
-  try {
-    return new Date(ts).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit'});
-  } catch { return ts ? ts.substring(11,19) : ''; }
+  try { return new Date(ts).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'}); }
+  catch { return ts ? String(ts).substring(11,19) : ''; }
 }
 
-function renderMessage(msg, isNew=false) {
-  const icon = TYPE_ICONS[msg.type] || '💬';
-  const time = formatTime(msg.timestamp || msg.created_at);
-  const rc = roleClass(msg.from_role);
-  const bodyText = (msg.content || '').trim();
-  const collapsed = bodyText.length > 200 ? 'collapsed' : '';
-
-  const card = document.createElement('div');
-  card.className = `msg-card ${rc}${isNew ? ' new' : ''}`;
-  card.dataset.type = msg.type;
-  card.dataset.thread = msg.thread_id;
-  card.innerHTML = `
-    <div class="msg-header">
-      <span class="msg-icon">${icon}</span>
-      <span class="msg-from">${msg.from_role}</span>
-      <span class="msg-arrow">→</span>
-      <span class="msg-to">${msg.to_role}</span>
-      <span class="msg-type">${msg.type}</span>
-      <span class="msg-time">${time}</span>
-    </div>
-    <div class="msg-body ${collapsed}">${escHtml(bodyText)}</div>
-  `;
-  card.querySelector('.msg-body').addEventListener('click', function() {
-    this.classList.toggle('collapsed');
-  });
-  return card;
+function relTime(ts) {
+  if (!ts) return '';
+  const diff = Date.now() - new Date(ts).getTime();
+  const s = Math.floor(diff/1000);
+  if (s < 60)    return `${s}s ago`;
+  const m = Math.floor(s/60);
+  if (m < 60)    return `${m}m ago`;
+  const h = Math.floor(m/60);
+  if (h < 24)    return `${h}h ago`;
+  return formatTime(ts);
 }
 
-function escHtml(s) {
-  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+function humanRole(role) {
+  return (role||'').replace(/_/g,' ');
 }
 
 function matchesFilter(msg) {
   if (currentFilter === 'all') return true;
-  return (TYPE_FILTER[currentFilter] || []).includes(msg.type);
+  return (TYPE_FILTER_MAP[currentFilter] || []).includes(msg.type);
+}
+
+function matchesAgent(msg) {
+  if (currentAgent === 'all') return true;
+  return msg.from_role === currentAgent || msg.to_role === currentAgent;
 }
 
 function matchesThread(msg) {
@@ -502,9 +1365,57 @@ function matchesThread(msg) {
   return msg.thread_id === currentThread;
 }
 
+// ══════════════════════════════════════════════════════════
+// Render a single message card
+// ══════════════════════════════════════════════════════════
+
+function renderMessage(msg, isNew=false) {
+  const icon     = TYPE_ICON[msg.type] || '💬';
+  const time     = formatTime(msg.timestamp || msg.created_at);
+  const roleKey  = (msg.from_role||'system').replace(/-/g,'_');
+  const bodyRaw  = (msg.content || '').trim();
+  const isLong   = bodyRaw.length > 280;
+  const typeBadge= TYPE_LABEL[msg.type] || msg.type;
+
+  // Build badge class
+  const badgeClass = `msg-type-badge badge-${msg.type}`;
+
+  const card = document.createElement('div');
+  card.className = `msg-card role-${roleKey} type-${msg.type}${isNew ? ' new' : ''}`;
+  card.dataset.type   = msg.type;
+  card.dataset.thread = msg.thread_id || '';
+  card.dataset.from   = msg.from_role || '';
+
+  const fromColor  = ROLE_COLOR[msg.from_role] || 'var(--muted)';
+  const bodyHtml   = renderMarkdown(bodyRaw);
+  const bodyClass  = isLong ? 'msg-body collapsed' : 'msg-body';
+
+  card.innerHTML = `
+    <div class="msg-header">
+      <span class="msg-icon">${icon}</span>
+      <span class="msg-from" style="color:${fromColor}">${humanRole(msg.from_role)}</span>
+      <span class="msg-arrow">→</span>
+      <span class="msg-to">${humanRole(msg.to_role)}</span>
+      <span class="${badgeClass}">${typeBadge}</span>
+      <span class="msg-time">${time}</span>
+    </div>
+    <div class="${bodyClass}">${bodyHtml}</div>
+  `;
+
+  card.querySelector('.msg-body').addEventListener('click', function() {
+    this.classList.toggle('collapsed');
+  });
+
+  return card;
+}
+
+// ══════════════════════════════════════════════════════════
+// Feed re-render
+// ══════════════════════════════════════════════════════════
+
 function rerender() {
   const list = document.getElementById('msg-list');
-  const visible = allMessages.filter(m => matchesFilter(m) && matchesThread(m));
+  const visible = allMessages.filter(m => matchesFilter(m) && matchesAgent(m) && matchesThread(m));
   if (visible.length === 0) {
     list.innerHTML = '<div class="empty">No messages match the current filter.</div>';
     return;
@@ -514,121 +1425,302 @@ function rerender() {
   list.scrollTop = list.scrollHeight;
 }
 
+// ══════════════════════════════════════════════════════════
+// Add message (dedup + state update)
+// ══════════════════════════════════════════════════════════
+
 function addMessage(msg, isNew=false) {
-  // Dedup
   if (allMessages.find(m => m.id === msg.id)) return;
   allMessages.push(msg);
   totalMsgs++;
   document.getElementById('stat-msgs').textContent = totalMsgs;
 
-  // Update thread registry
+  // Thread registry
   if (msg.thread_id) {
     if (!threads[msg.thread_id]) {
-      threads[msg.thread_id] = { id: msg.thread_id, title: msg.thread_id.substring(0,8), count: 0, status: 'active' };
+      threads[msg.thread_id] = {
+        id: msg.thread_id, title: msg.thread_id.substring(0,8),
+        count: 0, status: 'active'
+      };
       document.getElementById('stat-threads').textContent = Object.keys(threads).length;
     }
     threads[msg.thread_id].count++;
-    // Use content as title hint for human_input
     if (msg.type === 'human_input' && msg.content) {
-      const firstLine = msg.content.split('\n')[0].replace(/\*\*/g,'').trim();
-      threads[msg.thread_id].title = firstLine.substring(0,40);
+      const first = msg.content.split('\n')[0].replace(/\*\*/g,'').trim();
+      threads[msg.thread_id].title = first.substring(0,42);
     }
-    // Mark thread complete on completion event
     if (msg.type === 'thread_complete') {
       threads[msg.thread_id].status = 'complete';
-      showToast(`✅ Thread "${threads[msg.thread_id].title}" complete — CI green`, 'success');
+      let meta = {};
+      try { meta = JSON.parse(msg.metadata || '{}'); } catch {}
+      if (meta.github_repo) threads[msg.thread_id].github_repo = meta.github_repo;
+      const repoSnippet = meta.github_repo
+        ? ` — <a href="${meta.github_repo}" target="_blank" style="color:var(--accent)">${meta.github_repo}</a>`
+        : '';
+      const toastEl = document.createElement('div');
+      toastEl.className = 'toast success';
+      toastEl.innerHTML = `🏁 <strong>${escHtml(threads[msg.thread_id].title)}</strong> complete${repoSnippet}`;
+      document.getElementById('toast-container').appendChild(toastEl);
+      setTimeout(() => { toastEl.style.opacity='0'; toastEl.style.transform='translateX(20px)'; toastEl.style.transition='all .35s'; setTimeout(()=>toastEl.remove(),350); }, 10000);
     }
     renderThreadList();
   }
 
-  // Update agent activity
+  // Agent activity tracking
   if (msg.from_role && msg.from_role !== 'orchestrator' && msg.from_role !== 'system') {
-    agentActivity[msg.from_role] = (agentActivity[msg.from_role] || 0) + 1;
-    renderAgents();
+    agentActivity[msg.from_role] = (agentActivity[msg.from_role]||0) + 1;
+    agentLastMsg[msg.from_role]  = { content: msg.content, type: msg.type, time: msg.timestamp||msg.created_at };
   }
 
-  // Append to DOM if matches current view
-  if (matchesFilter(msg) && matchesThread(msg)) {
+  // Track delegations
+  if (msg.type === 'task_assignment') {
+    delegations.unshift({ from: msg.from_role, to: msg.to_role, task: msg.content, time: msg.timestamp||msg.created_at });
+    if (delegations.length > 20) delegations.pop();
+    if (activeTab === 'team') renderAgentCards();
+  }
+
+  // Append to DOM if visible
+  if (matchesFilter(msg) && matchesAgent(msg) && matchesThread(msg)) {
     const list = document.getElementById('msg-list');
     const empty = list.querySelector('.empty');
     if (empty) empty.remove();
-    const card = renderMessage(msg, isNew);
-    list.appendChild(card);
+    list.appendChild(renderMessage(msg, isNew));
     if (isNew) list.scrollTop = list.scrollHeight;
   }
+
+  if (activeTab === 'team') renderAgentCards();
 }
+
+// ══════════════════════════════════════════════════════════
+// Thread sidebar
+// ══════════════════════════════════════════════════════════
 
 function renderThreadList() {
   const el = document.getElementById('thread-list');
   el.innerHTML = '';
   const sorted = Object.values(threads).sort((a,b) => b.count - a.count);
-  if (sorted.length === 0) { el.innerHTML = '<div class="empty">No threads yet</div>'; return; }
+  if (!sorted.length) {
+    el.innerHTML = '<div class="empty" style="padding:20px 12px;text-align:left;font-size:11px">No threads yet</div>';
+    return;
+  }
 
-  // "All" option
+  // "All" row
   const all = document.createElement('div');
   all.className = 'thread-item' + (!currentThread ? ' active' : '');
-  all.innerHTML = `<span class="t-count">${totalMsgs}</span><div class="t-title">All messages</div>`;
-  all.addEventListener('click', () => { currentThread = null; document.querySelectorAll('.thread-item').forEach(t=>t.classList.remove('active')); all.classList.add('active'); rerender(); document.getElementById('feed-title').textContent = 'All Messages'; loadBudget(null); document.getElementById('close-thread-btn').style.display = 'none'; });
+  all.innerHTML = `<div class="t-title">All messages</div><div class="t-meta"><span>${totalMsgs} msgs</span><span class="t-badge">all</span></div>`;
+  all.addEventListener('click', () => {
+    currentThread = null;
+    refreshThreadSelection();
+    document.getElementById('feed-title').textContent = 'All Messages';
+    loadBudget(null);
+    document.getElementById('close-thread-btn').style.display = 'none';
+  });
   el.appendChild(all);
 
   sorted.forEach(t => {
-    const isComplete = t.status === 'complete';
-    const isClosed   = t.status === 'closed';
     const item = document.createElement('div');
-    item.className = 'thread-item' + (currentThread === t.id ? ' active' : '') + (isComplete ? ' complete' : '') + (isClosed ? ' closed' : '');
-    item.dataset.id = t.id;
-    const statusSuffix = isComplete ? ' · done' : isClosed ? ' · closed' : '';
-    item.innerHTML = `<span class="t-count">${t.count}</span><div class="t-title">${escHtml(t.title)}</div><div class="t-meta">${t.id.substring(0,8)}${statusSuffix}</div>`;
-    item.addEventListener('click', () => {
+    const cls  = ['thread-item'];
+    if (currentThread === t.id) cls.push('active');
+    if (t.status === 'complete') cls.push('complete');
+    if (t.status === 'closed')   cls.push('closed');
+    if (t.status === 'waiting')  cls.push('waiting');
+    item.className   = cls.join(' ');
+    item.dataset.id  = t.id;
+
+    const statusLabel = t.status === 'active' ? '' : ` · ${t.status}`;
+    const ghLink = t.github_repo
+      ? `<div><a class="t-github" href="${escHtml(t.github_repo)}" target="_blank" rel="noopener">⎇ GitHub</a></div>`
+      : '';
+    item.innerHTML = `
+      <div style="display:flex;align-items:flex-start;gap:4px">
+        <div class="t-title" style="flex:1;min-width:0">${escHtml(t.title)}</div>
+        <button class="t-delete-btn" title="Delete thread">✕</button>
+      </div>
+      <div class="t-meta">
+        <span>${t.id.substring(0,8)}${statusLabel}</span>
+        <span class="t-badge">${t.count}</span>
+      </div>
+      ${ghLink}
+    `;
+    // Click on item body → select thread
+    item.addEventListener('click', (e) => {
+      if (e.target.classList.contains('t-delete-btn')) return; // handled separately
       currentThread = t.id;
-      document.querySelectorAll('.thread-item').forEach(el=>el.classList.remove('active'));
-      item.classList.add('active');
-      rerender();
+      refreshThreadSelection();
       document.getElementById('feed-title').textContent = t.title;
-      loadTasks();
-      loadBudget(t.id);
-      // Show close button only for active threads
-      const closeBtn = document.getElementById('close-thread-btn');
-      closeBtn.style.display = (t.status === 'active') ? 'inline-block' : 'none';
+      loadTasks(); loadBudget(t.id);
+      document.getElementById('close-thread-btn').style.display = (t.status==='active') ? 'inline-block' : 'none';
+      refreshWaitingBanner();
+      updateNewTaskBtn();
+      _applyChatMode();
+    });
+    // Delete button
+    item.querySelector('.t-delete-btn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      deleteThread(t.id, t.title);
     });
     el.appendChild(item);
   });
 }
 
-const AGENTS = ['product_owner','engineering_manager','architect','senior_dev_1','senior_dev_2','junior_dev_1','junior_dev_2'];
-
-async function loadAgentStatus() {
-  try {
-    const res = await fetch('/agents');
-    if (!res.ok) return;
-    const agents = await res.json();
-    agents.forEach(a => { agentHeartbeat[a.role] = a; });
-    renderAgents();
-  } catch(e) { /* non-fatal */ }
+function refreshThreadSelection() {
+  document.querySelectorAll('.thread-item').forEach(el => {
+    el.classList.toggle('active', el.dataset.id === currentThread || (!currentThread && !el.dataset.id));
+  });
+  rerender();
 }
 
-function renderAgents() {
-  const el = document.getElementById('agent-list');
-  el.innerHTML = '';
-  let activeCount = 0;
-  AGENTS.forEach(role => {
-    const count   = agentActivity[role] || 0;
-    const hb      = agentHeartbeat[role];
-    // Heartbeat status takes priority; fall back to message activity
-    let dotClass  = '';
-    if (hb && hb.status === 'online')       { dotClass = 'online'; activeCount++; }
-    else if (hb && hb.status === 'stale')   { dotClass = 'stale'; }
-    else if (!hb && count > 0)              { dotClass = 'online'; activeCount++; }
+function updateNewTaskBtn() {
+  const btn = document.getElementById('new-task-btn');
+  if (!btn) return;
+  const isActive = currentThread && threads[currentThread] && threads[currentThread].status === 'active';
+  btn.textContent = isActive ? '✏ Steer' : '＋ New Task';
+  btn.title       = isActive ? 'Send a direction to the team working on this thread' : 'Start a new task';
+}
 
+// ══════════════════════════════════════════════════════════
+// Kanban board
+// ══════════════════════════════════════════════════════════
+
+function renderKanban(tasks) {
+  allTasks = tasks;
+
+  const cols = { pending:[], in_progress:[], review:[], done:[] };
+  tasks.forEach(t => { if (cols[t.status]) cols[t.status].push(t); });
+
+  // Summary counts
+  document.getElementById('ksn-pending').textContent  = cols.pending.length;
+  document.getElementById('ksn-wip').textContent      = cols.in_progress.length;
+  document.getElementById('ksn-review').textContent   = cols.review.length;
+  document.getElementById('ksn-done').textContent     = cols.done.length;
+
+  // Update header progress bar
+  const total = tasks.length;
+  const done  = cols.done.length;
+  if (total > 0) {
+    const pct = Math.round(done / total * 100);
+    document.getElementById('hdr-progress-fill').style.width  = pct + '%';
+    document.getElementById('hdr-progress-label').textContent = `${done}/${total} tasks`;
+  }
+
+  const board = document.getElementById('kanban-board');
+  board.innerHTML = '';
+
+  const colDefs = [
+    { key:'pending',     label:'Todo',        cls:'kcol-pending' },
+    { key:'in_progress', label:'In Progress', cls:'kcol-wip' },
+    { key:'review',      label:'Review',      cls:'kcol-review' },
+    { key:'done',        label:'Done',        cls:'kcol-done' },
+  ];
+
+  colDefs.forEach(({ key, label, cls }) => {
+    const items = cols[key];
+    if (items.length === 0 && key !== 'pending') return; // hide empty review/done
+
+    const col = document.createElement('div');
+    col.className = `kanban-col ${cls}`;
+    col.innerHTML = `
+      <div class="kanban-col-header">
+        ${label}
+        <span class="kcol-count">${items.length}</span>
+      </div>
+    `;
+    items.forEach(t => {
+      const card = document.createElement('div');
+      card.className = 'task-card';
+      const assigneeChip = t.assignee
+        ? `<span class="task-assignee-chip" style="color:${ROLE_COLOR[t.assignee]||'var(--muted)'};">${humanRole(t.assignee)}</span>`
+        : '<span class="task-assignee-chip">unassigned</span>';
+      card.innerHTML = `
+        <div class="task-card-title">${escHtml(t.title)}</div>
+        <div class="task-card-footer">${assigneeChip}</div>
+      `;
+      col.appendChild(card);
+    });
+
+    if (items.length === 0) {
+      col.innerHTML += '<div style="font-size:10px;color:var(--border);padding:4px 2px">empty</div>';
+    }
+    board.appendChild(col);
+  });
+}
+
+// ══════════════════════════════════════════════════════════
+// Agent cards (Team tab)
+// ══════════════════════════════════════════════════════════
+
+function renderAgentCards() {
+  const el = document.getElementById('agent-cards');
+  el.innerHTML = '';
+  let onlineCount = 0;
+
+  ALL_AGENTS.forEach(role => {
+    const hb    = agentHeartbeat[role];
+    const count = agentActivity[role] || 0;
+    const last  = agentLastMsg[role];
+    const color = ROLE_COLOR[role] || 'var(--muted)';
+
+    let dotCls = '';
+    if (hb && hb.status === 'online')     { dotCls = 'online'; onlineCount++; }
+    else if (hb && hb.status === 'stale') { dotCls = 'stale'; }
+    else if (!hb && count > 0)            { dotCls = 'online'; onlineCount++; }
+
+    const card = document.createElement('div');
+    card.className = 'agent-card';
+
+    const activityText = last
+      ? `${TYPE_ICON[last.type]||'💬'} ${(last.content||'').substring(0,80).replace(/\n/g,' ')}`
+      : 'Waiting for messages…';
+
+    const lastTime = last ? relTime(last.time) : '';
+
+    card.innerHTML = `
+      <div class="agent-card-hdr">
+        <div class="a-dot ${dotCls}"></div>
+        <span class="a-name" style="color:${color}">${humanRole(role)}</span>
+        <span class="a-model">${ROLE_MODEL[role]||''}</span>
+        <span class="a-count">${count||''}</span>
+      </div>
+      <div class="a-activity">${escHtml(activityText)}</div>
+      ${lastTime ? `<div class="a-last">${lastTime}</div>` : ''}
+    `;
+    el.appendChild(card);
+  });
+
+  document.getElementById('stat-agents') && (document.getElementById('stat-agents').textContent = onlineCount);
+}
+
+// ══════════════════════════════════════════════════════════
+// Delegation chain
+// ══════════════════════════════════════════════════════════
+
+function renderDelegations() {
+  const el = document.getElementById('delegation-list');
+  if (!delegations.length) {
+    el.innerHTML = '<div style="font-size:10px;color:var(--muted)">No delegations yet</div>';
+    return;
+  }
+  el.innerHTML = '';
+  delegations.slice(0, 12).forEach(d => {
     const row = document.createElement('div');
-    row.className = 'agent-row';
-    row.innerHTML = `<div class="agent-dot ${dotClass}"></div><span class="agent-name">${role.replace(/_/g,' ')}</span><span class="agent-count">${count || ''}</span>`;
+    row.className = 'delegation-item';
+    const fromColor = ROLE_COLOR[d.from]||'var(--muted)';
+    const toColor   = ROLE_COLOR[d.to]  ||'var(--muted)';
+    const preview   = (d.task||'').split('\n')[0].replace(/^#+\s*/,'').substring(0,55);
+    row.innerHTML = `
+      <span class="d-from" style="color:${fromColor}">${humanRole(d.from)}</span>
+      <span class="d-arrow">→</span>
+      <span class="d-to"   style="color:${toColor}">${humanRole(d.to)}</span>
+      <span class="d-task">${escHtml(preview)}</span>
+    `;
     el.appendChild(row);
   });
-  document.getElementById('stat-agents').textContent = activeCount;
 }
 
-// ── Filter buttons ──
+// ══════════════════════════════════════════════════════════
+// Filter buttons
+// ══════════════════════════════════════════════════════════
+
 document.querySelectorAll('.filter-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
@@ -638,14 +1730,16 @@ document.querySelectorAll('.filter-btn').forEach(btn => {
   });
 });
 
-// ── Load history then open SSE ──
+// ══════════════════════════════════════════════════════════
+// Load history + SSE
+// ══════════════════════════════════════════════════════════
+
 async function loadHistory() {
   try {
     const res = await fetch('/threads');
     const threadList = await res.json();
-    // Pre-populate thread metadata (including status) before loading messages
     for (const t of threadList) {
-      threads[t.id] = { id: t.id, title: t.title || t.id.substring(0,8), count: 0, status: t.status };
+      threads[t.id] = { id: t.id, title: t.title || t.id.substring(0,8), count: 0, status: t.status, github_repo: t.github_repo || '' };
     }
     document.getElementById('stat-threads').textContent = threadList.length;
     renderThreadList();
@@ -660,75 +1754,117 @@ async function loadHistory() {
 
 function connectSSE() {
   sseSource = new EventSource('/stream/all');
+
   sseSource.onopen = () => {
+    const dot = document.getElementById('conn-dot');
+    dot.classList.add('live');
     document.getElementById('conn-status').textContent = 'live';
-    document.getElementById('conn-status').className = 'status live';
   };
+
   sseSource.onmessage = (e) => {
     try {
       const msg = JSON.parse(e.data);
       addMessage(msg, true);
-      if (msg.type === 'ci_result') {
-        loadCIResults();
-        loadTasks();
-        // Show toast with CI summary
-        const badge = msg.content && msg.content.startsWith('✅') ? 'success' : 'error';
-        showToast(msg.content || 'CI run complete', badge, 6000);
-      }
-      if (msg.type === 'budget_warning') {
-        showToast(msg.content || 'Token budget warning', 'warning', 8000);
-        if (currentThread && msg.thread_id === currentThread) loadBudget(currentThread);
-      }
-      if (msg.type === 'budget_exceeded') {
-        showToast(msg.content || 'Token budget exceeded!', 'error', 10000);
-        if (currentThread && msg.thread_id === currentThread) loadBudget(currentThread);
-      }
-      if (msg.type === 'thread_idle') {
-        showToast(msg.content || '⏰ Thread idle', 'warning', 8000);
-        // Mark thread in sidebar with idle prefix
-        const tid = msg.thread_id;
-        if (tid && threads[tid]) {
-          const item = document.querySelector(`.thread-item[data-id="${tid}"] .t-title`);
-          if (item && !item.textContent.startsWith('⏰')) {
-            item.textContent = '⏰ ' + item.textContent;
-          }
-        }
-      }
-      if (msg.type === 'thread_closed') {
-        const tid = msg.thread_id;
-        if (tid && threads[tid]) {
-          threads[tid].status = 'closed';
+
+      switch (msg.type) {
+        case 'ci_result':
+          loadCIResults(); loadTasks();
+          updateCIBadge(msg.content);
+          showToast(msg.content || 'CI run complete', msg.content?.startsWith('✅') ? 'success' : 'error', 6000);
+          break;
+        case 'budget_warning':
+          showToast(msg.content || 'Token budget warning', 'warning', 8000);
+          if (currentThread === msg.thread_id) loadBudget(currentThread);
+          break;
+        case 'budget_exceeded':
+          showToast(msg.content || 'Token budget exceeded!', 'error', 10000);
+          if (currentThread === msg.thread_id) loadBudget(currentThread);
+          break;
+        case 'thread_idle':
+          showToast(msg.content || '⏰ Thread idle', 'warning', 8000);
+          break;
+        case 'thread_closed':
+          if (msg.thread_id && threads[msg.thread_id]) threads[msg.thread_id].status = 'closed';
           renderThreadList();
-        }
-        showToast(msg.content || '🔒 Thread closed', 'info', 5000);
+          showToast(msg.content || '🔒 Thread closed', 'info', 5000);
+          break;
+        case 'human_question':
+          pendingCount++;
+          updateQuestionsBadge();
+          loadPendingQuestions();  // also calls refreshWaitingBanner
+          showToast(`⚠️ ${humanRole(msg.from_role)} needs your input — click the thread to reply`, 'warning', 10000);
+          updateThreadStatus(msg.thread_id, 'waiting');
+          break;
+        case 'human_input':
+          if (msg.from_role === 'human') {
+            updateThreadStatus(msg.thread_id, 'active');
+            if (currentThread === msg.thread_id) refreshWaitingBanner();
+          }
+          break;
       }
+
+      // Refresh team tab delegation list on task assignment
+      if (msg.type === 'task_assignment' && activeTab === 'team') renderDelegations();
+      // Refresh kanban on task events
+      if (['task_complete','task_assignment'].includes(msg.type)) loadTasks();
     } catch {}
   };
+
   sseSource.onerror = () => {
+    const dot = document.getElementById('conn-dot');
+    dot.classList.remove('live');
     document.getElementById('conn-status').textContent = 'reconnecting…';
-    document.getElementById('conn-status').className = 'status';
     setTimeout(connectSSE, 3000);
   };
 }
 
-// ── Metrics polling ──
+function updateCIBadge(content) {
+  const wrap = document.getElementById('stat-ci-wrap');
+  const span = document.getElementById('stat-ci');
+  if (!content) return;
+  wrap.style.display = '';
+  const ok = content.startsWith('✅');
+  span.textContent  = ok ? '✅' : '❌';
+  span.className    = ok ? 'ci-ok' : 'ci-err';
+}
+
+// ══════════════════════════════════════════════════════════
+// API loaders
+// ══════════════════════════════════════════════════════════
+
+async function loadAgentStatus() {
+  try {
+    const res = await fetch('/agents');
+    if (!res.ok) return;
+    const agents = await res.json();
+    agents.forEach(a => { agentHeartbeat[a.role] = a; });
+    if (activeTab === 'team') renderAgentCards();
+  } catch {}
+}
+
+async function loadTasks() {
+  try {
+    const url = currentThread ? `/tasks?thread_id=${currentThread}` : '/tasks';
+    const res  = await fetch(url);
+    if (!res.ok) return;
+    const tasks = await res.json();
+    renderKanban(tasks);
+    if (activeTab === 'team') renderDelegations();
+  } catch {}
+}
+
 async function loadMetrics() {
   try {
     const res = await fetch('/metrics');
     if (!res.ok) return;
-    const data = await res.json();
-    renderCosts(data);
-  } catch(e) { /* non-fatal */ }
+    renderCosts(await res.json());
+  } catch {}
 }
 
 function renderCosts(data) {
   const el = document.getElementById('cost-list');
-  if (!data || data.length === 0) {
-    el.innerHTML = '<div style="font-size:10px;color:var(--muted);padding:4px">No data yet</div>';
-    return;
-  }
-  let totalCost = 0;
-  let totalToks = 0;
+  if (!data || !data.length) { el.innerHTML = '<div style="font-size:10px;color:var(--muted)">No data yet</div>'; return; }
+  let totalCost = 0, totalToks = 0;
   el.innerHTML = '';
   data.forEach(d => {
     totalCost += d.estimated_cost_usd;
@@ -736,271 +1872,142 @@ function renderCosts(data) {
     totalToks += toks;
     const row = document.createElement('div');
     row.className = 'cost-row';
+    const color = ROLE_COLOR[d.agent_role]||'var(--muted)';
     row.innerHTML = `
-      <span class="cost-role">${d.agent_role.replace(/_/g,' ')}</span>
-      <span class="cost-tokens">${fmtToks(toks)}</span>
+      <span class="cost-role" style="color:${color}">${humanRole(d.agent_role)}</span>
+      <span class="cost-toks">${fmtToks(toks)}</span>
       <span class="cost-usd">$${d.estimated_cost_usd.toFixed(4)}</span>
     `;
     el.appendChild(row);
   });
   const total = document.createElement('div');
   total.className = 'cost-total';
-  total.innerHTML = `<span>Total (${fmtToks(totalToks)})</span><span style="color:#56d364">$${totalCost.toFixed(4)}</span>`;
+  total.innerHTML = `<span>Total (${fmtToks(totalToks)})</span><span style="color:var(--green)">$${totalCost.toFixed(4)}</span>`;
   el.appendChild(total);
   document.getElementById('stat-cost').textContent = totalCost.toFixed(4);
 }
 
 function fmtToks(n) {
-  if (n >= 1000) return (n/1000).toFixed(1)+'k';
-  return String(n);
+  if (n >= 1000000) return (n/1000000).toFixed(2)+'M';
+  if (n >= 1000)    return (n/1000).toFixed(1)+'k';
+  return String(n||0);
 }
 
-// ── Wiki ──
+async function loadCIResults() {
+  try {
+    const [lr, tr] = await Promise.all([fetch('/ci-results'), fetch('/ci-results/trend')]);
+    if (lr.ok) renderCIList(await lr.json());
+    if (tr.ok) renderCISparkline(await tr.json());
+  } catch {}
+}
+
+function renderCISparkline(trend) {
+  const el = document.getElementById('ci-sparkline');
+  el.innerHTML = '';
+  trend.slice(-15).forEach(r => {
+    const dot = document.createElement('span');
+    dot.className = `ci-dot ${r.exit_code===0?'pass':'fail'}`;
+    dot.title = `${r.exit_code===0?'✅':'❌'} ${r.passed}/${r.total} · ${formatTime(r.ran_at)}`;
+    el.appendChild(dot);
+  });
+  if (trend.length) {
+    const last = trend[trend.length-1];
+    updateCIBadge(last.exit_code===0 ? `✅ ${last.passed}/${last.total}` : `❌ ${last.passed}/${last.total}`);
+  }
+}
+
+function renderCIList(results) {
+  const el = document.getElementById('ci-list');
+  if (!results || !results.length) { el.innerHTML = '<div style="font-size:10px;color:var(--muted)">No runs yet</div>'; return; }
+  el.innerHTML = '';
+  results.slice(0,5).forEach(r => {
+    const row = document.createElement('div');
+    row.className = 'stat-row';
+    const badge = r.exit_code===0 ? '<span class="stat-val g">✅ pass</span>' : '<span class="stat-val r">❌ fail</span>';
+    row.innerHTML = `<span class="stat-label">${r.passed}/${r.total} tests · ${formatTime(r.ran_at)}</span>${badge}`;
+    el.appendChild(row);
+  });
+}
+
+async function loadToolStats() {
+  try {
+    const res = await fetch('/tool-history/stats');
+    if (!res.ok) return;
+    renderToolStats(await res.json());
+  } catch {}
+}
+
+function renderToolStats(stats) {
+  const el = document.getElementById('tool-stats-list');
+  if (!stats || !stats.length) { el.innerHTML = '<div style="font-size:10px;color:var(--muted)">No data yet</div>'; return; }
+  el.innerHTML = `
+    <div class="tool-row" style="font-size:9px;color:var(--muted)">
+      <span class="tool-name">tool</span>
+      <span class="tool-calls">calls</span>
+      <span class="tool-sr">ok%</span>
+      <span class="tool-avg">avg ms</span>
+    </div>
+  `;
+  stats.slice(0,10).forEach(s => {
+    const pct = (s.success_rate*100).toFixed(0);
+    const col = s.success_rate>=0.9 ? 'var(--green)' : s.success_rate>=0.7 ? 'var(--amber)' : 'var(--red)';
+    const row = document.createElement('div');
+    row.className = 'tool-row';
+    row.innerHTML = `
+      <span class="tool-name" title="${s.tool_name}">${s.tool_name.substring(0,18)}</span>
+      <span class="tool-calls">${s.total_calls}</span>
+      <span class="tool-sr" style="color:${col}">${pct}%</span>
+      <span class="tool-avg">${s.avg_duration_ms.toFixed(0)}</span>
+    `;
+    el.appendChild(row);
+  });
+}
+
+// ══════════════════════════════════════════════════════════
+// Wiki
+// ══════════════════════════════════════════════════════════
+
 async function loadWiki() {
   try {
     const res = await fetch('/wiki');
     if (!res.ok) return;
-    const articles = await res.json();
-    renderWikiList(articles);
-  } catch(e) { /* non-fatal */ }
+    renderWikiList(await res.json());
+  } catch {}
 }
 
 function renderWikiList(articles) {
   const el = document.getElementById('wiki-list');
-  if (!articles || articles.length === 0) {
-    el.innerHTML = '<div style="font-size:10px;color:var(--muted);padding:4px">No articles yet</div>';
-    return;
-  }
+  if (!articles || !articles.length) { el.innerHTML = '<div style="font-size:10px;color:var(--muted)">No articles yet</div>'; return; }
   el.innerHTML = '';
   articles.forEach(a => {
     const item = document.createElement('div');
-    item.className = 'wiki-article';
-    item.innerHTML = `<div class="wiki-title">${escHtml(a.title)}</div><div class="wiki-author">by ${a.author}</div>`;
+    item.className = 'wiki-item';
+    item.innerHTML = `<div class="wiki-item-title">${escHtml(a.title)}</div><div class="wiki-item-meta">by ${a.author}</div>`;
     item.addEventListener('click', () => openWikiModal(a));
     el.appendChild(item);
   });
 }
 
-function openWikiModal(article) {
-  document.getElementById('wiki-modal-title').textContent = article.title;
-  document.getElementById('wiki-modal-body').textContent = article.content;
+function openWikiModal(a) {
+  document.getElementById('wiki-modal-title').textContent = a.title;
+  document.getElementById('wiki-modal-body').textContent  = a.content;
   document.getElementById('wiki-modal').classList.add('open');
 }
-function closeWikiModal() {
-  document.getElementById('wiki-modal').classList.remove('open');
-}
-document.getElementById('wiki-modal').addEventListener('click', function(e) {
-  if (e.target === this) closeWikiModal();
-});
+function closeWikiModal() { document.getElementById('wiki-modal').classList.remove('open'); }
+document.getElementById('wiki-modal').addEventListener('click', e => { if (e.target===document.getElementById('wiki-modal')) closeWikiModal(); });
 
-// ── CI Results ──
-async function loadCIResults() {
-  try {
-    const [listRes, trendRes] = await Promise.all([
-      fetch('/ci-results'),
-      fetch('/ci-results/trend'),
-    ]);
-    if (listRes.ok)  renderCIResults(await listRes.json());
-    if (trendRes.ok) renderCISparkline(await trendRes.json());
-  } catch(e) { /* non-fatal */ }
-}
+// ══════════════════════════════════════════════════════════
+// Budget bar
+// ══════════════════════════════════════════════════════════
 
-function renderCISparkline(trend) {
-  const container = document.getElementById('ci-sparkline');
-  if (!container) return;
-  container.innerHTML = '';
-  const recent = trend.slice(-15);
-  recent.forEach(r => {
-    const dot = document.createElement('span');
-    dot.className = `ci-dot ${r.exit_code === 0 ? 'pass' : 'fail'}`;
-    dot.title = `${r.exit_code === 0 ? '✅' : '❌'} ${r.passed}/${r.total} · ${formatTime(r.ran_at)}`;
-    container.appendChild(dot);
-  });
-}
-
-function renderCIResults(results) {
-  const el = document.getElementById('ci-list');
-  if (!results || results.length === 0) {
-    el.innerHTML = '<div style="font-size:10px;color:var(--muted);padding:4px">No runs yet</div>';
-    return;
-  }
-  el.innerHTML = '';
-  results.slice(0, 5).forEach(r => {
-    const badge = r.exit_code === 0 ? '✅' : '❌';
-    const time  = formatTime(r.ran_at);
-    const row   = document.createElement('div');
-    row.className = 'ci-row';
-    row.innerHTML = `
-      <span class="ci-badge">${badge}</span>
-      <span class="ci-counts">${r.passed}/${r.total} passed</span>
-      <span class="ci-time">${time}</span>
-    `;
-    el.appendChild(row);
-  });
-}
-
-// ── Kanban Tasks ──
-async function loadTasks() {
-  try {
-    const url = currentThread ? `/tasks?thread_id=${currentThread}` : '/tasks';
-    const res  = await fetch(url);
-    if (!res.ok) return;
-    const tasks = await res.json();
-    renderTasks(tasks.slice(0, 8));
-  } catch(e) { /* non-fatal */ }
-}
-
-function renderTasks(tasks) {
-  const el = document.getElementById('task-list');
-  if (!tasks || tasks.length === 0) {
-    el.innerHTML = '<div style="font-size:10px;color:var(--muted);padding:4px">No tasks yet</div>';
-    return;
-  }
-  el.innerHTML = '';
-  tasks.forEach(t => {
-    const row = document.createElement('div');
-    row.className = 'task-row';
-    row.innerHTML = `
-      <div class="task-title">${escHtml(t.title)}</div>
-      <div class="task-meta">
-        <span class="task-assignee">${t.assignee || 'unassigned'}</span>
-        <span class="task-status ${t.status}">${t.status.replace('_',' ')}</span>
-      </div>
-    `;
-    el.appendChild(row);
-  });
-}
-
-// ── Standup modal ──
-async function openStandupModal() {
-  document.getElementById('standup-modal').classList.add('open');
-  document.getElementById('standup-publish-status').textContent = '';
-  document.getElementById('standup-content').innerHTML = '<div class="empty">Loading…</div>';
-  try {
-    const res = await fetch('/standup?hours=24');
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-    renderStandupReport(data);
-  } catch(e) {
-    document.getElementById('standup-content').innerHTML = `<div class="empty">Failed to load standup: ${e.message}</div>`;
-  }
-}
-
-function closeStandupModal() {
-  document.getElementById('standup-modal').classList.remove('open');
-}
-
-document.getElementById('standup-modal').addEventListener('click', function(e) {
-  if (e.target === this) closeStandupModal();
-});
-
-function renderStandupReport(d) {
-  const el = document.getElementById('standup-content');
-  const genAt = d.generated_at ? new Date(d.generated_at).toLocaleString() : '—';
-
-  let html = `<div style="font-size:10px;color:var(--muted);margin-bottom:12px">Generated ${genAt} · last ${d.period_hours}h</div>`;
-
-  // Active threads
-  html += `<div class="standup-section"><h4>Active Threads (${d.active_threads.length})</h4>`;
-  if (d.active_threads.length === 0) {
-    html += '<div class="standup-none">No active threads</div>';
-  } else {
-    d.active_threads.forEach(t => {
-      html += `<div class="standup-row"><span class="standup-label">${escHtml(t.title || t.id)}</span><span class="standup-value">${t.messages} msgs</span><span style="font-size:10px;color:var(--muted)">${t.status}</span></div>`;
-    });
-  }
-  html += '</div>';
-
-  // Tasks done
-  html += `<div class="standup-section"><h4>Completed Tasks (${d.tasks_completed.length})</h4>`;
-  if (d.tasks_completed.length === 0) {
-    html += '<div class="standup-none">None</div>';
-  } else {
-    d.tasks_completed.forEach(t => {
-      html += `<div class="standup-row"><span class="standup-label">✅ ${escHtml(t.title)}</span><span style="font-size:10px;color:var(--muted)">${t.assignee || '—'}</span></div>`;
-    });
-  }
-  html += '</div>';
-
-  // WIP
-  html += `<div class="standup-section"><h4>In Progress (${d.tasks_in_progress.length})</h4>`;
-  if (d.tasks_in_progress.length === 0) {
-    html += '<div class="standup-none">None</div>';
-  } else {
-    d.tasks_in_progress.forEach(t => {
-      html += `<div class="standup-row"><span class="standup-label">🔄 ${escHtml(t.title)}</span><span style="font-size:10px;color:var(--muted)">${t.assignee || '—'}</span></div>`;
-    });
-  }
-  html += '</div>';
-
-  // CI summary
-  const ci = d.ci_summary || {};
-  html += `<div class="standup-section"><h4>CI Summary</h4>`;
-  html += `<div class="standup-row"><span class="standup-label">Passed / Failed / Total</span><span class="standup-value" style="color:${ci.failed > 0 ? '#ff7b72' : '#56d364'}">${ci.passed} / ${ci.failed} / ${ci.total}</span></div>`;
-  html += '</div>';
-
-  // Message activity
-  html += `<div class="standup-section"><h4>Message Activity</h4>`;
-  const agents = Object.entries(d.messages_by_agent || {});
-  if (agents.length === 0) {
-    html += '<div class="standup-none">No messages</div>';
-  } else {
-    agents.forEach(([role, cnt]) => {
-      html += `<div class="standup-row"><span class="standup-label">${role.replace(/_/g,' ')}</span><span class="standup-value">${cnt}</span></div>`;
-    });
-  }
-  html += '</div>';
-
-  // Token cost
-  const cost = d.token_cost || {};
-  html += `<div class="standup-section"><h4>Token Cost</h4>`;
-  html += `<div class="standup-row"><span class="standup-label">Input tokens</span><span class="standup-value">${fmtToks(cost.total_input || 0)}</span></div>`;
-  html += `<div class="standup-row"><span class="standup-label">Output tokens</span><span class="standup-value">${fmtToks(cost.total_output || 0)}</span></div>`;
-  html += `<div class="standup-row"><span class="standup-label">Estimated cost</span><span class="standup-value" style="color:#56d364">$${(cost.estimated_cost_usd || 0).toFixed(4)}</span></div>`;
-  html += '</div>';
-
-  // Blockers
-  if (d.recent_blockers && d.recent_blockers.length > 0) {
-    html += `<div class="standup-section"><h4>Recent Blockers (${d.recent_blockers.length})</h4>`;
-    d.recent_blockers.forEach(b => {
-      html += `<div class="standup-row" style="flex-direction:column;gap:2px"><span style="font-size:10px;color:var(--muted)">${b.from_role}</span><span style="font-size:11px">${escHtml(b.excerpt)}</span></div>`;
-    });
-    html += '</div>';
-  }
-
-  el.innerHTML = html;
-}
-
-async function publishStandup() {
-  const btn = document.getElementById('standup-publish-btn');
-  const status = document.getElementById('standup-publish-status');
-  btn.disabled = true;
-  status.textContent = 'Publishing…';
-  try {
-    const res = await fetch('/standup/publish', {method: 'POST'});
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-    status.textContent = `✅ Published: "${data.title}"`;
-    status.style.color = '#56d364';
-    loadWiki();
-  } catch(e) {
-    status.textContent = `❌ Failed: ${e.message}`;
-    status.style.color = '#ff7b72';
-  } finally {
-    btn.disabled = false;
-  }
-}
-
-// ── Thread budget bar ──
 async function loadBudget(threadId) {
   const wrap = document.getElementById('budget-bar-wrap');
   if (!threadId) { wrap.classList.remove('visible'); return; }
   try {
-    const res = await fetch(`/threads/${threadId}/budget`);
+    const res  = await fetch(`/threads/${threadId}/budget`);
     if (!res.ok) { wrap.classList.remove('visible'); return; }
-    const data = await res.json();
-    renderBudgetBar(data);
-  } catch(e) { wrap.classList.remove('visible'); }
+    renderBudgetBar(await res.json());
+  } catch { wrap.classList.remove('visible'); }
 }
 
 function renderBudgetBar(data) {
@@ -1008,116 +2015,678 @@ function renderBudgetBar(data) {
   const fill  = document.getElementById('budget-fill');
   const label = document.getElementById('budget-label');
   if (data.status === 'unlimited') {
-    const used = data.tokens_used > 0 ? fmtToks(data.tokens_used) + ' tokens used' : 'no budget set';
-    label.textContent = used;
-    fill.style.width = '0%';
+    label.textContent = data.tokens_used > 0 ? fmtToks(data.tokens_used) + ' tokens' : 'no budget limit';
+    fill.style.width  = '0%';
     wrap.classList.add('visible');
     return;
   }
   const pct = Math.min(data.pct_used, 100);
-  fill.style.width = pct + '%';
-  fill.style.background = data.status === 'exceeded' ? '#ff7b72' : data.status === 'warning' ? '#ffa657' : '#56d364';
-  label.textContent = `${data.pct_used.toFixed(0)}% · ${fmtToks(data.tokens_used)}/${fmtToks(data.budget)}`;
+  fill.style.width      = pct + '%';
+  fill.style.background = data.status==='exceeded' ? 'var(--red)' : data.status==='warning' ? 'var(--amber)' : 'var(--green)';
+  label.textContent     = `${data.pct_used.toFixed(0)}% · ${fmtToks(data.tokens_used)} / ${fmtToks(data.budget)}`;
   wrap.classList.add('visible');
 }
 
-// ── Tool Activity ──
-async function loadToolActivity() {
-  try {
-    const [histRes, statsRes] = await Promise.all([
-      fetch('/tool-history?limit=8'),
-      fetch('/tool-history/stats'),
-    ]);
-    if (histRes.ok)  renderToolActivity(await histRes.json());
-    if (statsRes.ok) renderToolStats(await statsRes.json());
-  } catch(e) { /* non-fatal */ }
-}
+// ══════════════════════════════════════════════════════════
+// Thread close
+// ══════════════════════════════════════════════════════════
 
-function renderToolActivity(records) {
-  const el = document.getElementById('tool-activity-list');
-  if (!records || records.length === 0) {
-    el.innerHTML = '<div style="font-size:10px;color:var(--muted);padding:4px">No tool calls yet</div>';
-    return;
-  }
-  el.innerHTML = '';
-  records.forEach(r => {
-    const row = document.createElement('div');
-    row.className = 'tool-row';
-    const statusIcon = r.success
-      ? '<span class="tool-status-ok">✅</span>'
-      : '<span class="tool-status-err">❌</span>';
-    const shortAgent = (r.agent_role || '').replace(/_/g,' ').substring(0,12);
-    const shortTool  = (r.tool_name  || '').substring(0,18);
-    row.innerHTML = `
-      ${statusIcon}
-      <span class="tool-agent" title="${r.agent_role}">${shortAgent}</span>
-      <span class="tool-name"  title="${r.tool_name}">${shortTool}</span>
-      <span class="tool-duration">${r.duration_ms}ms</span>
-    `;
-    if (!r.success && r.error) row.title = r.error;
-    el.appendChild(row);
-  });
-}
-
-function renderToolStats(stats) {
-  const el = document.getElementById('tool-stats-list');
-  if (!stats || stats.length === 0) { el.innerHTML = ''; return; }
-  let html = '<div style="display:flex;gap:4px;padding:3px 4px;font-size:9px;color:var(--muted);border-bottom:1px solid var(--border)">'
-    + '<span style="flex:1">tool</span><span style="min-width:26px;text-align:right">calls</span>'
-    + '<span style="min-width:34px;text-align:right">ok%</span><span style="min-width:36px;text-align:right">avg ms</span></div>';
-  stats.slice(0, 8).forEach(s => {
-    const srPct  = (s.success_rate * 100).toFixed(0);
-    const srColor = s.success_rate >= 0.9 ? '#56d364' : s.success_rate >= 0.7 ? '#ffa657' : '#ff7b72';
-    html += `<div class="tool-stats-row">
-      <span class="tool-stats-name" title="${s.tool_name}">${s.tool_name.substring(0,18)}</span>
-      <span class="tool-stats-calls">${s.total_calls}</span>
-      <span class="tool-stats-sr" style="color:${srColor}">${srPct}%</span>
-      <span class="tool-stats-avg">${s.avg_duration_ms.toFixed(0)}ms</span>
-    </div>`;
-  });
-  el.innerHTML = html;
-}
-
-// ── Thread close ──
 async function closeCurrentThread() {
   if (!currentThread) return;
   const t = threads[currentThread];
-  const title = t ? t.title : currentThread.substring(0,8);
-  if (!confirm(`Close thread "${title}"? This cannot be undone.`)) return;
+  if (!confirm(`Close thread "${t ? t.title : currentThread.substring(0,8)}"?`)) return;
   try {
-    const res = await fetch(`/threads/${currentThread}/close`, {method: 'POST'});
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({detail: `HTTP ${res.status}`}));
-      showToast(`Failed to close thread: ${err.detail || res.status}`, 'error');
-      return;
-    }
-    if (threads[currentThread]) {
-      threads[currentThread].status = 'closed';
-    }
+    const res = await fetch(`/threads/${currentThread}/close`, {method:'POST'});
+    if (!res.ok) { showToast('Failed to close thread', 'error'); return; }
+    if (threads[currentThread]) threads[currentThread].status = 'closed';
     document.getElementById('close-thread-btn').style.display = 'none';
     renderThreadList();
-    showToast(`🔒 Thread "${title}" closed`, 'info');
+    showToast('🔒 Thread closed', 'info');
+  } catch(e) { showToast(`Error: ${e.message}`, 'error'); }
+}
+
+async function deleteThread(threadId, title) {
+  if (!confirm(`Delete thread "${title || threadId.substring(0,8)}" and all its messages?\nThis cannot be undone.`)) return;
+  try {
+    const res = await fetch(`/threads/${threadId}`, {method:'DELETE'});
+    if (!res.ok) { showToast('Failed to delete thread', 'error'); return; }
+    // Remove from local state
+    delete threads[threadId];
+    // Remove all messages belonging to this thread from allMessages
+    for (let i = allMessages.length - 1; i >= 0; i--) {
+      if (allMessages[i].thread_id === threadId) allMessages.splice(i, 1);
+    }
+    totalMsgs = allMessages.length;
+    document.getElementById('stat-msgs').textContent    = totalMsgs;
+    document.getElementById('stat-threads').textContent = Object.keys(threads).length;
+    // If we were viewing this thread, go back to all
+    if (currentThread === threadId) {
+      currentThread = null;
+      document.getElementById('feed-title').textContent = 'All Messages';
+      document.getElementById('close-thread-btn').style.display = 'none';
+      updateNewTaskBtn();
+      _applyChatMode();
+    }
+    renderThreadList();
+    rerender();
+    showToast(`🗑 Thread deleted`, 'info');
+  } catch(e) { showToast(`Error: ${e.message}`, 'error'); }
+}
+
+// ══════════════════════════════════════════════════════════
+// Human questions (Phase 9)
+// ══════════════════════════════════════════════════════════
+
+function updateQuestionsBadge() {
+  const badge = document.getElementById('questions-badge');
+  if (pendingCount > 0) { badge.textContent = pendingCount; badge.classList.add('visible'); }
+  else                  { badge.classList.remove('visible'); }
+}
+
+// ── Waiting banner (inline reply for paused threads) ────────────────────────
+function refreshWaitingBanner() {
+  const banner = document.getElementById('waiting-banner');
+  if (!currentThread) { banner.classList.remove('visible'); return; }
+  const t = threads[currentThread];
+  if (!t || t.status !== 'waiting') { banner.classList.remove('visible'); return; }
+  const q = pendingQuestions.find(pq => pq.thread_id === currentThread);
+  if (!q) {
+    document.getElementById('wb-agent').textContent    = '';
+    document.getElementById('wb-question').textContent = 'An agent is waiting for your input. Loading question…';
+    document.getElementById('wb-context').style.display = 'none';
+    banner.classList.add('visible');
+    return;
+  }
+  document.getElementById('wb-agent').textContent    = `from ${humanRole(q.from_role)}`;
+  document.getElementById('wb-question').textContent = q.question;
+  const ctxEl = document.getElementById('wb-context');
+  if (q.context) { ctxEl.textContent = `Context: ${q.context}`; ctxEl.style.display = 'block'; }
+  else            { ctxEl.style.display = 'none'; }
+  document.getElementById('wb-reply').value       = '';
+  document.getElementById('wb-status').textContent = '';
+  document.getElementById('wb-send-btn').disabled  = false;
+  banner.dataset.questionId = q.id;
+  banner.dataset.fromRole   = q.from_role;
+  banner.dataset.threadId   = q.thread_id;
+  banner.classList.add('visible');
+}
+
+async function sendWaitingReply() {
+  const banner   = document.getElementById('waiting-banner');
+  const threadId = banner.dataset.threadId || currentThread;
+  const fromRole = banner.dataset.fromRole;
+  const msg      = document.getElementById('wb-reply').value.trim();
+  const status   = document.getElementById('wb-status');
+  const btn      = document.getElementById('wb-send-btn');
+  if (!msg) { status.textContent = 'Please type a reply first.'; return; }
+  btn.disabled = true; status.textContent = 'Sending…';
+  try {
+    const res = await fetch(`/threads/${threadId}/human-reply`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({message: msg, target_role: fromRole}),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    pendingQuestions = pendingQuestions.filter(pq => pq.thread_id !== threadId);
+    pendingCount     = pendingQuestions.length;
+    updateQuestionsBadge();
+    updateThreadStatus(threadId, 'active');
+    banner.classList.remove('visible');
+    if (document.getElementById('questions-modal').classList.contains('open')) renderQuestionsContent();
+    showToast(`✅ Reply sent to ${humanRole(fromRole)}`, 'success');
   } catch(e) {
-    showToast(`Failed to close thread: ${e.message}`, 'error');
+    status.textContent = `❌ ${e.message}`;
+    status.style.color = 'var(--red)';
+    btn.disabled = false;
   }
 }
 
-// Periodic refresh: metrics every 15s, agents/ci/tasks every 20s, wiki every 30s
-setInterval(loadMetrics, 15000);
-setInterval(loadAgentStatus, 20000);
-setInterval(loadCIResults, 20000);
-setInterval(loadTasks, 20000);
-setInterval(loadWiki, 30000);
-setInterval(loadToolActivity, 15000);
+async function loadPendingQuestions() {
+  try {
+    const res = await fetch('/pending-questions');
+    if (!res.ok) return;
+    pendingQuestions = await res.json();
+    pendingCount     = pendingQuestions.length;
+    updateQuestionsBadge();
+    refreshWaitingBanner();
+    if (document.getElementById('questions-modal').classList.contains('open')) renderQuestionsContent();
+  } catch {}
+}
 
-renderAgents();
-loadHistory().then(() => connectSSE());
+function openQuestionsModal() {
+  document.getElementById('questions-modal').classList.add('open');
+  renderQuestionsContent();
+}
+function closeQuestionsModal() { document.getElementById('questions-modal').classList.remove('open'); }
+document.getElementById('questions-modal').addEventListener('click', e => {
+  if (e.target === document.getElementById('questions-modal')) closeQuestionsModal();
+});
+
+function renderQuestionsContent() {
+  const el = document.getElementById('questions-content');
+  if (!pendingQuestions.length) {
+    el.innerHTML = '<div class="empty">No pending questions — all clear! ✅</div>';
+    return;
+  }
+  el.innerHTML = '';
+  pendingQuestions.forEach(q => {
+    const card = document.createElement('div');
+    card.className = 'question-card';
+    const time         = formatTime(q.created_at);
+    const agentOptions = ALL_AGENTS.map(r =>
+      `<option value="${r}" ${r===q.from_role?'selected':''}>${humanRole(r)}</option>`
+    ).join('');
+    const ctxHtml = q.context ? `<div class="q-ctx">${escHtml(q.context)}</div>` : '';
+    card.innerHTML = `
+      <div class="q-meta">Thread <strong>${q.thread_id.substring(0,8)}</strong> · <strong style="color:${ROLE_COLOR[q.from_role]||'var(--muted)'}">${humanRole(q.from_role)}</strong> · ${time}</div>
+      <div class="q-text">${escHtml(q.question)}</div>
+      ${ctxHtml}
+      <div class="q-form">
+        <textarea id="qreply-${q.id}" placeholder="Type your answer…"></textarea>
+        <div class="q-actions">
+          <button class="q-reply-btn" onclick="submitReply('${q.thread_id}',${q.id},'${q.from_role}')">Send Reply</button>
+          <span style="font-size:10px;color:var(--muted)">to:</span>
+          <select class="q-select" id="qagent-${q.id}">${agentOptions}</select>
+          <span class="q-status" id="qstatus-${q.id}"></span>
+        </div>
+      </div>
+    `;
+    el.appendChild(card);
+  });
+}
+
+async function submitReply(threadId, questionId, defaultRole) {
+  const ta     = document.getElementById(`qreply-${questionId}`);
+  const sel    = document.getElementById(`qagent-${questionId}`);
+  const status = document.getElementById(`qstatus-${questionId}`);
+  const msg    = ta.value.trim();
+  const to     = sel ? sel.value : defaultRole;
+  if (!msg) { status.textContent = 'Enter a reply first.'; return; }
+  status.textContent = 'Sending…';
+  try {
+    const res = await fetch(`/threads/${threadId}/human-reply`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({message: msg, target_role: to}),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    status.textContent = `✅ Sent to ${humanRole(to)}`;
+    status.style.color = 'var(--green)';
+    pendingQuestions   = pendingQuestions.filter(q => q.id !== questionId);
+    pendingCount       = pendingQuestions.length;
+    updateQuestionsBadge();
+    updateThreadStatus(threadId, 'active');
+    setTimeout(() => {
+      if (document.getElementById('questions-modal').classList.contains('open')) renderQuestionsContent();
+    }, 700);
+    showToast(`✅ Reply sent to ${humanRole(to)}`, 'success');
+  } catch(e) {
+    status.textContent = `❌ ${e.message}`;
+    status.style.color = 'var(--red)';
+  }
+}
+
+function updateThreadStatus(threadId, status) {
+  if (threads[threadId]) { threads[threadId].status = status; renderThreadList(); }
+}
+
+// ══════════════════════════════════════════════════════════
+// Standup modal
+// ══════════════════════════════════════════════════════════
+
+async function openStandupModal() {
+  document.getElementById('standup-modal').classList.add('open');
+  document.getElementById('standup-pub-status').textContent = '';
+  document.getElementById('standup-content').innerHTML = '<div class="empty">Loading…</div>';
+  try {
+    const res = await fetch('/standup?hours=24');
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    renderStandupReport(await res.json());
+  } catch(e) {
+    document.getElementById('standup-content').innerHTML = `<div class="empty">Failed: ${e.message}</div>`;
+  }
+}
+
+function closeStandupModal() { document.getElementById('standup-modal').classList.remove('open'); }
+document.getElementById('standup-modal').addEventListener('click', e => {
+  if (e.target===document.getElementById('standup-modal')) closeStandupModal();
+});
+
+function renderStandupReport(d) {
+  const el  = document.getElementById('standup-content');
+  const gen = d.generated_at ? new Date(d.generated_at).toLocaleString() : '—';
+  let html  = `<div style="font-size:10px;color:var(--muted);margin-bottom:14px">Generated ${gen} · last ${d.period_hours}h</div>`;
+
+  html += section('Active Threads', d.active_threads.map(t =>
+    `<div class="standup-row"><span class="standup-label">${escHtml(t.title||t.id)}</span><span class="standup-value">${t.messages} msgs</span><span style="font-size:10px;color:var(--muted)">${t.status}</span></div>`
+  ).join('') || '<div class="standup-none">None</div>');
+
+  html += section('Completed Tasks', d.tasks_completed.map(t =>
+    `<div class="standup-row"><span class="standup-label">✅ ${escHtml(t.title)}</span><span style="font-size:10px;color:var(--muted)">${t.assignee||'—'}</span></div>`
+  ).join('') || '<div class="standup-none">None</div>');
+
+  html += section('In Progress', d.tasks_in_progress.map(t =>
+    `<div class="standup-row"><span class="standup-label">🔄 ${escHtml(t.title)}</span><span style="font-size:10px;color:var(--muted)">${t.assignee||'—'}</span></div>`
+  ).join('') || '<div class="standup-none">None</div>');
+
+  const ci  = d.ci_summary || {};
+  const cok = ci.failed===0 && ci.total>0;
+  html += section('CI Summary', `<div class="standup-row"><span class="standup-label">Passed / Failed / Total</span><span class="standup-value" style="color:${cok?'var(--green)':'var(--red)'}">${ci.passed} / ${ci.failed} / ${ci.total}</span></div>`);
+
+  const cost = d.token_cost || {};
+  html += section('Token Cost', `
+    <div class="standup-row"><span class="standup-label">Input</span><span class="standup-value">${fmtToks(cost.total_input||0)}</span></div>
+    <div class="standup-row"><span class="standup-label">Output</span><span class="standup-value">${fmtToks(cost.total_output||0)}</span></div>
+    <div class="standup-row"><span class="standup-label">Estimated cost</span><span class="standup-value" style="color:var(--green)">$${(cost.estimated_cost_usd||0).toFixed(4)}</span></div>
+  `);
+
+  if (d.recent_blockers && d.recent_blockers.length) {
+    html += section('Recent Blockers', d.recent_blockers.map(b =>
+      `<div class="standup-row" style="flex-direction:column;gap:2px"><span style="font-size:10px;color:var(--muted)">${b.from_role}</span><span>${escHtml(b.excerpt)}</span></div>`
+    ).join(''));
+  }
+
+  el.innerHTML = html;
+}
+
+function section(title, content) {
+  return `<div class="standup-section"><h4>${title}</h4>${content}</div>`;
+}
+
+async function publishStandup() {
+  const btn = document.getElementById('standup-pub-btn');
+  const st  = document.getElementById('standup-pub-status');
+  btn.disabled = true; st.textContent = 'Publishing…';
+  try {
+    const res = await fetch('/standup/publish', {method:'POST'});
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const d = await res.json();
+    st.textContent = `✅ Published: "${d.title}"`; st.style.color = 'var(--green)';
+    loadWiki();
+  } catch(e) {
+    st.textContent = `❌ ${e.message}`; st.style.color = 'var(--red)';
+  } finally { btn.disabled = false; }
+}
+
+// ══════════════════════════════════════════════════════════
+// Chat input bar
+// ══════════════════════════════════════════════════════════
+
+function _chatIsSteerMode() {
+  return !!(currentThread && threads[currentThread] && threads[currentThread].status === 'active');
+}
+
+function _applyChatMode() {
+  const steer = _chatIsSteerMode();
+  // Collapsed pill text
+  document.getElementById('chat-placeholder').textContent = steer
+    ? `Message the team on "${threads[currentThread].title}"…`
+    : 'Start a new task…';
+  // Title row — hidden in steer mode
+  document.getElementById('chat-title-row').style.display = steer ? 'none' : 'flex';
+  // Desc label
+  document.getElementById('chat-desc-label').textContent = steer ? 'Msg' : 'Desc';
+  // Desc placeholder
+  document.getElementById('chat-desc').placeholder = steer
+    ? 'Send a direction, correction, or new requirement to the team…'
+    : 'Describe what you need in detail — this becomes the team\'s spec…';
+  // Priority selector
+  document.getElementById('chat-priority').style.display = steer ? 'none' : '';
+  // Send button label
+  document.getElementById('chat-send-btn').textContent = steer ? 'Send →' : 'Send Task →';
+}
+
+function openChat() {
+  _applyChatMode();
+  document.getElementById('chat-collapsed').style.display = 'none';
+  document.getElementById('chat-expanded').classList.add('open');
+  // Focus the right field
+  const focusId = _chatIsSteerMode() ? 'chat-desc' : 'chat-title';
+  setTimeout(() => document.getElementById(focusId).focus(), 40);
+}
+
+function closeChat() {
+  document.getElementById('chat-collapsed').style.display = 'flex';
+  document.getElementById('chat-expanded').classList.remove('open');
+  document.getElementById('chat-title').value    = '';
+  document.getElementById('chat-desc').value     = '';
+  document.getElementById('chat-priority').value = 'normal';
+  const btn = document.getElementById('chat-send-btn');
+  btn.disabled    = false;
+  btn.textContent = _chatIsSteerMode() ? 'Send →' : 'Send Task →';
+}
+
+// Keyboard shortcuts: ⌘/Ctrl+Enter to send, Esc to cancel
+document.addEventListener('keydown', e => {
+  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+    if (document.getElementById('chat-expanded').classList.contains('open')) {
+      e.preventDefault();
+      submitTask();
+    }
+  }
+  if (e.key === 'Escape') {
+    if (document.getElementById('chat-expanded').classList.contains('open')) closeChat();
+  }
+});
+
+async function submitTask() {
+  const btn = document.getElementById('chat-send-btn');
+
+  if (_chatIsSteerMode()) {
+    // ── Steer mode: inject human input into the current thread ──
+    const msg = document.getElementById('chat-desc').value.trim();
+    if (!msg) {
+      const el = document.getElementById('chat-desc');
+      el.style.borderColor = 'var(--c-human)';
+      el.focus();
+      setTimeout(() => { el.style.borderColor = ''; }, 1600);
+      return;
+    }
+    btn.disabled    = true;
+    btn.textContent = 'Sending…';
+    try {
+      const res = await fetch(`/threads/${currentThread}/human-reply`, {
+        method:  'POST',
+        headers: {'Content-Type': 'application/json'},
+        body:    JSON.stringify({ message: msg, target_role: 'engineering_manager' }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      showToast('✅ Message sent to the team', 'success', 4000);
+      closeChat();
+    } catch(e) {
+      showToast(`❌ Send failed: ${e.message}`, 'error');
+      btn.disabled    = false;
+      btn.textContent = 'Send →';
+    }
+    return;
+  }
+
+  // ── New-task mode ──
+  const title    = document.getElementById('chat-title').value.trim();
+  const desc     = document.getElementById('chat-desc').value.trim();
+  const priority = document.getElementById('chat-priority').value;
+  const titleEl  = document.getElementById('chat-title');
+
+  if (!title) {
+    titleEl.style.borderColor = 'var(--red)';
+    titleEl.focus();
+    setTimeout(() => { titleEl.style.borderColor = ''; }, 1600);
+    return;
+  }
+
+  btn.disabled    = true;
+  btn.textContent = 'Launching…';
+
+  try {
+    const res = await fetch('/task', {
+      method:  'POST',
+      headers: {'Content-Type': 'application/json'},
+      body:    JSON.stringify({ title, description: desc || title, priority }),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+
+    showToast(`🚀 Task submitted — thread ${data.thread_id.substring(0,8)}`, 'success', 6000);
+    closeChat();
+
+    if (!threads[data.thread_id]) {
+      threads[data.thread_id] = { id: data.thread_id, title, count: 0, status: 'active', github_repo: data.github_repo || '' };
+      document.getElementById('stat-threads').textContent = Object.keys(threads).length;
+      renderThreadList();
+    }
+  } catch(e) {
+    showToast(`❌ Submit failed: ${e.message}`, 'error');
+    btn.disabled    = false;
+    btn.textContent = 'Send Task →';
+  }
+}
+
+// ══════════════════════════════════════════════════════════
+// Home / Landing View
+// ══════════════════════════════════════════════════════════
+
+// track which mode the home card is in: 'new-task' | 'steer'
+let homeMode = 'new-task';
+
+function showHomeView() {
+  // Pick mode based on whether a thread is currently active
+  if (currentThread && threads[currentThread] && threads[currentThread].status === 'active') {
+    _setHomeMode('steer');
+  } else {
+    _setHomeMode('new-task');
+  }
+  const hv = document.getElementById('home-view');
+  hv.classList.remove('hidden', 'hiding');
+  // Focus the right field
+  if (homeMode === 'steer') {
+    document.getElementById('home-desc').focus();
+  } else {
+    document.getElementById('home-title').focus();
+  }
+}
+
+function _setHomeMode(mode) {
+  homeMode = mode;
+  const isSteer = mode === 'steer';
+
+  // Heading + subtext
+  document.getElementById('home-heading').textContent = isSteer
+    ? 'Steer this project'
+    : 'What do you want to build?';
+  document.getElementById('home-sub').textContent = isSteer
+    ? 'Send a direction, correction, or new requirement to the team working on this thread.'
+    : 'Describe your task and the AI dev team will take it from here.';
+
+  // Thread context chip
+  const ctxEl = document.getElementById('home-steer-ctx');
+  ctxEl.style.display = isSteer ? 'block' : 'none';
+  if (isSteer && currentThread && threads[currentThread]) {
+    document.getElementById('home-steer-thread').textContent = threads[currentThread].title || currentThread;
+  }
+
+  // Title field — only needed for new tasks
+  document.getElementById('home-title-wrap').style.display = isSteer ? 'none' : 'block';
+
+  // Desc label + placeholder
+  const descLabel = document.getElementById('home-desc-label');
+  const descInput = document.getElementById('home-desc');
+  if (isSteer) {
+    descLabel.innerHTML = 'Your direction';
+    descInput.placeholder = 'e.g. "Switch to PostgreSQL instead of in-memory storage" or "Add JWT authentication before anything else"';
+    descInput.style.minHeight = '130px';
+  } else {
+    descLabel.innerHTML = 'Description <span style="font-weight:400;text-transform:none;letter-spacing:0">(optional — more detail = better results)</span>';
+    descInput.placeholder = 'Describe the requirements, tech stack preferences, endpoints, tests needed, etc…';
+    descInput.style.minHeight = '110px';
+  }
+  document.getElementById('home-desc').value = '';
+
+  // Priority selector — only for new tasks
+  document.getElementById('home-priority').style.display = isSteer ? 'none' : '';
+
+  // Button label
+  document.getElementById('home-submit-btn').textContent = isSteer ? 'Send to team →' : 'Launch Task →';
+
+  // Hint text
+  document.getElementById('home-hint').textContent = isSteer
+    ? '⌘ ↵ to send · Esc to cancel'
+    : '⌘ ↵ to submit · or click the button';
+
+  // Swap example chips
+  const examplesEl = document.getElementById('home-examples');
+  if (isSteer) {
+    examplesEl.innerHTML = `
+      <span class="home-example-label">Quick directions</span>
+      <span class="home-chip" onclick="fillSteerExample('Switch to SQLite for persistence instead of in-memory storage')">Use SQLite</span>
+      <span class="home-chip" onclick="fillSteerExample('Add JWT authentication — POST /login and /register endpoints before anything else')">Add auth</span>
+      <span class="home-chip" onclick="fillSteerExample('Stop what you are doing and focus on fixing the failing tests first')">Fix tests first</span>
+      <span class="home-chip" onclick="fillSteerExample('The API design looks good — ship it as-is and do not add more features')">Ship as-is</span>
+    `;
+  } else {
+    examplesEl.innerHTML = `
+      <span class="home-example-label">Try an example</span>
+      <span class="home-chip" onclick="fillExample('Build a REST API for a task manager', 'Create a FastAPI app with POST /tasks, GET /tasks, PATCH /tasks/{id}, DELETE /tasks/{id}. In-memory storage, Pydantic models, pytest tests.')">Task Manager API</span>
+      <span class="home-chip" onclick="fillExample('Build a password generator API', 'FastAPI endpoint POST /generate — accepts length (default 16) and include_symbols (default true) query params. Returns {&quot;password&quot;: string}. Add pytest tests.')">Password Generator</span>
+      <span class="home-chip" onclick="fillExample('Build a currency converter API', 'FastAPI app with GET /convert?from=USD&amp;to=EUR&amp;amount=100. Use hardcoded exchange rates. Full test suite.')">Currency Converter</span>
+      <span class="home-chip" onclick="fillExample('Build a simple blog API', 'REST API for blog posts: CRUD endpoints, author field, tags support, search by title. FastAPI + pytest.')">Blog API</span>
+    `;
+  }
+}
+
+function hidHomeView() {
+  const hv = document.getElementById('home-view');
+  hv.classList.add('hiding');
+  setTimeout(() => hv.classList.add('hidden'), 320);
+}
+
+function fillExample(title, desc) {
+  document.getElementById('home-title').value = title;
+  document.getElementById('home-desc').value  = desc;
+  document.getElementById('home-title').focus();
+}
+
+function fillSteerExample(msg) {
+  document.getElementById('home-desc').value = msg;
+  document.getElementById('home-desc').focus();
+}
+
+async function homeSubmitTask() {
+  const btn = document.getElementById('home-submit-btn');
+
+  if (homeMode === 'steer') {
+    // ── Steer mode: inject human input into the current thread ──
+    const msg = document.getElementById('home-desc').value.trim();
+    if (!msg) {
+      const el = document.getElementById('home-desc');
+      el.style.borderColor = 'var(--red)';
+      el.focus();
+      setTimeout(() => { el.style.borderColor = ''; }, 1600);
+      return;
+    }
+    btn.disabled    = true;
+    btn.textContent = 'Sending…';
+    try {
+      const res = await fetch(`/threads/${currentThread}/human-reply`, {
+        method:  'POST',
+        headers: {'Content-Type': 'application/json'},
+        body:    JSON.stringify({ message: msg, target_role: 'engineering_manager' }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      hidHomeView();
+      showToast('✅ Direction sent to the team', 'success', 4000);
+    } catch(e) {
+      showToast(`❌ Send failed: ${e.message}`, 'error');
+    } finally {
+      btn.disabled    = false;
+      btn.textContent = 'Send to team →';
+    }
+    return;
+  }
+
+  // ── New-task mode: submit a fresh task ──
+  const title    = document.getElementById('home-title').value.trim();
+  const desc     = document.getElementById('home-desc').value.trim();
+  const priority = document.getElementById('home-priority').value;
+  const titleEl  = document.getElementById('home-title');
+
+  if (!title) {
+    titleEl.style.borderColor = 'var(--red)';
+    titleEl.focus();
+    setTimeout(() => { titleEl.style.borderColor = ''; }, 1600);
+    return;
+  }
+
+  btn.disabled    = true;
+  btn.textContent = 'Launching…';
+
+  try {
+    const res = await fetch('/task', {
+      method:  'POST',
+      headers: {'Content-Type': 'application/json'},
+      body:    JSON.stringify({ title, description: desc || title, priority }),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+
+    // Add to sidebar immediately
+    threads[data.thread_id] = { id: data.thread_id, title, count: 1, status: 'active', github_repo: data.github_repo || '' };
+    document.getElementById('stat-threads').textContent = Object.keys(threads).length;
+
+    // Select this thread BEFORE rendering so active class is applied
+    currentThread = data.thread_id;
+    renderThreadList();
+
+    // Update feed header
+    document.getElementById('feed-title').textContent = title;
+    document.getElementById('close-thread-btn').style.display = 'inline-block';
+    loadTasks(); loadBudget(data.thread_id);
+
+    // Scroll sidebar to top so new thread (sorted first) is visible
+    document.getElementById('thread-list').scrollTop = 0;
+
+    // Clear form + reset button
+    document.getElementById('home-title').value = '';
+    document.getElementById('home-desc').value  = '';
+    btn.disabled    = false;
+    btn.textContent = 'Launch Task →';
+
+    // Hide home, show dashboard
+    hidHomeView();
+    showToast(`🚀 Task submitted — thread ${data.thread_id.substring(0,8)}`, 'success', 6000);
+  } catch(e) {
+    showToast(`❌ Submit failed: ${e.message}`, 'error');
+    btn.disabled    = false;
+    btn.textContent = 'Launch Task →';
+  }
+}
+
+// Home view keyboard shortcut (⌘+↵ or Ctrl+↵)
+document.addEventListener('keydown', (e) => {
+  const hv = document.getElementById('home-view');
+  if (!hv.classList.contains('hidden') && !hv.classList.contains('hiding')) {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+      e.preventDefault();
+      homeSubmitTask();
+    }
+    if (e.key === 'Escape') {
+      hidHomeView();
+    }
+  }
+});
+
+// ══════════════════════════════════════════════════════════
+// Init
+// ══════════════════════════════════════════════════════════
+
+initAgentChips();
+renderAgentCards();
+loadHistory().then(() => {
+  connectSSE();
+  // Show home page only if no threads exist yet
+  if (Object.keys(threads).length === 0) {
+    showHomeView();
+  } else {
+    document.getElementById('home-view').classList.add('hidden');
+  }
+});
+loadTasks();
 loadMetrics();
 loadAgentStatus();
 loadCIResults();
-loadTasks();
 loadWiki();
-loadToolActivity();
+loadPendingQuestions();
+
+// Periodic polling
+setInterval(loadMetrics,         15000);
+setInterval(loadAgentStatus,     20000);
+setInterval(loadCIResults,       20000);
+setInterval(loadTasks,           15000);
+setInterval(loadWiki,            30000);
+setInterval(loadToolStats,       20000);
+setInterval(loadPendingQuestions, 10000);
+
+// Cmd/Ctrl+Enter submits the waiting-banner reply textarea
+document.getElementById('wb-reply').addEventListener('keydown', e => {
+  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); sendWaitingReply(); }
+});
 </script>
 </body>
 </html>

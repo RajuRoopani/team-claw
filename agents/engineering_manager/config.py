@@ -18,6 +18,11 @@ ALLOWED_TOOLS = [
     "find_files",
     "check_budget",
     "edit_file",
+    "ask_human",
+    "git_diff",
+    "git_push",
+    "git_checkout_branch",
+    "git_merge",
 ]
 
 AVAILABLE_ROLES = [

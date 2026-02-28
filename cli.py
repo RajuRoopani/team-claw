@@ -10,6 +10,8 @@ Usage:
     python cli.py standup [--hours N]
     python cli.py budget <thread_id>
     python cli.py tools [--agent <role>] [--thread <id>] [--limit N]
+    python cli.py questions [--thread <id>]
+    python cli.py reply <thread_id> <message> [--to <agent_role>]
 """
 from __future__ import annotations
 
@@ -50,6 +52,7 @@ TYPE_ICONS = {
     "acceptance_result": "🎯",
     "human_input":      "👤",
     "agent_reply":      "🤖",
+    "human_question":   "🔔",
 }
 
 
@@ -294,6 +297,67 @@ async def cmd_budget(thread_id: str) -> None:
     print()
 
 
+async def cmd_questions(thread: str | None = None) -> None:
+    params: dict[str, str] = {}
+    if thread:
+        params["thread_id"] = thread
+
+    async with httpx.AsyncClient(base_url=BASE_URL, timeout=10) as client:
+        resp = await client.get("/pending-questions", params=params)
+        resp.raise_for_status()
+        questions = resp.json()
+
+    if not questions:
+        print("No pending questions.")
+        return
+
+    scope = f" (thread {thread[:8]})" if thread else ""
+    print(f"\n{BOLD}Pending Questions{scope}{RESET}  {DIM}({len(questions)} unanswered){RESET}\n")
+    print(f"  {'ID':>6}  {'Thread':<10}  {'Agent':<22}  Question")
+    print(f"  {'─'*6}  {'─'*10}  {'─'*22}  {'─'*50}")
+    for q in questions:
+        tid = q['thread_id'][:8]
+        question_preview = q['question'][:60].replace('\n', ' ')
+        if len(q['question']) > 60:
+            question_preview += '…'
+        print(f"  {q['id']:>6}  {tid:<10}  {q['from_role']:<22}  {question_preview}")
+        if q.get('context'):
+            ctx_preview = q['context'][:80].replace('\n', ' ')
+            print(f"  {'':>6}  {'':>10}  {DIM}{'context:':<22}  {ctx_preview}{RESET}")
+    print()
+
+
+async def cmd_reply(thread_id: str, message: str, to: str | None = None) -> None:
+    if not to:
+        # Auto-detect target from most recent pending question
+        async with httpx.AsyncClient(base_url=BASE_URL, timeout=10) as client:
+            resp = await client.get(f"/pending-questions?thread_id={thread_id}")
+            if resp.status_code == 200 and resp.json():
+                questions = resp.json()
+                to = questions[0]["from_role"]
+            else:
+                print(f"No pending questions in thread {thread_id[:8]}. Use --to <agent_role>.")
+                return
+
+    async with httpx.AsyncClient(base_url=BASE_URL, timeout=10) as client:
+        resp = await client.post(
+            f"/threads/{thread_id}/human-reply",
+            json={"message": message, "target_role": to},
+        )
+        if resp.status_code == 404:
+            print(f"Thread {thread_id} not found.")
+            return
+        resp.raise_for_status()
+        data = resp.json()
+
+    print(f"\n{BOLD}Reply sent!{RESET}")
+    print(f"  Thread  : {thread_id[:8]}")
+    print(f"  To      : {_color(to)}{BOLD}{to}{RESET}")
+    print(f"  Status  : {data['status']}")
+    print(f"\nWatch the thread:")
+    print(f"  python cli.py watch {thread_id}\n")
+
+
 def main() -> None:
     args = sys.argv[1:]
     if not args:
@@ -361,6 +425,31 @@ def main() -> None:
             else:
                 i += 1
         asyncio.run(cmd_tools(agent=agent_filter, thread=thread_filter, limit=limit_val))
+
+    elif cmd == "questions":
+        thread_filter = None
+        i = 1
+        while i < len(args):
+            if args[i] == "--thread" and i + 1 < len(args):
+                thread_filter = args[i + 1]; i += 2
+            else:
+                i += 1
+        asyncio.run(cmd_questions(thread=thread_filter))
+
+    elif cmd == "reply":
+        if len(args) < 3:
+            print("Usage: python cli.py reply <thread_id> <message> [--to <agent_role>]")
+            sys.exit(1)
+        thread_id = args[1]
+        message   = args[2]
+        to_role   = None
+        i = 3
+        while i < len(args):
+            if args[i] == "--to" and i + 1 < len(args):
+                to_role = args[i + 1]; i += 2
+            else:
+                i += 1
+        asyncio.run(cmd_reply(thread_id, message, to=to_role))
 
     else:
         print(f"Unknown command: {cmd}")

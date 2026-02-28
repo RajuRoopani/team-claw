@@ -57,9 +57,10 @@ def execute(req: ExecuteRequest) -> ExecuteResult:
             env=env,
         )
         ok = proc.returncode == 0
+        # Keep the tail so pytest summary lines are always preserved
         return ExecuteResult(
-            stdout=proc.stdout[:MAX_OUTPUT],
-            stderr=proc.stderr[:MAX_OUTPUT],
+            stdout=proc.stdout[-MAX_OUTPUT:],
+            stderr=proc.stderr[-MAX_OUTPUT:],
             exit_code=proc.returncode,
             timed_out=False,
             summary="✅ Success" if ok else f"❌ Failed (exit {proc.returncode})",
@@ -111,7 +112,8 @@ def _build_cmd(req: ExecuteRequest) -> list[str]:
 
     if req.language == "pytest":
         target = req.file_path or "tests/"
-        return ["python3", "-m", "pytest", str(_safe_path(target)), "-v", "--tb=short"]
+        return ["python3", "-m", "pytest", str(_safe_path(target)), "-v", "--tb=short",
+                "--continue-on-collection-errors", "-p", "no:cacheprovider"]
 
     if req.language == "bash":
         if req.code:

@@ -106,3 +106,19 @@ CREATE TABLE IF NOT EXISTS tool_executions (
 CREATE INDEX IF NOT EXISTS idx_tool_exec_agent ON tool_executions(agent_role);
 CREATE INDEX IF NOT EXISTS idx_tool_exec_tool  ON tool_executions(tool_name);
 CREATE INDEX IF NOT EXISTS idx_tool_exec_time  ON tool_executions(executed_at DESC);
+
+-- ── Phase 9: human-in-the-loop ────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS human_questions (
+    id          BIGSERIAL   PRIMARY KEY,
+    thread_id   TEXT        NOT NULL,
+    from_role   TEXT        NOT NULL,
+    question    TEXT        NOT NULL,
+    context     TEXT        DEFAULT '',
+    answered    BOOLEAN     NOT NULL DEFAULT FALSE,
+    answer      TEXT        DEFAULT '',
+    answered_at TIMESTAMPTZ,
+    created_at  TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_hq_thread     ON human_questions(thread_id);
+CREATE INDEX IF NOT EXISTS idx_hq_unanswered ON human_questions(answered) WHERE NOT answered;

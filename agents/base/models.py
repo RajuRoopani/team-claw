@@ -20,6 +20,7 @@ class MessageType(str, Enum):
     # System types
     HUMAN_INPUT = "human_input"
     AGENT_REPLY = "agent_reply"
+    HUMAN_QUESTION = "human_question"   # agent → human (awaiting answer)
 
 
 class Priority(str, Enum):

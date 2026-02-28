@@ -86,6 +86,8 @@ services:
       WEBHOOK_URL: ${WEBHOOK_URL:-}
       THREAD_BUDGET_TOKENS: ${THREAD_BUDGET_TOKENS:-0}
       IDLE_THREAD_MINUTES: ${IDLE_THREAD_MINUTES:-0}
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      GITHUB_USERNAME: ${GITHUB_USERNAME:-RajuRoopani}
     volumes:
       - workspace:/workspace
 
@@ -116,6 +118,8 @@ services:
       MODEL: ${EM_MODEL:-claude-opus-4-6}
       SANDBOX_URL: http://sandbox:8081
       ORCHESTRATOR_URL: http://orchestrator:8080
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      GITHUB_USERNAME: ${GITHUB_USERNAME:-RajuRoopani}
 
   architect:
     <<: *agent-base
@@ -143,6 +147,8 @@ services:
       MODEL: ${SR_MODEL:-claude-sonnet-4-6}
       SANDBOX_URL: http://sandbox:8081
       ORCHESTRATOR_URL: http://orchestrator:8080
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      GITHUB_USERNAME: ${GITHUB_USERNAME:-RajuRoopani}
 
   senior-dev-2:
     <<: *agent-base
@@ -158,6 +164,8 @@ services:
       MODEL: ${SR_MODEL:-claude-sonnet-4-6}
       SANDBOX_URL: http://sandbox:8081
       ORCHESTRATOR_URL: http://orchestrator:8080
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      GITHUB_USERNAME: ${GITHUB_USERNAME:-RajuRoopani}
 
   junior-dev-1:
     <<: *agent-base
@@ -173,6 +181,8 @@ services:
       MODEL: ${JR_MODEL:-claude-haiku-4-5-20251001}
       SANDBOX_URL: http://sandbox:8081
       ORCHESTRATOR_URL: http://orchestrator:8080
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      GITHUB_USERNAME: ${GITHUB_USERNAME:-RajuRoopani}
 
   junior-dev-2:
     <<: *agent-base
@@ -188,3 +198,5 @@ services:
       MODEL: ${JR_MODEL:-claude-haiku-4-5-20251001}
       SANDBOX_URL: http://sandbox:8081
       ORCHESTRATOR_URL: http://orchestrator:8080
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      GITHUB_USERNAME: ${GITHUB_USERNAME:-RajuRoopani}

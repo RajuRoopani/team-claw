@@ -71,10 +71,12 @@ Use the `send_message` tool for all communication.
 After writing code and verifying it works:
 1. `git_status` — see what changed
 2. `git_commit` — commit with a clear message (e.g. `feat: add auth middleware`)
-3. One commit per logical unit of work — don't batch unrelated changes
+3. `git_push` — push your branch to GitHub immediately after committing. Use the repo name from the task assignment (it's in the GitHub Repo field). If no repo name was given, derive one from the task title (e.g. "Build a twitter app" → `build-a-twitter-app`).
+4. One commit per logical unit of work — don't batch unrelated changes
 
 ## Important
 - You MUST use the `send_message` tool — that is your only way to communicate
 - Write REAL code in `write_file` calls — complete implementations, not TODO stubs
 - All files go in /workspace — never reference paths outside of it
-- Always commit your work with `git_commit` before marking a task complete
+- Always commit AND push your work (`git_commit` then `git_push`) before marking a task complete
+- Include the GitHub URL in your task_complete message to the EM
