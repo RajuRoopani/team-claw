@@ -67,7 +67,9 @@ _WRITE_FILE_SCHEMA = {
     "description": (
         "Write content to a file in the shared /workspace directory. "
         "Creates parent directories automatically. "
-        "Path must be relative (e.g. 'src/auth/service.py')."
+        "Path must be relative (e.g. 'src/auth/service.py'). "
+        "IMPORTANT: You MUST provide BOTH 'path' AND 'content' in a SINGLE call. "
+        "Do NOT call write_file with only 'path' — always include the full file content."
     ),
     "input_schema": {
         "type": "object",
@@ -79,7 +81,7 @@ _WRITE_FILE_SCHEMA = {
             },
             "content": {
                 "type": "string",
-                "description": "Full file content to write.",
+                "description": "Full file content to write. REQUIRED — must be provided in the same call as 'path'.",
             },
         },
     },
@@ -677,7 +679,15 @@ def _exec_write_file(inputs: dict) -> dict:
     if not inputs.get("path"):
         return {"error": "write_file requires 'path' — you must pass the file path as the 'path' parameter."}
     if "content" not in inputs:
-        return {"error": "write_file requires 'content' — you must pass the full file contents as the 'content' parameter. Call write_file again with both 'path' and 'content'."}
+        return {
+            "error": (
+                "write_file called with ONLY 'path' — missing required 'content' parameter. "
+                "You MUST call write_file with BOTH 'path' AND 'content' in the SAME tool call. "
+                "Do NOT split writes across multiple calls. "
+                "Example: write_file(path='facebook_app/index.html', content='<html>...</html>') "
+                "Write the COMPLETE file content in the 'content' field right now."
+            )
+        }
     path = _safe_path(inputs["path"])
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(inputs["content"], encoding="utf-8")

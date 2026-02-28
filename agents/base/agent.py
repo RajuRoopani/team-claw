@@ -221,7 +221,7 @@ class Agent:
           ask Claude → if tool_use: execute + feed results → repeat
           until stop_reason == "end_turn"
         """
-        max_iterations = 25  # safety cap (increased for complex multi-step workflows)
+        max_iterations = 30  # safety cap (increased for complex multi-step workflows)
 
         # Loop detection: track (tool_name, frozen_inputs) of last N tool calls
         _recent_calls: list[tuple[str, str]] = []
@@ -231,7 +231,7 @@ class Agent:
         for iteration in range(max_iterations):
             response = await self.claude.messages.create(
                 model=self.model,
-                max_tokens=4096,
+                max_tokens=8192,
                 system=self.system_prompt,
                 messages=conversation,
                 tools=self.tool_schemas,
@@ -288,9 +288,14 @@ class Agent:
                             self.role, loop_tool, most_common_count,
                         )
                         _recent_calls.clear()
-                        conversation.append({
-                            "role": "user",
-                            "content": (
+                        # IMPORTANT: tool_results MUST be added first to keep the conversation
+                        # valid (every tool_use block needs a matching tool_result).
+                        # The circuit-breaker is appended as a text block in the SAME user
+                        # turn — injecting it as a separate user message would produce a
+                        # "tool_use without tool_result" 400 error from the API.
+                        tool_results.append({
+                            "type": "text",
+                            "text": (
                                 f"⚠️ LOOP DETECTED: You have called `{loop_tool}` {most_common_count} times "
                                 f"in a row with the same inputs and it is not making progress. "
                                 f"STOP calling `{loop_tool}`. "
@@ -299,7 +304,6 @@ class Agent:
                                 f"Do NOT repeat the same failing tool call again. Make a decision and move on."
                             ),
                         })
-                        continue
 
                 conversation.append({"role": "user", "content": tool_results})
             elif response.stop_reason == "max_tokens":
