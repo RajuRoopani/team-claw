@@ -537,6 +537,7 @@ Waiting On
 | 14 | Bug fixes: thread sidebar title no longer overwritten by mid-task steering messages; `execute_code` tool no longer loops silently when called without `code` or `file_path` |
 | 15 | Dashboard theme selector: 7 selectable themes (Void, Ocean, Dracula, Nord, Cyberpunk, Forest, Solar) with CSS custom-property swapping, color dot + swatch preview, localStorage persistence |
 | 16 | Agent reliability: **loop detection** in `_agentic_loop` (circuit-breaks when same tool+inputs repeats 3×); **file ownership protocol** in EM + dev prompts (explicit per-file assignments prevent overwrite conflicts); **status noise reduction** (devs only message on blockers/questions/completion); `execute_code` removed from EM tools; `write_file` now returns actionable error when `content` param is missing |
+| 17 | **Per-task isolated git repos**: `git_commit`, `git_status`, `git_push` all support a `subdirectory` param — agents write to `/workspace/{project}/` and push only that folder as a clean isolated repo. No more slack_app/uber_app files bleeding into unrelated repos. Enables true parallel agent work with zero cross-task contamination. |
 
 ---
 
