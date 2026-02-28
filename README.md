@@ -4,6 +4,8 @@ An autonomous AI software development team running in Docker. Seven Claude agent
 
 Built across 9 phases, from a minimal 2-agent loop to a full team with CI, human-in-the-loop escalation, live dashboard, and tool telemetry.
 
+![Team Claw Dashboard](docs/dashboard.png)
+
 ---
 
 ## The Team
