@@ -1,0 +1,1544 @@
+"""
+Orchestrator — the human-facing API.
+
+Responsibilities:
+  - Accept task submissions from humans (POST /task)
+  - Route them into the EM's inbox as HUMAN_INPUT messages
+  - Listen on its own inbox ("orchestrator") for agent replies
+  - Persist all audit messages (from team:audit stream) to Postgres
+  - Expose read endpoints for threads and messages
+
+Run: uvicorn main:app --host 0.0.0.0 --port 8080 --reload
+"""
+from __future__ import annotations
+
+import asyncio
+import json
+import logging
+import os
+import pathlib
+import subprocess
+import uuid
+from contextlib import asynccontextmanager
+from datetime import datetime, timedelta, timezone
+from typing import AsyncGenerator
+
+import asyncpg
+import httpx
+import redis.asyncio as aioredis
+from fastapi import FastAPI, HTTPException, Query
+from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
+from pydantic import BaseModel
+
+logging.basicConfig(
+    level=os.environ.get("LOG_LEVEL", "INFO").upper(),
+    format="%(asctime)s  [orchestrator]  %(levelname)-8s  %(message)s",
+    datefmt="%H:%M:%S",
+)
+logger = logging.getLogger(__name__)
+
+REDIS_URL = os.environ["REDIS_URL"]
+DB_URL = os.environ["DB_URL"]
+SANDBOX_URL = os.environ.get("SANDBOX_URL", "http://sandbox:8081")
+WEBHOOK_URL = os.environ.get("WEBHOOK_URL", "")
+THREAD_BUDGET_TOKENS = int(os.environ.get("THREAD_BUDGET_TOKENS", "0"))  # 0 = disabled
+IDLE_THREAD_MINUTES = int(os.environ.get("IDLE_THREAD_MINUTES", "0"))    # 0 = disabled
+AUDIT_STREAM = "team:audit"
+AUDIT_GROUP = "grp:orchestrator-audit"
+AUDIT_CONSUMER = "orchestrator-0"
+
+ALL_AGENT_ROLES = [
+    "product_owner", "engineering_manager", "architect",
+    "senior_dev_1", "senior_dev_2", "junior_dev_1", "junior_dev_2",
+]
+
+
+# ─────────────────────────────────────────────
+# App state
+# ─────────────────────────────────────────────
+
+class AppState:
+    redis: aioredis.Redis
+    db: asyncpg.Pool
+    audit_task: asyncio.Task | None = None
+    agent_last_seen: dict[str, datetime] = {}
+    budget_warnings_fired: set[str] = set()  # "{thread_id}:{threshold}"
+    idle_alerts_fired: set[str] = set()      # thread_ids already alerted
+    idle_task: asyncio.Task | None = None
+
+
+state = AppState()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    state.redis = aioredis.from_url(REDIS_URL, decode_responses=False)
+    state.db = await asyncpg.create_pool(DB_URL, min_size=2, max_size=10)
+    state.agent_last_seen = {}
+    state.budget_warnings_fired = set()
+    state.idle_alerts_fired = set()
+    state.idle_task = None
+    await _setup_audit_consumer()
+    await _ensure_phase4_tables()
+    await _ensure_phase5_tables()
+    await _ensure_phase8_tables()
+    _init_workspace_git()
+    state.audit_task = asyncio.create_task(_audit_loop(), name="audit-loop")
+    state.idle_task = asyncio.create_task(_idle_monitor_loop(), name="idle-monitor")
+    logger.info("Orchestrator online.")
+    yield
+    # Shutdown
+    if state.audit_task:
+        state.audit_task.cancel()
+    if state.idle_task:
+        state.idle_task.cancel()
+    await state.redis.aclose()
+    await state.db.close()
+
+
+app = FastAPI(title="Team Claw Orchestrator", lifespan=lifespan)
+
+
+# ─────────────────────────────────────────────
+# Pydantic schemas
+# ─────────────────────────────────────────────
+
+class TaskRequest(BaseModel):
+    title: str
+    description: str
+    priority: str = "normal"
+
+
+class TaskResponse(BaseModel):
+    thread_id: str
+    message_id: str
+    status: str = "submitted"
+
+
+class ThreadSummary(BaseModel):
+    id: str
+    title: str
+    status: str
+    message_count: int
+    created_at: str
+
+
+class MessageOut(BaseModel):
+    id: str
+    thread_id: str
+    from_role: str
+    to_role: str
+    type: str
+    content: str
+    priority: str
+    created_at: str
+
+
+# Phase 4 models
+class MemoryItem(BaseModel):
+    key: str
+    value: str
+    updated_at: str
+
+
+class WikiArticle(BaseModel):
+    title: str
+    content: str
+    author: str
+    updated_at: str
+
+
+class WikiWriteRequest(BaseModel):
+    content: str
+    author: str = "unknown"
+
+
+class MetricsRecord(BaseModel):
+    agent_role: str
+    thread_id: str | None = None
+    model: str
+    input_tokens: int
+    output_tokens: int
+
+
+class AgentMetricsSummary(BaseModel):
+    agent_role: str
+    total_input_tokens: int
+    total_output_tokens: int
+    total_calls: int
+    estimated_cost_usd: float
+
+
+# Phase 5 models
+class AgentStatus(BaseModel):
+    role: str
+    status: str          # online | stale | offline
+    last_seen: str | None
+
+
+class TaskCreate(BaseModel):
+    thread_id: str
+    title: str
+    description: str = ""
+    assignee: str = ""
+    created_by: str = ""
+
+
+class TaskUpdate(BaseModel):
+    status: str          # pending | in_progress | review | done
+
+
+class TaskOut(BaseModel):
+    id: str
+    thread_id: str
+    title: str
+    description: str
+    assignee: str
+    status: str
+    created_by: str
+    created_at: str
+    updated_at: str
+
+
+class CIResult(BaseModel):
+    id: int
+    task_id: str | None
+    thread_id: str | None
+    passed: int
+    failed: int
+    total: int
+    exit_code: int
+    output: str
+    ran_at: str
+
+
+# Phase 6 models
+class ThreadSummaryDetail(BaseModel):
+    id: str
+    title: str
+    status: str
+    created_at: str
+    tasks_total: int
+    tasks_done: int
+    tasks_in_progress: int
+    ci_last_exit_code: int | None
+    ci_last_passed: int | None
+    ci_last_total: int | None
+
+
+class CITrendPoint(BaseModel):
+    exit_code: int
+    passed: int
+    total: int
+    ran_at: str
+
+
+# Phase 7 models
+class ThreadBudget(BaseModel):
+    thread_id: str
+    tokens_used: int
+    budget: int          # 0 = unlimited
+    pct_used: float      # 0.0–100.0+
+    status: str          # ok | warning (>80%) | exceeded (>100%) | unlimited
+
+
+class StandupReport(BaseModel):
+    generated_at: str
+    period_hours: int
+    active_threads: list[dict]
+    tasks_completed: list[dict]
+    tasks_in_progress: list[dict]
+    ci_summary: dict
+    messages_by_agent: dict
+    token_cost: dict
+    recent_blockers: list[dict]
+
+
+# Phase 8 models
+class ToolExecutionRecord(BaseModel):
+    agent_role: str
+    tool_name: str
+    thread_id: str | None = None
+    duration_ms: int = 0
+    success: bool = True
+    error: str = ""
+
+
+class ToolExecutionOut(BaseModel):
+    id: int
+    agent_role: str
+    tool_name: str
+    thread_id: str | None
+    duration_ms: int
+    success: bool
+    error: str
+    executed_at: str
+
+
+class ToolStats(BaseModel):
+    tool_name: str
+    total_calls: int
+    success_rate: float
+    avg_duration_ms: float
+    p95_duration_ms: float
+
+
+# ─────────────────────────────────────────────
+# API endpoints
+# ─────────────────────────────────────────────
+
+@app.post("/task", response_model=TaskResponse)
+async def submit_task(req: TaskRequest) -> TaskResponse:
+    """Submit a new task — creates a thread and routes to the EM."""
+    thread_id = str(uuid.uuid4())
+    message_id = str(uuid.uuid4())
+    now = datetime.now(timezone.utc)
+
+    # Persist thread
+    async with state.db.acquire() as conn:
+        await conn.execute(
+            "INSERT INTO threads(id, title, status, created_at, updated_at) VALUES($1,$2,'active',$3,$3)",
+            thread_id, req.title, now,
+        )
+
+    # Build message payload
+    payload = {
+        "id": message_id,
+        "thread_id": thread_id,
+        "from_role": "orchestrator",
+        "to_role": "engineering_manager",
+        "type": "human_input",
+        "content": f"**{req.title}**\n\n{req.description}",
+        "priority": req.priority,
+        "artifacts": "[]",
+        "parent_message_id": "",
+        "timestamp": now.isoformat(),
+        "metadata": json.dumps({"source": "human"}),
+    }
+
+    # Deliver to Product Owner inbox (PO handles all incoming requirements)
+    await state.redis.xadd("agent:product_owner:inbox", _encode(payload))
+    # Audit
+    await state.redis.xadd(AUDIT_STREAM, _encode(payload))
+
+    logger.info("Task submitted: thread=%s title=%r", thread_id[:8], req.title)
+    return TaskResponse(thread_id=thread_id, message_id=message_id)
+
+
+@app.get("/threads", response_model=list[ThreadSummary])
+async def list_threads() -> list[ThreadSummary]:
+    async with state.db.acquire() as conn:
+        rows = await conn.fetch(
+            """
+            SELECT t.id, t.title, t.status, t.created_at,
+                   COUNT(m.id) AS message_count
+            FROM threads t
+            LEFT JOIN messages m ON m.thread_id = t.id
+            GROUP BY t.id
+            ORDER BY t.created_at DESC
+            LIMIT 50
+            """
+        )
+    return [
+        ThreadSummary(
+            id=str(r["id"]),
+            title=r["title"] or "",
+            status=r["status"],
+            message_count=r["message_count"],
+            created_at=r["created_at"].isoformat(),
+        )
+        for r in rows
+    ]
+
+
+@app.get("/threads/{thread_id}/messages", response_model=list[MessageOut])
+async def get_thread_messages(thread_id: str) -> list[MessageOut]:
+    async with state.db.acquire() as conn:
+        rows = await conn.fetch(
+            """
+            SELECT id, thread_id, from_role, to_role, type, content, priority, created_at
+            FROM messages
+            WHERE thread_id = $1
+            ORDER BY created_at ASC
+            """,
+            thread_id,
+        )
+    if not rows:
+        raise HTTPException(status_code=404, detail="Thread not found or empty")
+    return [
+        MessageOut(
+            id=str(r["id"]),
+            thread_id=str(r["thread_id"]),
+            from_role=r["from_role"],
+            to_role=r["to_role"],
+            type=r["type"],
+            content=r["content"],
+            priority=r["priority"],
+            created_at=r["created_at"].isoformat(),
+        )
+        for r in rows
+    ]
+
+
+@app.get("/threads/{thread_id}/stream")
+async def stream_thread(thread_id: str):
+    """Server-Sent Events stream of new messages for a thread."""
+    async def event_gen() -> AsyncGenerator[str, None]:
+        last_id = "$"
+        while True:
+            result = await state.redis.xread(
+                {AUDIT_STREAM: last_id}, count=20, block=3000
+            )
+            if result:
+                for _stream, entries in result:
+                    for redis_id, fields in entries:
+                        last_id = redis_id
+                        decoded = _decode(fields)
+                        if decoded.get("thread_id") == thread_id:
+                            yield f"data: {json.dumps(decoded)}\n\n"
+            await asyncio.sleep(0)
+
+    return StreamingResponse(event_gen(), media_type="text/event-stream")
+
+
+# ─────────────────────────────────────────────
+# Phase 4: Agent memory endpoints
+# ─────────────────────────────────────────────
+
+@app.get("/memory/{role}", response_model=list[MemoryItem])
+async def list_memories(role: str) -> list[MemoryItem]:
+    async with state.db.acquire() as conn:
+        rows = await conn.fetch(
+            "SELECT key, value, updated_at FROM agent_memories WHERE agent_role=$1 ORDER BY key",
+            role,
+        )
+    return [MemoryItem(key=r["key"], value=r["value"], updated_at=r["updated_at"].isoformat()) for r in rows]
+
+
+@app.get("/memory/{role}/{key}", response_model=MemoryItem)
+async def get_memory(role: str, key: str) -> MemoryItem:
+    async with state.db.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT key, value, updated_at FROM agent_memories WHERE agent_role=$1 AND key=$2",
+            role, key,
+        )
+    if not row:
+        raise HTTPException(status_code=404, detail="Memory key not found")
+    return MemoryItem(key=row["key"], value=row["value"], updated_at=row["updated_at"].isoformat())
+
+
+@app.put("/memory/{role}/{key}")
+async def set_memory(role: str, key: str, body: dict) -> dict:
+    value = body.get("value", "")
+    async with state.db.acquire() as conn:
+        await conn.execute(
+            """
+            INSERT INTO agent_memories(agent_role, key, value, updated_at)
+            VALUES($1,$2,$3,NOW())
+            ON CONFLICT (agent_role, key) DO UPDATE SET value=EXCLUDED.value, updated_at=NOW()
+            """,
+            role, key, value,
+        )
+    return {"status": "ok", "role": role, "key": key}
+
+
+@app.delete("/memory/{role}/{key}")
+async def delete_memory(role: str, key: str) -> dict:
+    async with state.db.acquire() as conn:
+        await conn.execute(
+            "DELETE FROM agent_memories WHERE agent_role=$1 AND key=$2", role, key
+        )
+    return {"status": "deleted"}
+
+
+# ─────────────────────────────────────────────
+# Phase 4: Team wiki endpoints
+# ─────────────────────────────────────────────
+
+@app.get("/wiki", response_model=list[WikiArticle])
+async def list_wiki(q: str = "") -> list[WikiArticle]:
+    async with state.db.acquire() as conn:
+        if q:
+            rows = await conn.fetch(
+                "SELECT title, content, author, updated_at FROM team_wiki "
+                "WHERE title ILIKE $1 OR content ILIKE $1 ORDER BY updated_at DESC",
+                f"%{q}%",
+            )
+        else:
+            rows = await conn.fetch(
+                "SELECT title, content, author, updated_at FROM team_wiki ORDER BY updated_at DESC"
+            )
+    return [
+        WikiArticle(title=r["title"], content=r["content"], author=r["author"], updated_at=r["updated_at"].isoformat())
+        for r in rows
+    ]
+
+
+@app.get("/wiki/{title:path}", response_model=WikiArticle)
+async def get_wiki(title: str) -> WikiArticle:
+    async with state.db.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT title, content, author, updated_at FROM team_wiki WHERE title=$1", title
+        )
+    if not row:
+        raise HTTPException(status_code=404, detail="Wiki article not found")
+    return WikiArticle(title=row["title"], content=row["content"], author=row["author"], updated_at=row["updated_at"].isoformat())
+
+
+@app.put("/wiki/{title:path}")
+async def set_wiki(title: str, body: WikiWriteRequest) -> dict:
+    async with state.db.acquire() as conn:
+        await conn.execute(
+            """
+            INSERT INTO team_wiki(title, content, author, updated_at)
+            VALUES($1,$2,$3,NOW())
+            ON CONFLICT (title) DO UPDATE SET content=EXCLUDED.content, author=EXCLUDED.author, updated_at=NOW()
+            """,
+            title, body.content, body.author,
+        )
+    return {"status": "ok", "title": title}
+
+
+# ─────────────────────────────────────────────
+# Phase 4: Token telemetry endpoints
+# ─────────────────────────────────────────────
+
+# Cost per million tokens (USD) — approximate as of Feb 2026
+_COST_TABLE = {
+    "claude-opus-4-6":          (15.0, 75.0),
+    "claude-sonnet-4-6":        (3.0,  15.0),
+    "claude-haiku-4-5-20251001":(0.25,  1.25),
+    "claude-haiku-4-5":         (0.25,  1.25),
+}
+
+
+def _estimate_cost(model: str, input_tokens: int, output_tokens: int) -> float:
+    in_rate, out_rate = _COST_TABLE.get(model, (3.0, 15.0))
+    return (input_tokens * in_rate + output_tokens * out_rate) / 1_000_000
+
+
+async def _compute_thread_tokens(thread_id: str) -> int:
+    async with state.db.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT COALESCE(SUM(input_tokens + output_tokens), 0) AS total FROM agent_metrics WHERE thread_id=$1",
+            thread_id,
+        )
+    return int(row["total"]) if row else 0
+
+
+@app.post("/metrics", status_code=201)
+async def record_metrics(rec: MetricsRecord) -> dict:
+    async with state.db.acquire() as conn:
+        await conn.execute(
+            """
+            INSERT INTO agent_metrics(agent_role, thread_id, model, input_tokens, output_tokens)
+            VALUES($1,$2,$3,$4,$5)
+            """,
+            rec.agent_role, rec.thread_id, rec.model, rec.input_tokens, rec.output_tokens,
+        )
+    # Budget monitoring
+    if THREAD_BUDGET_TOKENS > 0 and rec.thread_id:
+        used = await _compute_thread_tokens(rec.thread_id)
+        now_str = datetime.now(timezone.utc).isoformat()
+        if used > THREAD_BUDGET_TOKENS:
+            key = f"{rec.thread_id}:exceeded"
+            if key not in state.budget_warnings_fired:
+                state.budget_warnings_fired.add(key)
+                asyncio.create_task(_fire_webhook("budget.exceeded", {
+                    "thread_id": rec.thread_id, "tokens_used": used, "budget": THREAD_BUDGET_TOKENS,
+                }))
+                payload = {
+                    "id": str(uuid.uuid4()), "thread_id": rec.thread_id,
+                    "from_role": "orchestrator", "to_role": "orchestrator",
+                    "type": "budget_exceeded",
+                    "content": f"⚠️ Thread {rec.thread_id[:8]} exceeded token budget ({used:,}/{THREAD_BUDGET_TOKENS:,})",
+                    "priority": "high", "artifacts": "[]", "parent_message_id": "",
+                    "timestamp": now_str, "metadata": "{}",
+                }
+                await state.redis.xadd(AUDIT_STREAM, _encode(payload))
+        elif used > THREAD_BUDGET_TOKENS * 0.8:
+            key = f"{rec.thread_id}:warning"
+            if key not in state.budget_warnings_fired:
+                state.budget_warnings_fired.add(key)
+                payload = {
+                    "id": str(uuid.uuid4()), "thread_id": rec.thread_id,
+                    "from_role": "orchestrator", "to_role": "orchestrator",
+                    "type": "budget_warning",
+                    "content": f"🔶 Thread {rec.thread_id[:8]} at {used/THREAD_BUDGET_TOKENS*100:.0f}% of token budget ({used:,}/{THREAD_BUDGET_TOKENS:,})",
+                    "priority": "normal", "artifacts": "[]", "parent_message_id": "",
+                    "timestamp": now_str, "metadata": "{}",
+                }
+                await state.redis.xadd(AUDIT_STREAM, _encode(payload))
+    return {"status": "recorded"}
+
+
+@app.get("/metrics", response_model=list[AgentMetricsSummary])
+async def get_metrics() -> list[AgentMetricsSummary]:
+    async with state.db.acquire() as conn:
+        rows = await conn.fetch(
+            """
+            SELECT agent_role, model,
+                   SUM(input_tokens)  AS total_input,
+                   SUM(output_tokens) AS total_output,
+                   COUNT(*)           AS total_calls
+            FROM agent_metrics
+            GROUP BY agent_role, model
+            ORDER BY agent_role
+            """
+        )
+    # Merge by role (an agent may have used multiple models if config changed)
+    merged: dict[str, dict] = {}
+    for r in rows:
+        role = r["agent_role"]
+        if role not in merged:
+            merged[role] = {"total_input": 0, "total_output": 0, "calls": 0, "cost": 0.0}
+        merged[role]["total_input"]  += r["total_input"]
+        merged[role]["total_output"] += r["total_output"]
+        merged[role]["calls"]        += r["total_calls"]
+        merged[role]["cost"]         += _estimate_cost(r["model"], r["total_input"], r["total_output"])
+
+    return [
+        AgentMetricsSummary(
+            agent_role=role,
+            total_input_tokens=v["total_input"],
+            total_output_tokens=v["total_output"],
+            total_calls=v["calls"],
+            estimated_cost_usd=round(v["cost"], 4),
+        )
+        for role, v in merged.items()
+    ]
+
+
+# ─────────────────────────────────────────────
+# Phase 5: Agent heartbeat endpoints
+# ─────────────────────────────────────────────
+
+@app.post("/heartbeat/{role}", status_code=200)
+async def heartbeat(role: str) -> dict:
+    state.agent_last_seen[role] = datetime.now(timezone.utc)
+    return {"status": "ok", "role": role}
+
+
+@app.get("/agents", response_model=list[AgentStatus])
+async def get_agents() -> list[AgentStatus]:
+    now = datetime.now(timezone.utc)
+    result = []
+    for role in ALL_AGENT_ROLES:
+        last = state.agent_last_seen.get(role)
+        if last is None:
+            status = "offline"
+        elif (now - last).total_seconds() < 60:
+            status = "online"
+        elif (now - last).total_seconds() < 300:
+            status = "stale"
+        else:
+            status = "offline"
+        result.append(AgentStatus(
+            role=role,
+            status=status,
+            last_seen=last.isoformat() if last else None,
+        ))
+    return result
+
+
+# ─────────────────────────────────────────────
+# Phase 5: Task board endpoints
+# ─────────────────────────────────────────────
+
+@app.get("/tasks", response_model=list[TaskOut])
+async def list_tasks(thread_id: str | None = Query(default=None)) -> list[TaskOut]:
+    async with state.db.acquire() as conn:
+        if thread_id:
+            rows = await conn.fetch(
+                "SELECT * FROM tasks WHERE thread_id=$1 ORDER BY created_at ASC", thread_id
+            )
+        else:
+            rows = await conn.fetch(
+                "SELECT * FROM tasks ORDER BY created_at DESC LIMIT 100"
+            )
+    return [_task_row_to_out(r) for r in rows]
+
+
+@app.post("/tasks", response_model=TaskOut, status_code=201)
+async def create_task_endpoint(body: TaskCreate) -> TaskOut:
+    task_id = str(uuid.uuid4())
+    now = datetime.now(timezone.utc)
+    async with state.db.acquire() as conn:
+        row = await conn.fetchrow(
+            """
+            INSERT INTO tasks(id, thread_id, title, description, assignee, status, created_by, created_at, updated_at)
+            VALUES($1,$2,$3,$4,$5,'pending',$6,$7,$7)
+            RETURNING *
+            """,
+            task_id, body.thread_id, body.title, body.description,
+            body.assignee, body.created_by, now,
+        )
+    return _task_row_to_out(row)
+
+
+@app.patch("/tasks/{task_id}", response_model=TaskOut)
+async def update_task_endpoint(
+    task_id: str, body: TaskUpdate, force: bool = Query(default=False)
+) -> TaskOut:
+    # CI quality gate: block marking done if the last CI run for this thread failed
+    if body.status == "done" and not force:
+        async with state.db.acquire() as conn:
+            task_row = await conn.fetchrow("SELECT thread_id FROM tasks WHERE id=$1", task_id)
+        if task_row:
+            gate_open, reason = await _check_ci_gate(str(task_row["thread_id"]))
+            if not gate_open:
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"CI quality gate: {reason}. Add ?force=true to override.",
+                )
+
+    now = datetime.now(timezone.utc)
+    async with state.db.acquire() as conn:
+        row = await conn.fetchrow(
+            "UPDATE tasks SET status=$1, updated_at=$2 WHERE id=$3 RETURNING *",
+            body.status, now, task_id,
+        )
+    if not row:
+        raise HTTPException(status_code=404, detail="Task not found")
+    out = _task_row_to_out(row)
+    if body.status == "done":
+        asyncio.create_task(_run_ci_for_task(task_id=task_id, thread_id=out.thread_id))
+        asyncio.create_task(_auto_complete_thread(out.thread_id))
+    return out
+
+
+def _task_row_to_out(r) -> TaskOut:
+    return TaskOut(
+        id=str(r["id"]),
+        thread_id=str(r["thread_id"]),
+        title=r["title"] or "",
+        description=r["description"] or "",
+        assignee=r["assignee"] or "",
+        status=r["status"] or "pending",
+        created_by=r["created_by"] or "",
+        created_at=r["created_at"].isoformat(),
+        updated_at=r["updated_at"].isoformat(),
+    )
+
+
+# ─────────────────────────────────────────────
+# Phase 5: CI pipeline endpoints
+# ─────────────────────────────────────────────
+
+@app.post("/run-tests", response_model=CIResult, status_code=201)
+async def run_tests_endpoint(task_id: str | None = None, thread_id: str | None = None) -> CIResult:
+    return await _run_ci_for_task(task_id=task_id, thread_id=thread_id)
+
+
+@app.get("/ci-results", response_model=list[CIResult])
+async def list_ci_results(thread_id: str | None = Query(default=None)) -> list[CIResult]:
+    async with state.db.acquire() as conn:
+        if thread_id:
+            rows = await conn.fetch(
+                "SELECT * FROM ci_results WHERE thread_id=$1 ORDER BY ran_at DESC LIMIT 20",
+                thread_id,
+            )
+        else:
+            rows = await conn.fetch(
+                "SELECT * FROM ci_results ORDER BY ran_at DESC LIMIT 20"
+            )
+    return [_ci_row_to_out(r) for r in rows]
+
+
+@app.get("/ci-results/latest", response_model=CIResult | None)
+async def latest_ci_result() -> CIResult | None:
+    async with state.db.acquire() as conn:
+        row = await conn.fetchrow("SELECT * FROM ci_results ORDER BY ran_at DESC LIMIT 1")
+    return _ci_row_to_out(row) if row else None
+
+
+def _ci_row_to_out(r) -> CIResult:
+    return CIResult(
+        id=r["id"],
+        task_id=r["task_id"],
+        thread_id=r["thread_id"],
+        passed=r["passed"],
+        failed=r["failed"],
+        total=r["total"],
+        exit_code=r["exit_code"],
+        output=r["output"] or "",
+        ran_at=r["ran_at"].isoformat(),
+    )
+
+
+async def _run_ci_for_task(*, task_id: str | None, thread_id: str | None) -> CIResult:
+    """Run the full test suite in the sandbox and persist the result."""
+    logger.info("CI triggered: task=%s thread=%s", task_id, thread_id)
+    passed = failed = total = 0
+    output = ""
+    exit_code = -1
+
+    try:
+        async with httpx.AsyncClient(timeout=120) as client:
+            resp = await client.post(
+                f"{SANDBOX_URL}/execute",
+                json={"language": "pytest", "file_path": "tests/", "working_directory": ""},
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            import re
+            exit_code = data.get("exit_code", -1)
+            full_stdout = data.get("stdout", "")
+            full_stderr = data.get("stderr", "")
+            # Parse counts from the full output before truncating
+            combined = full_stdout + full_stderr
+            m = re.search(r"(\d+) passed", combined)
+            if m:
+                passed = int(m.group(1))
+            m = re.search(r"(\d+) failed", combined)
+            if m:
+                failed = int(m.group(1))
+            total = passed + failed
+            # Keep tail of output (summary line is at the end)
+            output = (full_stdout[-6000:] + full_stderr[-2000:]).strip()
+    except Exception as exc:
+        logger.warning("CI run failed: %s", exc)
+        output = str(exc)
+        exit_code = -1
+
+    now = datetime.now(timezone.utc)
+    async with state.db.acquire() as conn:
+        row = await conn.fetchrow(
+            """
+            INSERT INTO ci_results(task_id, thread_id, passed, failed, total, exit_code, output, ran_at)
+            VALUES($1,$2,$3,$4,$5,$6,$7,$8)
+            RETURNING *
+            """,
+            task_id, thread_id, passed, failed, total, exit_code, output, now,
+        )
+
+    result = _ci_row_to_out(row)
+    badge = "✅" if exit_code == 0 else "❌"
+    # Fire webhook for external integrations
+    asyncio.create_task(_fire_webhook(
+        "ci.pass" if exit_code == 0 else "ci.fail",
+        {"task_id": task_id, "thread_id": thread_id,
+         "passed": passed, "failed": failed, "total": total, "exit_code": exit_code},
+    ))
+    # Publish CI result to audit stream so dashboard picks it up live
+    ci_payload = {
+        "id": str(uuid.uuid4()),
+        "thread_id": thread_id or "",
+        "from_role": "ci",
+        "to_role": "orchestrator",
+        "type": "ci_result",
+        "content": f"{badge} CI: {passed}/{total} tests passed — task {(task_id or '')[:8]}",
+        "priority": "normal",
+        "artifacts": "[]",
+        "parent_message_id": "",
+        "timestamp": now.isoformat(),
+        "metadata": json.dumps({"task_id": task_id, "exit_code": exit_code}),
+    }
+    await state.redis.xadd(AUDIT_STREAM, {k: str(v) for k, v in ci_payload.items()})
+    logger.info("CI complete: %s/%s passed (exit=%s)", passed, total, exit_code)
+    # Re-check thread auto-completion now that CI result is stored
+    if thread_id:
+        asyncio.create_task(_auto_complete_thread(thread_id))
+    return result
+
+
+# ─────────────────────────────────────────────
+# Phase 6: Webhook, CI gate, thread auto-completion helpers
+# ─────────────────────────────────────────────
+
+async def _fire_webhook(event: str, data: dict) -> None:
+    """POST a structured event to WEBHOOK_URL (best-effort, non-blocking)."""
+    if not WEBHOOK_URL:
+        return
+    payload = {
+        "event":     event,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "data":      data,
+    }
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            await client.post(WEBHOOK_URL, json=payload)
+        logger.info("Webhook fired: event=%s", event)
+    except Exception as exc:
+        logger.debug("Webhook failed (non-fatal): %s", exc)
+
+
+async def _check_ci_gate(thread_id: str) -> tuple[bool, str]:
+    """Return (gate_open, reason). Gate is open unless the last CI run for this thread failed."""
+    async with state.db.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT exit_code, passed, failed FROM ci_results WHERE thread_id=$1 ORDER BY ran_at DESC LIMIT 1",
+            thread_id,
+        )
+    if row is None:
+        return True, "no CI runs yet"
+    if row["exit_code"] == 0:
+        return True, f"{row['passed']} tests passing"
+    return False, f"last CI run failed ({row['failed']} failure(s)) — fix tests before closing"
+
+
+async def _auto_complete_thread(thread_id: str) -> bool:
+    """Mark thread complete if every task is done and last CI passed. Returns True if completed."""
+    async with state.db.acquire() as conn:
+        counts = await conn.fetchrow(
+            """SELECT COUNT(*) AS total,
+                      COUNT(*) FILTER (WHERE status = 'done') AS done_count
+               FROM tasks WHERE thread_id = $1""",
+            thread_id,
+        )
+        if not counts or counts["total"] == 0 or counts["total"] != counts["done_count"]:
+            return False
+        ci_row = await conn.fetchrow(
+            "SELECT exit_code, passed, total FROM ci_results WHERE thread_id=$1 ORDER BY ran_at DESC LIMIT 1",
+            thread_id,
+        )
+        if ci_row is None or ci_row["exit_code"] != 0:
+            return False
+        updated = await conn.fetchrow(
+            "UPDATE threads SET status='complete', updated_at=NOW() WHERE id=$1 AND status != 'complete' RETURNING id",
+            thread_id,
+        )
+    if updated is None:
+        return False  # already complete
+
+    now = datetime.now(timezone.utc)
+    event_payload = {
+        "id":               str(uuid.uuid4()),
+        "thread_id":        thread_id,
+        "from_role":        "orchestrator",
+        "to_role":          "orchestrator",
+        "type":             "thread_complete",
+        "content":          f"✅ Thread {thread_id[:8]} complete — all tasks done, CI green",
+        "priority":         "high",
+        "artifacts":        "[]",
+        "parent_message_id": "",
+        "timestamp":        now.isoformat(),
+        "metadata":         json.dumps({"passed": ci_row["passed"], "total": ci_row["total"]}),
+    }
+    await state.redis.xadd(AUDIT_STREAM, _encode(event_payload))
+    asyncio.create_task(_fire_webhook("thread.complete", {
+        "thread_id": thread_id,
+        "passed":    ci_row["passed"],
+        "total":     ci_row["total"],
+    }))
+    logger.info("Thread %s auto-completed (%d/%d tests).", thread_id[:8], ci_row["passed"], ci_row["total"])
+    return True
+
+
+# ─────────────────────────────────────────────
+# Phase 6: Endpoints
+# ─────────────────────────────────────────────
+
+@app.get("/threads/{thread_id}/summary", response_model=ThreadSummaryDetail)
+async def get_thread_summary(thread_id: str) -> ThreadSummaryDetail:
+    async with state.db.acquire() as conn:
+        thread = await conn.fetchrow(
+            "SELECT id, title, status, created_at FROM threads WHERE id=$1", thread_id
+        )
+        if not thread:
+            raise HTTPException(status_code=404, detail="Thread not found")
+        counts = await conn.fetchrow(
+            """SELECT COUNT(*) AS total,
+                      COUNT(*) FILTER (WHERE status = 'done')        AS done_count,
+                      COUNT(*) FILTER (WHERE status = 'in_progress') AS in_progress_count
+               FROM tasks WHERE thread_id = $1""",
+            thread_id,
+        )
+        ci_last = await conn.fetchrow(
+            "SELECT exit_code, passed, total FROM ci_results WHERE thread_id=$1 ORDER BY ran_at DESC LIMIT 1",
+            thread_id,
+        )
+    return ThreadSummaryDetail(
+        id=str(thread["id"]),
+        title=thread["title"] or "",
+        status=thread["status"],
+        created_at=thread["created_at"].isoformat(),
+        tasks_total=counts["total"] or 0,
+        tasks_done=counts["done_count"] or 0,
+        tasks_in_progress=counts["in_progress_count"] or 0,
+        ci_last_exit_code=ci_last["exit_code"] if ci_last else None,
+        ci_last_passed=ci_last["passed"] if ci_last else None,
+        ci_last_total=ci_last["total"] if ci_last else None,
+    )
+
+
+@app.post("/webhooks/test")
+async def test_webhook() -> dict:
+    """Fire a test.ping event to the configured WEBHOOK_URL."""
+    if not WEBHOOK_URL:
+        return {"status": "skipped", "reason": "WEBHOOK_URL not configured"}
+    await _fire_webhook("test.ping", {"message": "Team Claw webhook test"})
+    return {"status": "fired", "url": WEBHOOK_URL}
+
+
+@app.get("/threads/{thread_id}/budget", response_model=ThreadBudget)
+async def get_thread_budget(thread_id: str) -> ThreadBudget:
+    async with state.db.acquire() as conn:
+        exists = await conn.fetchval("SELECT 1 FROM threads WHERE id=$1", thread_id)
+    if not exists:
+        raise HTTPException(404, "Thread not found")
+    used = await _compute_thread_tokens(thread_id)
+    budget = THREAD_BUDGET_TOKENS
+    if budget == 0:
+        return ThreadBudget(thread_id=thread_id, tokens_used=used, budget=0, pct_used=0.0, status="unlimited")
+    pct = used / budget * 100
+    status = "exceeded" if pct >= 100 else "warning" if pct >= 80 else "ok"
+    return ThreadBudget(
+        thread_id=thread_id, tokens_used=used, budget=budget,
+        pct_used=round(pct, 1), status=status,
+    )
+
+
+@app.get("/standup", response_model=StandupReport)
+async def get_standup(hours: int = Query(default=24)) -> StandupReport:
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
+    async with state.db.acquire() as conn:
+        active_threads = await conn.fetch(
+            "SELECT t.id, t.title, t.status, COUNT(m.id) AS msg_count "
+            "FROM threads t JOIN messages m ON m.thread_id=t.id "
+            "WHERE m.created_at >= $1 GROUP BY t.id ORDER BY msg_count DESC LIMIT 10",
+            cutoff,
+        )
+        tasks_done = await conn.fetch(
+            "SELECT id, title, assignee, updated_at FROM tasks WHERE status='done' AND updated_at >= $1 ORDER BY updated_at DESC LIMIT 20",
+            cutoff,
+        )
+        tasks_wip = await conn.fetch(
+            "SELECT id, title, assignee FROM tasks WHERE status='in_progress' ORDER BY updated_at DESC LIMIT 10"
+        )
+        ci = await conn.fetchrow(
+            "SELECT COUNT(*) FILTER (WHERE exit_code=0) AS passed, "
+            "COUNT(*) FILTER (WHERE exit_code!=0) AS failed, COUNT(*) AS total "
+            "FROM ci_results WHERE ran_at >= $1",
+            cutoff,
+        )
+        msgs_by_agent = await conn.fetch(
+            "SELECT from_role, COUNT(*) AS cnt FROM messages WHERE created_at >= $1 "
+            "AND from_role != 'orchestrator' GROUP BY from_role ORDER BY cnt DESC",
+            cutoff,
+        )
+        metrics = await conn.fetch(
+            "SELECT model, SUM(input_tokens) AS inp, SUM(output_tokens) AS out "
+            "FROM agent_metrics WHERE recorded_at >= $1 GROUP BY model",
+            cutoff,
+        )
+        blockers = await conn.fetch(
+            "SELECT id, content, from_role, thread_id, created_at FROM messages "
+            "WHERE type='blocker' AND created_at >= $1 ORDER BY created_at DESC LIMIT 5",
+            cutoff,
+        )
+    total_in = total_out = 0
+    total_cost = 0.0
+    for m in metrics:
+        total_in  += m["inp"]
+        total_out += m["out"]
+        total_cost += _estimate_cost(m["model"], m["inp"], m["out"])
+    return StandupReport(
+        generated_at=datetime.now(timezone.utc).isoformat(),
+        period_hours=hours,
+        active_threads=[
+            {"id": str(r["id"]), "title": r["title"], "status": r["status"], "messages": r["msg_count"]}
+            for r in active_threads
+        ],
+        tasks_completed=[
+            {"id": str(r["id"]), "title": r["title"], "assignee": r["assignee"],
+             "completed_at": r["updated_at"].isoformat()}
+            for r in tasks_done
+        ],
+        tasks_in_progress=[
+            {"id": str(r["id"]), "title": r["title"], "assignee": r["assignee"]}
+            for r in tasks_wip
+        ],
+        ci_summary={"passed": ci["passed"], "failed": ci["failed"], "total": ci["total"]},
+        messages_by_agent={r["from_role"]: r["cnt"] for r in msgs_by_agent},
+        token_cost={
+            "total_input": total_in, "total_output": total_out,
+            "estimated_cost_usd": round(total_cost, 4),
+        },
+        recent_blockers=[
+            {"id": str(r["id"]), "from_role": r["from_role"], "thread_id": str(r["thread_id"]),
+             "excerpt": r["content"][:120]}
+            for r in blockers
+        ],
+    )
+
+
+@app.post("/standup/publish")
+async def publish_standup() -> dict:
+    report = await get_standup(hours=24)
+    date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    title = f"Daily Standup — {date_str}"
+    lines = [
+        f"# {title}",
+        f"_Generated at {report.generated_at} (last {report.period_hours}h)_\n",
+        "## Active Threads",
+    ]
+    for t in report.active_threads:
+        lines.append(f"- **{t['title']}** ({t['status']}, {t['messages']} msgs)")
+    lines.append("\n## Tasks Completed")
+    for t in report.tasks_completed:
+        lines.append(f"- ✅ {t['title']} — _{t['assignee']}_")
+    if not report.tasks_completed:
+        lines.append("- _(none)_")
+    lines.append("\n## In Progress")
+    for t in report.tasks_in_progress:
+        lines.append(f"- 🔄 {t['title']} — _{t['assignee']}_")
+    if not report.tasks_in_progress:
+        lines.append("- _(none)_")
+    ci = report.ci_summary
+    lines.append(f"\n## CI Summary\n{ci['passed']} passed / {ci['failed']} failed / {ci['total']} total")
+    lines.append("\n## Message Activity")
+    for role, cnt in report.messages_by_agent.items():
+        lines.append(f"- {role}: {cnt} messages")
+    cost = report.token_cost
+    lines.append(
+        f"\n## Token Cost\n"
+        f"Input: {cost['total_input']:,} | Output: {cost['total_output']:,} | "
+        f"Est. cost: **${cost['estimated_cost_usd']:.4f}**"
+    )
+    if report.recent_blockers:
+        lines.append("\n## Recent Blockers")
+        for b in report.recent_blockers:
+            lines.append(f"- [{b['from_role']}] {b['excerpt']}")
+    content = "\n".join(lines)
+    async with state.db.acquire() as conn:
+        await conn.execute(
+            """
+            INSERT INTO team_wiki(title, content, author, updated_at)
+            VALUES($1,$2,'orchestrator',NOW())
+            ON CONFLICT (title) DO UPDATE SET content=EXCLUDED.content, updated_at=NOW()
+            """,
+            title, content,
+        )
+    return {"status": "published", "title": title}
+
+
+@app.get("/ci-results/trend", response_model=list[CITrendPoint])
+async def ci_trend() -> list[CITrendPoint]:
+    """Return last 20 CI runs for sparkline visualization."""
+    async with state.db.acquire() as conn:
+        rows = await conn.fetch(
+            "SELECT exit_code, passed, total, ran_at FROM ci_results ORDER BY ran_at DESC LIMIT 20"
+        )
+    return [
+        CITrendPoint(
+            exit_code=r["exit_code"],
+            passed=r["passed"],
+            total=r["total"],
+            ran_at=r["ran_at"].isoformat(),
+        )
+        for r in reversed(rows)   # chronological order for the chart
+    ]
+
+
+@app.get("/stream/all")
+async def stream_all():
+    """Server-Sent Events stream of ALL audit messages (for the dashboard)."""
+    async def event_gen() -> AsyncGenerator[str, None]:
+        last_id = "$"
+        while True:
+            result = await state.redis.xread(
+                {AUDIT_STREAM: last_id}, count=50, block=3000
+            )
+            if result:
+                for _stream, entries in result:
+                    for redis_id, fields in entries:
+                        last_id = redis_id
+                        decoded = _decode(fields)
+                        yield f"data: {json.dumps(decoded)}\n\n"
+            await asyncio.sleep(0)
+
+    return StreamingResponse(
+        event_gen(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@app.get("/dashboard", response_class=HTMLResponse)
+async def dashboard():
+    """Serve the live dashboard."""
+    dash_file = pathlib.Path(__file__).parent / "dashboard.html"
+    if dash_file.exists():
+        return FileResponse(str(dash_file), media_type="text/html")
+    return HTMLResponse("<h1>Dashboard not found</h1>", status_code=404)
+
+
+@app.get("/health")
+async def health() -> dict:
+    return {"status": "ok", "service": "orchestrator"}
+
+
+# ─────────────────────────────────────────────
+# Phase 8: Tool execution telemetry endpoints
+# ─────────────────────────────────────────────
+
+def _tool_row_to_out(r) -> ToolExecutionOut:
+    return ToolExecutionOut(
+        id=r["id"],
+        agent_role=r["agent_role"],
+        tool_name=r["tool_name"],
+        thread_id=r["thread_id"],
+        duration_ms=r["duration_ms"],
+        success=r["success"],
+        error=r["error"] or "",
+        executed_at=r["executed_at"].isoformat(),
+    )
+
+
+@app.post("/tool-executions", status_code=201)
+async def record_tool_execution(rec: ToolExecutionRecord) -> dict:
+    async with state.db.acquire() as conn:
+        await conn.execute(
+            "INSERT INTO tool_executions(agent_role, tool_name, thread_id, duration_ms, success, error) "
+            "VALUES($1,$2,$3,$4,$5,$6)",
+            rec.agent_role, rec.tool_name, rec.thread_id,
+            rec.duration_ms, rec.success, rec.error or "",
+        )
+    return {"status": "recorded"}
+
+
+@app.get("/tool-history", response_model=list[ToolExecutionOut])
+async def get_tool_history(
+    agent: str | None = Query(default=None),
+    tool: str | None = Query(default=None),
+    thread_id: str | None = Query(default=None),
+    limit: int = Query(default=50, le=500),
+) -> list[ToolExecutionOut]:
+    conditions: list[str] = []
+    params: list = []
+    if agent:
+        conditions.append(f"agent_role=${len(params)+1}")
+        params.append(agent)
+    if tool:
+        conditions.append(f"tool_name=${len(params)+1}")
+        params.append(tool)
+    if thread_id:
+        conditions.append(f"thread_id=${len(params)+1}")
+        params.append(thread_id)
+    where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+    params.append(limit)
+    async with state.db.acquire() as conn:
+        rows = await conn.fetch(
+            f"SELECT * FROM tool_executions {where} ORDER BY executed_at DESC LIMIT ${len(params)}",
+            *params,
+        )
+    return [_tool_row_to_out(r) for r in rows]
+
+
+@app.get("/tool-history/stats", response_model=list[ToolStats])
+async def get_tool_stats() -> list[ToolStats]:
+    async with state.db.acquire() as conn:
+        rows = await conn.fetch("""
+            SELECT tool_name,
+                   COUNT(*)                                              AS total_calls,
+                   AVG(CASE WHEN success THEN 1.0 ELSE 0.0 END)        AS success_rate,
+                   AVG(duration_ms)                                      AS avg_duration,
+                   PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY duration_ms) AS p95_duration
+            FROM tool_executions
+            GROUP BY tool_name
+            ORDER BY total_calls DESC
+        """)
+    return [
+        ToolStats(
+            tool_name=r["tool_name"],
+            total_calls=r["total_calls"],
+            success_rate=round(float(r["success_rate"]), 3),
+            avg_duration_ms=round(float(r["avg_duration"]), 1),
+            p95_duration_ms=round(float(r["p95_duration"]), 1),
+        )
+        for r in rows
+    ]
+
+
+# ─────────────────────────────────────────────
+# Phase 8: Thread close endpoint
+# ─────────────────────────────────────────────
+
+@app.post("/threads/{thread_id}/close")
+async def close_thread(thread_id: str) -> dict:
+    async with state.db.acquire() as conn:
+        row = await conn.fetchrow(
+            "UPDATE threads SET status='closed', updated_at=NOW() "
+            "WHERE id=$1 AND status='active' RETURNING id",
+            thread_id,
+        )
+    if not row:
+        raise HTTPException(404, "Thread not found or not active")
+    now = datetime.now(timezone.utc)
+    payload = {
+        "id": str(uuid.uuid4()), "thread_id": thread_id,
+        "from_role": "orchestrator", "to_role": "orchestrator",
+        "type": "thread_closed",
+        "content": f"🔒 Thread {thread_id[:8]} manually closed",
+        "priority": "normal", "artifacts": "[]", "parent_message_id": "",
+        "timestamp": now.isoformat(), "metadata": "{}",
+    }
+    await state.redis.xadd(AUDIT_STREAM, _encode(payload))
+    asyncio.create_task(_fire_webhook("thread.closed", {"thread_id": thread_id}))
+    return {"status": "closed", "thread_id": thread_id}
+
+
+# ─────────────────────────────────────────────
+# Phase 8 table migration (idempotent)
+# ─────────────────────────────────────────────
+
+async def _ensure_phase8_tables() -> None:
+    ddl = """
+    CREATE TABLE IF NOT EXISTS tool_executions (
+        id          BIGSERIAL   PRIMARY KEY,
+        agent_role  TEXT        NOT NULL,
+        tool_name   TEXT        NOT NULL,
+        thread_id   TEXT,
+        duration_ms INTEGER     NOT NULL DEFAULT 0,
+        success     BOOLEAN     NOT NULL DEFAULT TRUE,
+        error       TEXT        DEFAULT '',
+        executed_at TIMESTAMPTZ DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS idx_tool_exec_agent ON tool_executions(agent_role);
+    CREATE INDEX IF NOT EXISTS idx_tool_exec_tool  ON tool_executions(tool_name);
+    CREATE INDEX IF NOT EXISTS idx_tool_exec_time  ON tool_executions(executed_at DESC);
+    """
+    async with state.db.acquire() as conn:
+        await conn.execute(ddl)
+    logger.info("Phase 8 tables ensured.")
+
+
+# ─────────────────────────────────────────────
+# Phase 8: Idle monitor background task
+# ─────────────────────────────────────────────
+
+async def _idle_monitor_loop() -> None:
+    """Fire thread_idle events for active threads silent for IDLE_THREAD_MINUTES."""
+    if IDLE_THREAD_MINUTES <= 0:
+        return
+    logger.info("Idle monitor started (threshold=%d min).", IDLE_THREAD_MINUTES)
+    while True:
+        await asyncio.sleep(60)
+        try:
+            cutoff = datetime.now(timezone.utc) - timedelta(minutes=IDLE_THREAD_MINUTES)
+            async with state.db.acquire() as conn:
+                rows = await conn.fetch(
+                    """
+                    SELECT t.id, t.title, MAX(m.created_at) AS last_msg
+                    FROM threads t
+                    LEFT JOIN messages m ON m.thread_id = t.id
+                    WHERE t.status = 'active'
+                    GROUP BY t.id, t.title
+                    HAVING MAX(m.created_at) < $1 OR MAX(m.created_at) IS NULL
+                    """,
+                    cutoff,
+                )
+            now = datetime.now(timezone.utc)
+            for row in rows:
+                tid = str(row["id"])
+                if tid in state.idle_alerts_fired:
+                    continue
+                state.idle_alerts_fired.add(tid)
+                last_msg = row["last_msg"]
+                idle_mins = int((now - last_msg).total_seconds() / 60) if last_msg else 999
+                payload = {
+                    "id": str(uuid.uuid4()), "thread_id": tid,
+                    "from_role": "orchestrator", "to_role": "orchestrator",
+                    "type": "thread_idle",
+                    "content": f"⏰ Thread {tid[:8]} idle for {idle_mins}m — \"{row['title'] or tid[:8]}\"",
+                    "priority": "normal", "artifacts": "[]", "parent_message_id": "",
+                    "timestamp": now.isoformat(), "metadata": "{}",
+                }
+                await state.redis.xadd(AUDIT_STREAM, _encode(payload))
+                asyncio.create_task(_fire_webhook("thread.idle", {
+                    "thread_id": tid, "idle_minutes": idle_mins,
+                }))
+        except asyncio.CancelledError:
+            break
+        except Exception as exc:
+            logger.warning("Idle monitor error: %s", exc)
+
+
+# ─────────────────────────────────────────────
+# Phase 4 table migration (idempotent)
+# ─────────────────────────────────────────────
+
+async def _ensure_phase4_tables() -> None:
+    """Create Phase 4 tables if they don't exist yet (safe to re-run)."""
+    ddl = """
+    CREATE TABLE IF NOT EXISTS agent_memories (
+        agent_role  TEXT        NOT NULL,
+        key         TEXT        NOT NULL,
+        value       TEXT        NOT NULL,
+        updated_at  TIMESTAMPTZ DEFAULT NOW(),
+        PRIMARY KEY (agent_role, key)
+    );
+    CREATE TABLE IF NOT EXISTS team_wiki (
+        title       TEXT        PRIMARY KEY,
+        content     TEXT        NOT NULL,
+        author      TEXT        NOT NULL DEFAULT 'unknown',
+        updated_at  TIMESTAMPTZ DEFAULT NOW()
+    );
+    CREATE TABLE IF NOT EXISTS agent_metrics (
+        id              BIGSERIAL   PRIMARY KEY,
+        agent_role      TEXT        NOT NULL,
+        thread_id       TEXT,
+        model           TEXT        NOT NULL,
+        input_tokens    INTEGER     NOT NULL DEFAULT 0,
+        output_tokens   INTEGER     NOT NULL DEFAULT 0,
+        recorded_at     TIMESTAMPTZ DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS idx_agent_metrics_role ON agent_metrics(agent_role);
+    CREATE INDEX IF NOT EXISTS idx_agent_metrics_time ON agent_metrics(recorded_at DESC);
+    """
+    async with state.db.acquire() as conn:
+        await conn.execute(ddl)
+    logger.info("Phase 4 tables ensured.")
+
+
+# ─────────────────────────────────────────────
+# Phase 5 table migration (idempotent)
+# ─────────────────────────────────────────────
+
+async def _ensure_phase5_tables() -> None:
+    ddl = """
+    CREATE TABLE IF NOT EXISTS ci_results (
+        id          BIGSERIAL   PRIMARY KEY,
+        task_id     TEXT,
+        thread_id   TEXT,
+        passed      INTEGER     NOT NULL DEFAULT 0,
+        failed      INTEGER     NOT NULL DEFAULT 0,
+        total       INTEGER     NOT NULL DEFAULT 0,
+        exit_code   INTEGER     NOT NULL,
+        output      TEXT,
+        ran_at      TIMESTAMPTZ DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS idx_ci_results_task   ON ci_results(task_id);
+    CREATE INDEX IF NOT EXISTS idx_ci_results_thread ON ci_results(thread_id);
+    """
+    async with state.db.acquire() as conn:
+        await conn.execute(ddl)
+    logger.info("Phase 5 tables ensured.")
+
+
+# ─────────────────────────────────────────────
+# Workspace git initialisation
+# ─────────────────────────────────────────────
+
+def _init_workspace_git() -> None:
+    """Ensure /workspace is a git repo (idempotent)."""
+    workspace = pathlib.Path("/workspace")
+    if not workspace.exists():
+        workspace.mkdir(parents=True, exist_ok=True)
+    if (workspace / ".git").exists():
+        logger.info("Workspace git repo already initialised.")
+        return
+    try:
+        subprocess.run(["git", "init", str(workspace)], check=True, capture_output=True)
+        subprocess.run(
+            ["git", "config", "user.email", "team-claw@ai"],
+            cwd=str(workspace), check=True, capture_output=True,
+        )
+        subprocess.run(
+            ["git", "config", "user.name", "Team Claw"],
+            cwd=str(workspace), check=True, capture_output=True,
+        )
+        gitignore = workspace / ".gitignore"
+        gitignore.write_text("__pycache__/\n*.pyc\n.pytest_cache/\n*.egg-info/\n")
+        subprocess.run(
+            ["git", "add", ".gitignore"],
+            cwd=str(workspace), check=True, capture_output=True,
+        )
+        subprocess.run(
+            ["git", "commit", "-m", "chore: init workspace"],
+            cwd=str(workspace), check=True, capture_output=True,
+        )
+        logger.info("Workspace git repo initialised at %s", workspace)
+    except subprocess.CalledProcessError as exc:
+        logger.warning("Git init failed (non-fatal): %s", exc)
+
+
+# ─────────────────────────────────────────────
+# Audit loop — reads team:audit, persists to DB
+# ─────────────────────────────────────────────
+
+async def _setup_audit_consumer() -> None:
+    try:
+        await state.redis.xgroup_create(
+            AUDIT_STREAM, AUDIT_GROUP, id="0", mkstream=True
+        )
+    except aioredis.ResponseError as exc:
+        if "BUSYGROUP" not in str(exc):
+            raise
+
+
+async def _audit_loop() -> None:
+    """Continuously drain team:audit stream and write to Postgres."""
+    logger.info("Audit loop started.")
+    while True:
+        try:
+            result = await state.redis.xreadgroup(
+                AUDIT_GROUP,
+                AUDIT_CONSUMER,
+                {AUDIT_STREAM: ">"},
+                count=50,
+                block=2000,
+            )
+            if not result:
+                continue
+            for _stream, entries in result:
+                for redis_id, fields in entries:
+                    decoded = _decode(fields)
+                    await _persist_message(decoded)
+                    await state.redis.xack(AUDIT_STREAM, AUDIT_GROUP, redis_id)
+        except asyncio.CancelledError:
+            break
+        except Exception as exc:
+            logger.exception("Audit loop error: %s", exc)
+            await asyncio.sleep(1)
+
+
+async def _persist_message(data: dict) -> None:
+    thread_id = data.get("thread_id")
+    if not thread_id:
+        return
+    try:
+        async with state.db.acquire() as conn:
+            # Ensure thread exists (may be created by agents mid-conversation)
+            await conn.execute(
+                "INSERT INTO threads(id, title, status) VALUES($1,$2,'active') ON CONFLICT DO NOTHING",
+                thread_id, f"Thread {thread_id[:8]}",
+            )
+            await conn.execute(
+                """
+                INSERT INTO messages(id, thread_id, from_role, to_role, type, content, priority,
+                                     artifacts, parent_message_id, metadata)
+                VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+                ON CONFLICT DO NOTHING
+                """,
+                data.get("id", str(uuid.uuid4())),
+                thread_id,
+                data.get("from_role", "unknown"),
+                data.get("to_role", "unknown"),
+                data.get("type", "unknown"),
+                data.get("content", ""),
+                data.get("priority", "normal"),
+                data.get("artifacts", "[]"),
+                data.get("parent_message_id") or None,
+                data.get("metadata", "{}"),
+            )
+    except Exception as exc:
+        logger.warning("Failed to persist message %s: %s", data.get("id"), exc)
+
+
+# ─────────────────────────────────────────────
+# Helpers
+# ─────────────────────────────────────────────
+
+def _encode(d: dict) -> dict:
+    """Ensure all values are bytes/str for Redis."""
+    return {k: str(v) for k, v in d.items()}
+
+
+def _decode(fields: dict) -> dict:
+    return {
+        k.decode() if isinstance(k, bytes) else k: v.decode() if isinstance(v, bytes) else v
+        for k, v in fields.items()
+    }

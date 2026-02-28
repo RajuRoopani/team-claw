@@ -1,0 +1,1123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Team Claw — Live Dashboard</title>
+<style>
+  :root {
+    --bg:       #0d1117;
+    --surface:  #161b22;
+    --border:   #30363d;
+    --text:     #c9d1d9;
+    --muted:    #8b949e;
+    --accent:   #58a6ff;
+
+    --c-orchestrator:      #8b949e;
+    --c-product_owner:     #d2a8ff;
+    --c-engineering_manager: #ffa657;
+    --c-architect:         #79c0ff;
+    --c-senior_dev_1:      #56d364;
+    --c-senior_dev_2:      #3fb950;
+    --c-junior_dev_1:      #ffa198;
+    --c-junior_dev_2:      #ff7b72;
+    --c-system:            #484f58;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    font-size: 13px;
+    height: 100vh;
+    display: grid;
+    grid-template-rows: 48px 1fr;
+    grid-template-columns: 220px 1fr 230px;
+    grid-template-areas:
+      "header header header"
+      "sidebar feed agents";
+    overflow: hidden;
+  }
+
+  /* ── Header ── */
+  header {
+    grid-area: header;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    gap: 16px;
+  }
+  header .logo { font-size: 16px; font-weight: 700; color: var(--accent); letter-spacing: 1px; }
+  header .status { font-size: 11px; color: var(--muted); }
+  header .status.live::before { content: "⬤ "; color: #56d364; }
+  header .stats { margin-left: auto; font-size: 11px; color: var(--muted); display: flex; gap: 16px; }
+  header .stats span { color: var(--text); font-weight: 600; }
+
+  /* ── Sidebar (threads) ── */
+  #sidebar {
+    grid-area: sidebar;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    padding: 8px 0;
+  }
+  #sidebar h3 { padding: 4px 12px 8px; font-size: 11px; text-transform: uppercase; color: var(--muted); letter-spacing: 0.8px; }
+  .thread-item {
+    padding: 8px 12px;
+    cursor: pointer;
+    border-left: 3px solid transparent;
+    transition: background 0.1s;
+  }
+  .thread-item:hover { background: rgba(88,166,255,0.06); }
+  .thread-item.active { border-left-color: var(--accent); background: rgba(88,166,255,0.1); }
+  .thread-item .t-title { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .thread-item .t-meta { font-size: 10px; color: var(--muted); margin-top: 2px; }
+  .thread-item .t-count { float: right; background: var(--border); color: var(--muted); border-radius: 10px; padding: 1px 6px; font-size: 10px; }
+
+  /* ── Feed ── */
+  #feed {
+    grid-area: feed;
+    overflow-y: auto;
+    padding: 12px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  #feed-header {
+    position: sticky;
+    top: 0;
+    background: var(--bg);
+    padding: 4px 0 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    z-index: 10;
+  }
+  #feed-title { font-size: 13px; font-weight: 600; }
+  #filter-bar { margin-left: auto; display: flex; gap: 4px; }
+  .filter-btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 2px 8px;
+    border-radius: 12px;
+    cursor: pointer;
+    font-size: 11px;
+    font-family: inherit;
+  }
+  .filter-btn.active { border-color: var(--accent); color: var(--accent); }
+
+  .msg-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 10px;
+    border-left: 3px solid var(--border);
+    animation: slideIn 0.15s ease;
+  }
+  .msg-card.new { animation: highlight 1.2s ease; }
+  @keyframes slideIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+  @keyframes highlight { 0% { background: rgba(88,166,255,0.12); } 100% { background: var(--surface); } }
+
+  .msg-header { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; flex-wrap: wrap; }
+  .msg-icon { font-size: 13px; }
+  .msg-from { font-weight: 700; font-size: 12px; }
+  .msg-arrow { color: var(--muted); font-size: 11px; }
+  .msg-to { font-size: 12px; }
+  .msg-type { margin-left: auto; font-size: 10px; color: var(--muted); background: var(--bg); padding: 1px 6px; border-radius: 8px; border: 1px solid var(--border); }
+  .msg-time { font-size: 10px; color: var(--muted); }
+  .msg-body { font-size: 12px; line-height: 1.5; color: var(--text); white-space: pre-wrap; word-break: break-word; max-height: 200px; overflow-y: auto; }
+  .msg-body.collapsed { max-height: 60px; cursor: pointer; }
+  .msg-body.collapsed::after { content: " …more"; color: var(--accent); }
+
+  /* Role colors applied to border-left and from name */
+  .role-orchestrator       .msg-from, .role-orchestrator       { border-left-color: var(--c-orchestrator); }
+  .role-product_owner      .msg-from, .role-product_owner      { border-left-color: var(--c-product_owner); }
+  .role-engineering_manager .msg-from, .role-engineering_manager { border-left-color: var(--c-engineering_manager); }
+  .role-architect          .msg-from, .role-architect          { border-left-color: var(--c-architect); }
+  .role-senior_dev_1       .msg-from, .role-senior_dev_1       { border-left-color: var(--c-senior_dev_1); }
+  .role-senior_dev_2       .msg-from, .role-senior_dev_2       { border-left-color: var(--c-senior_dev_2); }
+  .role-junior_dev_1       .msg-from, .role-junior_dev_1       { border-left-color: var(--c-junior_dev_1); }
+  .role-junior_dev_2       .msg-from, .role-junior_dev_2       { border-left-color: var(--c-junior_dev_2); }
+  .role-system             .msg-from, .role-system             { border-left-color: var(--c-system); }
+
+  .role-orchestrator       .msg-from { color: var(--c-orchestrator); }
+  .role-product_owner      .msg-from { color: var(--c-product_owner); }
+  .role-engineering_manager .msg-from { color: var(--c-engineering_manager); }
+  .role-architect          .msg-from { color: var(--c-architect); }
+  .role-senior_dev_1       .msg-from { color: var(--c-senior_dev_1); }
+  .role-senior_dev_2       .msg-from { color: var(--c-senior_dev_2); }
+  .role-junior_dev_1       .msg-from { color: var(--c-junior_dev_1); }
+  .role-junior_dev_2       .msg-from { color: var(--c-junior_dev_2); }
+  .role-system             .msg-from { color: var(--c-system); }
+
+  /* ── Agents panel ── */
+  #agents-panel {
+    grid-area: agents;
+    background: var(--surface);
+    border-left: 1px solid var(--border);
+    padding: 8px;
+    overflow-y: auto;
+  }
+  #agents-panel h3 { font-size: 11px; text-transform: uppercase; color: var(--muted); letter-spacing: 0.8px; padding: 4px 4px 8px; }
+  .agent-row { display: flex; align-items: center; gap: 6px; padding: 5px 4px; border-radius: 4px; }
+  .agent-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--border); flex-shrink: 0; }
+  .agent-dot.online { background: #56d364; }
+  .agent-dot.active { background: #ffa657; animation: pulse 0.8s infinite alternate; }
+  @keyframes pulse { from { opacity: 1; } to { opacity: 0.4; } }
+  .agent-name { font-size: 11px; color: var(--muted); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .agent-count { font-size: 10px; color: var(--muted); }
+
+  /* ── Agent dot states ── */
+  .agent-dot.stale  { background: #ffa657; }
+  .agent-dot.online { background: #56d364; }
+
+  /* ── Cost panel ── */
+  .panel-divider { border: none; border-top: 1px solid var(--border); margin: 8px 4px; }
+  .cost-row { display: flex; align-items: center; gap: 4px; padding: 4px 4px; font-size: 10px; }
+  .cost-role { color: var(--muted); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 10px; }
+  .cost-tokens { color: var(--text); font-size: 10px; }
+  .cost-usd { color: #56d364; font-size: 10px; min-width: 44px; text-align: right; }
+  .cost-total { display: flex; justify-content: space-between; padding: 4px 4px; font-size: 11px; font-weight: 600; color: var(--text); }
+
+  /* ── CI panel ── */
+  .ci-row { display: flex; align-items: center; gap: 4px; padding: 4px 4px; font-size: 10px; border-bottom: 1px solid var(--border); }
+  .ci-badge { font-size: 12px; flex-shrink: 0; }
+  .ci-counts { color: var(--text); flex: 1; }
+  .ci-time { color: var(--muted); font-size: 9px; }
+
+  /* ── Kanban tasks panel ── */
+  .task-row { padding: 5px 4px; border-bottom: 1px solid var(--border); }
+  .task-title { font-size: 10px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .task-meta { display: flex; gap: 4px; margin-top: 2px; align-items: center; }
+  .task-assignee { font-size: 9px; color: var(--muted); flex: 1; }
+  .task-status {
+    font-size: 9px; padding: 1px 5px; border-radius: 8px; border: 1px solid var(--border);
+    color: var(--muted);
+  }
+  .task-status.pending     { border-color: var(--border); }
+  .task-status.in_progress { border-color: #ffa657; color: #ffa657; }
+  .task-status.review      { border-color: #79c0ff; color: #79c0ff; }
+  .task-status.done        { border-color: #56d364; color: #56d364; }
+
+  /* ── Tool activity panel ── */
+  .tool-row { display: flex; align-items: center; gap: 4px; padding: 4px 4px; font-size: 10px; border-bottom: 1px solid var(--border); }
+  .tool-agent { color: var(--muted); width: 70px; flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tool-name { color: var(--text); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tool-duration { color: var(--muted); font-size: 9px; min-width: 32px; text-align: right; }
+  .tool-status-ok  { color: #56d364; font-size: 11px; }
+  .tool-status-err { color: #ff7b72; font-size: 11px; }
+  .tool-stats-row { display: flex; align-items: center; gap: 4px; padding: 3px 4px; font-size: 9px; border-bottom: 1px solid var(--border); }
+  .tool-stats-name { color: var(--accent); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tool-stats-calls { color: var(--text); min-width: 26px; text-align: right; }
+  .tool-stats-sr { min-width: 34px; text-align: right; }
+  .tool-stats-avg { color: var(--muted); min-width: 36px; text-align: right; }
+
+  /* ── Thread close button ── */
+  #close-thread-btn {
+    display: none;
+    background: var(--surface); border: 1px solid #ff7b72; color: #ff7b72;
+    padding: 2px 8px; border-radius: 12px; cursor: pointer; font-size: 11px; font-family: inherit;
+  }
+  #close-thread-btn:hover { background: rgba(255,123,114,0.1); }
+
+  /* ── Wiki panel ── */
+  .wiki-article { padding: 5px 4px; border-bottom: 1px solid var(--border); cursor: pointer; }
+  .wiki-article:hover { background: rgba(88,166,255,0.06); }
+  .wiki-title { font-size: 11px; color: var(--accent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .wiki-author { font-size: 9px; color: var(--muted); }
+  #wiki-modal {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+    z-index: 100; align-items: center; justify-content: center;
+  }
+  #wiki-modal.open { display: flex; }
+  #wiki-modal-inner {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+    padding: 20px; max-width: 640px; width: 90%; max-height: 80vh; overflow-y: auto;
+  }
+  #wiki-modal-title { font-size: 16px; font-weight: 700; margin-bottom: 12px; color: var(--accent); }
+  #wiki-modal-body { font-size: 12px; line-height: 1.6; white-space: pre-wrap; }
+  #wiki-modal-close { float: right; cursor: pointer; color: var(--muted); font-size: 18px; line-height: 1; }
+
+  /* ── Standup modal ── */
+  #standup-modal {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+    z-index: 100; align-items: flex-start; justify-content: center; padding-top: 40px;
+  }
+  #standup-modal.open { display: flex; }
+  #standup-modal-inner {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+    padding: 20px; max-width: 720px; width: 95%; max-height: 80vh; overflow-y: auto;
+  }
+  #standup-modal-close { float: right; cursor: pointer; color: var(--muted); font-size: 18px; line-height: 1; }
+  .standup-section { margin-bottom: 16px; }
+  .standup-section h4 { font-size: 12px; font-weight: 700; color: var(--accent); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .standup-row { font-size: 11px; color: var(--text); padding: 3px 0; border-bottom: 1px solid var(--border); display: flex; gap: 8px; }
+  .standup-row:last-child { border-bottom: none; }
+  .standup-label { color: var(--muted); flex: 1; }
+  .standup-value { color: var(--text); font-weight: 600; }
+  .standup-none { font-size: 11px; color: var(--muted); font-style: italic; }
+  .standup-btn {
+    background: var(--surface); border: 1px solid var(--border); color: var(--muted);
+    padding: 3px 10px; border-radius: 4px; cursor: pointer; font-size: 11px; font-family: inherit;
+  }
+  .standup-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* ── Thread budget bar ── */
+  #budget-bar-wrap {
+    display: none; align-items: center; gap: 8px; padding: 4px 0;
+    font-size: 10px; color: var(--muted);
+  }
+  #budget-bar-wrap.visible { display: flex; }
+  #budget-track {
+    flex: 1; height: 4px; background: var(--border); border-radius: 2px; overflow: hidden;
+  }
+  #budget-fill { height: 100%; width: 0%; background: #56d364; transition: width 0.4s, background 0.4s; border-radius: 2px; }
+  #budget-label { white-space: nowrap; min-width: 100px; text-align: right; }
+
+  /* ── Empty state ── */
+  .empty { text-align: center; color: var(--muted); padding: 40px 20px; font-size: 12px; }
+
+  /* ── Completed thread ── */
+  .thread-item.complete .t-title::before { content: "✅ "; }
+  .thread-item.complete .t-meta { color: #56d364; }
+
+  /* ── Closed thread ── */
+  .thread-item.closed .t-title::before { content: "🔒 "; }
+  .thread-item.closed .t-meta { color: var(--muted); }
+  .thread-item.closed .t-title { opacity: 0.6; }
+
+  /* ── CI sparkline ── */
+  .ci-sparkline { display: flex; gap: 3px; align-items: center; padding: 4px 4px 6px; flex-wrap: wrap; }
+  .ci-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; cursor: default; }
+  .ci-dot.pass { background: #56d364; }
+  .ci-dot.fail { background: #ff7b72; }
+  .ci-dot.unknown { background: var(--border); }
+
+  /* ── Toast notifications ── */
+  #toast-container {
+    position: fixed; bottom: 16px; right: 16px;
+    display: flex; flex-direction: column; gap: 6px; z-index: 300;
+  }
+  .toast {
+    background: var(--surface); border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: 6px; padding: 10px 14px;
+    font-size: 12px; max-width: 320px; line-height: 1.4;
+    animation: toastIn 0.2s ease; opacity: 1; transition: opacity 0.4s ease;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+  }
+  @keyframes toastIn { from { transform: translateX(20px); opacity: 0; } to { transform: none; opacity: 1; } }
+  .toast.success { border-left-color: #56d364; }
+  .toast.error   { border-left-color: #ff7b72; }
+  .toast.info    { border-left-color: #79c0ff; }
+  .toast.warning { border-left-color: #ffa657; }
+
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">⚙ TEAM CLAW</div>
+  <div class="status" id="conn-status">connecting…</div>
+  <div class="stats">
+    <span id="stat-msgs">0</span> messages &nbsp;
+    <span id="stat-threads">0</span> threads &nbsp;
+    <span id="stat-agents">0</span> active agents &nbsp;
+    $<span id="stat-cost">0.0000</span> est. cost
+  </div>
+  <button class="standup-btn" onclick="openStandupModal()" style="margin-left:8px">📋 Standup</button>
+</header>
+
+<nav id="sidebar">
+  <h3>Threads</h3>
+  <div id="thread-list"><div class="empty">No threads yet</div></div>
+</nav>
+
+<main id="feed">
+  <div id="feed-header">
+    <span id="feed-title">All Messages</span>
+    <div id="filter-bar">
+      <button class="filter-btn active" data-filter="all">All</button>
+      <button class="filter-btn" data-filter="task">Tasks</button>
+      <button class="filter-btn" data-filter="code">Code</button>
+      <button class="filter-btn" data-filter="status">Status</button>
+      <button id="close-thread-btn" onclick="closeCurrentThread()">🔒 Close</button>
+    </div>
+  </div>
+  <div id="budget-bar-wrap">
+    <div id="budget-track"><div id="budget-fill"></div></div>
+    <span id="budget-label">—</span>
+  </div>
+  <div id="msg-list"><div class="empty">Waiting for messages…</div></div>
+</main>
+
+<aside id="agents-panel">
+  <h3>Agents</h3>
+  <div id="agent-list"></div>
+
+  <hr class="panel-divider">
+  <h3 style="padding:4px 4px 6px;font-size:11px;text-transform:uppercase;color:var(--muted);letter-spacing:0.8px;">Token Cost</h3>
+  <div id="cost-list"><div style="font-size:10px;color:var(--muted);padding:4px">Loading…</div></div>
+
+  <hr class="panel-divider">
+  <h3 style="padding:4px 4px 6px;font-size:11px;text-transform:uppercase;color:var(--muted);letter-spacing:0.8px;">CI Results</h3>
+  <div id="ci-sparkline" class="ci-sparkline"></div>
+  <div id="ci-list"><div style="font-size:10px;color:var(--muted);padding:4px">No runs yet</div></div>
+
+  <hr class="panel-divider">
+  <h3 style="padding:4px 4px 6px;font-size:11px;text-transform:uppercase;color:var(--muted);letter-spacing:0.8px;">Tasks</h3>
+  <div id="task-list"><div style="font-size:10px;color:var(--muted);padding:4px">No tasks yet</div></div>
+
+  <hr class="panel-divider">
+  <h3 style="padding:4px 4px 6px;font-size:11px;text-transform:uppercase;color:var(--muted);letter-spacing:0.8px;">Team Wiki</h3>
+  <div id="wiki-list"><div style="font-size:10px;color:var(--muted);padding:4px">No articles yet</div></div>
+
+  <hr class="panel-divider">
+  <h3 style="padding:4px 4px 6px;font-size:11px;text-transform:uppercase;color:var(--muted);letter-spacing:0.8px;">Tool Activity</h3>
+  <div id="tool-activity-list"><div style="font-size:10px;color:var(--muted);padding:4px">No tool calls yet</div></div>
+  <div id="tool-stats-list" style="margin-top:6px"></div>
+</aside>
+
+<!-- Toast container -->
+<div id="toast-container"></div>
+
+<!-- Wiki article modal -->
+<div id="wiki-modal">
+  <div id="wiki-modal-inner">
+    <span id="wiki-modal-close" onclick="closeWikiModal()">✕</span>
+    <div id="wiki-modal-title"></div>
+    <div id="wiki-modal-body"></div>
+  </div>
+</div>
+
+<!-- Standup modal -->
+<div id="standup-modal">
+  <div id="standup-modal-inner">
+    <span id="standup-modal-close" onclick="closeStandupModal()">✕</span>
+    <div style="font-size:16px;font-weight:700;color:var(--accent);margin-bottom:16px">📋 Daily Standup</div>
+    <div id="standup-content"><div class="empty">Loading…</div></div>
+    <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
+      <button class="standup-btn" onclick="publishStandup()" id="standup-publish-btn">Publish to Wiki</button>
+      <span id="standup-publish-status" style="font-size:10px;color:var(--muted)"></span>
+    </div>
+  </div>
+</div>
+
+<script>
+const TYPE_ICONS = {
+  task_assignment:  '📋',
+  question:         '❓',
+  answer:           '💡',
+  review_request:   '🔍',
+  review_feedback:  '📝',
+  status_update:    '📊',
+  blocker:          '🚧',
+  task_complete:    '✅',
+  requirement:      '📌',
+  acceptance_result:'🎯',
+  human_input:      '👤',
+  agent_reply:      '🤖',
+};
+const TYPE_FILTER = {
+  task:   ['task_assignment','task_complete','requirement','acceptance_result'],
+  code:   ['review_request','review_feedback'],
+  status: ['status_update','blocker','question','answer'],
+};
+
+let allMessages = [];
+let threads = {};           // id -> {id, title, count, status}
+let agentActivity = {};
+let agentHeartbeat = {};    // role -> {status, last_seen} from /agents
+let currentFilter = 'all';
+let currentThread = null;
+let totalMsgs = 0;
+let sseSource = null;
+
+// ── Toast notifications ──
+function showToast(message, type='info', duration=5000) {
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.textContent = message;
+  document.getElementById('toast-container').appendChild(el);
+  setTimeout(() => { el.style.opacity = '0'; setTimeout(() => el.remove(), 400); }, duration);
+}
+
+function roleClass(role) {
+  return 'role-' + (role || 'system').replace(/-/g,'_');
+}
+
+function formatTime(ts) {
+  try {
+    return new Date(ts).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+  } catch { return ts ? ts.substring(11,19) : ''; }
+}
+
+function renderMessage(msg, isNew=false) {
+  const icon = TYPE_ICONS[msg.type] || '💬';
+  const time = formatTime(msg.timestamp || msg.created_at);
+  const rc = roleClass(msg.from_role);
+  const bodyText = (msg.content || '').trim();
+  const collapsed = bodyText.length > 200 ? 'collapsed' : '';
+
+  const card = document.createElement('div');
+  card.className = `msg-card ${rc}${isNew ? ' new' : ''}`;
+  card.dataset.type = msg.type;
+  card.dataset.thread = msg.thread_id;
+  card.innerHTML = `
+    <div class="msg-header">
+      <span class="msg-icon">${icon}</span>
+      <span class="msg-from">${msg.from_role}</span>
+      <span class="msg-arrow">→</span>
+      <span class="msg-to">${msg.to_role}</span>
+      <span class="msg-type">${msg.type}</span>
+      <span class="msg-time">${time}</span>
+    </div>
+    <div class="msg-body ${collapsed}">${escHtml(bodyText)}</div>
+  `;
+  card.querySelector('.msg-body').addEventListener('click', function() {
+    this.classList.toggle('collapsed');
+  });
+  return card;
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function matchesFilter(msg) {
+  if (currentFilter === 'all') return true;
+  return (TYPE_FILTER[currentFilter] || []).includes(msg.type);
+}
+
+function matchesThread(msg) {
+  if (!currentThread) return true;
+  return msg.thread_id === currentThread;
+}
+
+function rerender() {
+  const list = document.getElementById('msg-list');
+  const visible = allMessages.filter(m => matchesFilter(m) && matchesThread(m));
+  if (visible.length === 0) {
+    list.innerHTML = '<div class="empty">No messages match the current filter.</div>';
+    return;
+  }
+  list.innerHTML = '';
+  visible.forEach(m => list.appendChild(renderMessage(m, false)));
+  list.scrollTop = list.scrollHeight;
+}
+
+function addMessage(msg, isNew=false) {
+  // Dedup
+  if (allMessages.find(m => m.id === msg.id)) return;
+  allMessages.push(msg);
+  totalMsgs++;
+  document.getElementById('stat-msgs').textContent = totalMsgs;
+
+  // Update thread registry
+  if (msg.thread_id) {
+    if (!threads[msg.thread_id]) {
+      threads[msg.thread_id] = { id: msg.thread_id, title: msg.thread_id.substring(0,8), count: 0, status: 'active' };
+      document.getElementById('stat-threads').textContent = Object.keys(threads).length;
+    }
+    threads[msg.thread_id].count++;
+    // Use content as title hint for human_input
+    if (msg.type === 'human_input' && msg.content) {
+      const firstLine = msg.content.split('\n')[0].replace(/\*\*/g,'').trim();
+      threads[msg.thread_id].title = firstLine.substring(0,40);
+    }
+    // Mark thread complete on completion event
+    if (msg.type === 'thread_complete') {
+      threads[msg.thread_id].status = 'complete';
+      showToast(`✅ Thread "${threads[msg.thread_id].title}" complete — CI green`, 'success');
+    }
+    renderThreadList();
+  }
+
+  // Update agent activity
+  if (msg.from_role && msg.from_role !== 'orchestrator' && msg.from_role !== 'system') {
+    agentActivity[msg.from_role] = (agentActivity[msg.from_role] || 0) + 1;
+    renderAgents();
+  }
+
+  // Append to DOM if matches current view
+  if (matchesFilter(msg) && matchesThread(msg)) {
+    const list = document.getElementById('msg-list');
+    const empty = list.querySelector('.empty');
+    if (empty) empty.remove();
+    const card = renderMessage(msg, isNew);
+    list.appendChild(card);
+    if (isNew) list.scrollTop = list.scrollHeight;
+  }
+}
+
+function renderThreadList() {
+  const el = document.getElementById('thread-list');
+  el.innerHTML = '';
+  const sorted = Object.values(threads).sort((a,b) => b.count - a.count);
+  if (sorted.length === 0) { el.innerHTML = '<div class="empty">No threads yet</div>'; return; }
+
+  // "All" option
+  const all = document.createElement('div');
+  all.className = 'thread-item' + (!currentThread ? ' active' : '');
+  all.innerHTML = `<span class="t-count">${totalMsgs}</span><div class="t-title">All messages</div>`;
+  all.addEventListener('click', () => { currentThread = null; document.querySelectorAll('.thread-item').forEach(t=>t.classList.remove('active')); all.classList.add('active'); rerender(); document.getElementById('feed-title').textContent = 'All Messages'; loadBudget(null); document.getElementById('close-thread-btn').style.display = 'none'; });
+  el.appendChild(all);
+
+  sorted.forEach(t => {
+    const isComplete = t.status === 'complete';
+    const isClosed   = t.status === 'closed';
+    const item = document.createElement('div');
+    item.className = 'thread-item' + (currentThread === t.id ? ' active' : '') + (isComplete ? ' complete' : '') + (isClosed ? ' closed' : '');
+    item.dataset.id = t.id;
+    const statusSuffix = isComplete ? ' · done' : isClosed ? ' · closed' : '';
+    item.innerHTML = `<span class="t-count">${t.count}</span><div class="t-title">${escHtml(t.title)}</div><div class="t-meta">${t.id.substring(0,8)}${statusSuffix}</div>`;
+    item.addEventListener('click', () => {
+      currentThread = t.id;
+      document.querySelectorAll('.thread-item').forEach(el=>el.classList.remove('active'));
+      item.classList.add('active');
+      rerender();
+      document.getElementById('feed-title').textContent = t.title;
+      loadTasks();
+      loadBudget(t.id);
+      // Show close button only for active threads
+      const closeBtn = document.getElementById('close-thread-btn');
+      closeBtn.style.display = (t.status === 'active') ? 'inline-block' : 'none';
+    });
+    el.appendChild(item);
+  });
+}
+
+const AGENTS = ['product_owner','engineering_manager','architect','senior_dev_1','senior_dev_2','junior_dev_1','junior_dev_2'];
+
+async function loadAgentStatus() {
+  try {
+    const res = await fetch('/agents');
+    if (!res.ok) return;
+    const agents = await res.json();
+    agents.forEach(a => { agentHeartbeat[a.role] = a; });
+    renderAgents();
+  } catch(e) { /* non-fatal */ }
+}
+
+function renderAgents() {
+  const el = document.getElementById('agent-list');
+  el.innerHTML = '';
+  let activeCount = 0;
+  AGENTS.forEach(role => {
+    const count   = agentActivity[role] || 0;
+    const hb      = agentHeartbeat[role];
+    // Heartbeat status takes priority; fall back to message activity
+    let dotClass  = '';
+    if (hb && hb.status === 'online')       { dotClass = 'online'; activeCount++; }
+    else if (hb && hb.status === 'stale')   { dotClass = 'stale'; }
+    else if (!hb && count > 0)              { dotClass = 'online'; activeCount++; }
+
+    const row = document.createElement('div');
+    row.className = 'agent-row';
+    row.innerHTML = `<div class="agent-dot ${dotClass}"></div><span class="agent-name">${role.replace(/_/g,' ')}</span><span class="agent-count">${count || ''}</span>`;
+    el.appendChild(row);
+  });
+  document.getElementById('stat-agents').textContent = activeCount;
+}
+
+// ── Filter buttons ──
+document.querySelectorAll('.filter-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentFilter = btn.dataset.filter;
+    rerender();
+  });
+});
+
+// ── Load history then open SSE ──
+async function loadHistory() {
+  try {
+    const res = await fetch('/threads');
+    const threadList = await res.json();
+    // Pre-populate thread metadata (including status) before loading messages
+    for (const t of threadList) {
+      threads[t.id] = { id: t.id, title: t.title || t.id.substring(0,8), count: 0, status: t.status };
+    }
+    document.getElementById('stat-threads').textContent = threadList.length;
+    renderThreadList();
+    for (const t of threadList) {
+      const mRes = await fetch(`/threads/${t.id}/messages`);
+      if (!mRes.ok) continue;
+      const msgs = await mRes.json();
+      msgs.forEach(m => addMessage(m, false));
+    }
+  } catch(e) { console.warn('History load failed', e); }
+}
+
+function connectSSE() {
+  sseSource = new EventSource('/stream/all');
+  sseSource.onopen = () => {
+    document.getElementById('conn-status').textContent = 'live';
+    document.getElementById('conn-status').className = 'status live';
+  };
+  sseSource.onmessage = (e) => {
+    try {
+      const msg = JSON.parse(e.data);
+      addMessage(msg, true);
+      if (msg.type === 'ci_result') {
+        loadCIResults();
+        loadTasks();
+        // Show toast with CI summary
+        const badge = msg.content && msg.content.startsWith('✅') ? 'success' : 'error';
+        showToast(msg.content || 'CI run complete', badge, 6000);
+      }
+      if (msg.type === 'budget_warning') {
+        showToast(msg.content || 'Token budget warning', 'warning', 8000);
+        if (currentThread && msg.thread_id === currentThread) loadBudget(currentThread);
+      }
+      if (msg.type === 'budget_exceeded') {
+        showToast(msg.content || 'Token budget exceeded!', 'error', 10000);
+        if (currentThread && msg.thread_id === currentThread) loadBudget(currentThread);
+      }
+      if (msg.type === 'thread_idle') {
+        showToast(msg.content || '⏰ Thread idle', 'warning', 8000);
+        // Mark thread in sidebar with idle prefix
+        const tid = msg.thread_id;
+        if (tid && threads[tid]) {
+          const item = document.querySelector(`.thread-item[data-id="${tid}"] .t-title`);
+          if (item && !item.textContent.startsWith('⏰')) {
+            item.textContent = '⏰ ' + item.textContent;
+          }
+        }
+      }
+      if (msg.type === 'thread_closed') {
+        const tid = msg.thread_id;
+        if (tid && threads[tid]) {
+          threads[tid].status = 'closed';
+          renderThreadList();
+        }
+        showToast(msg.content || '🔒 Thread closed', 'info', 5000);
+      }
+    } catch {}
+  };
+  sseSource.onerror = () => {
+    document.getElementById('conn-status').textContent = 'reconnecting…';
+    document.getElementById('conn-status').className = 'status';
+    setTimeout(connectSSE, 3000);
+  };
+}
+
+// ── Metrics polling ──
+async function loadMetrics() {
+  try {
+    const res = await fetch('/metrics');
+    if (!res.ok) return;
+    const data = await res.json();
+    renderCosts(data);
+  } catch(e) { /* non-fatal */ }
+}
+
+function renderCosts(data) {
+  const el = document.getElementById('cost-list');
+  if (!data || data.length === 0) {
+    el.innerHTML = '<div style="font-size:10px;color:var(--muted);padding:4px">No data yet</div>';
+    return;
+  }
+  let totalCost = 0;
+  let totalToks = 0;
+  el.innerHTML = '';
+  data.forEach(d => {
+    totalCost += d.estimated_cost_usd;
+    const toks = d.total_input_tokens + d.total_output_tokens;
+    totalToks += toks;
+    const row = document.createElement('div');
+    row.className = 'cost-row';
+    row.innerHTML = `
+      <span class="cost-role">${d.agent_role.replace(/_/g,' ')}</span>
+      <span class="cost-tokens">${fmtToks(toks)}</span>
+      <span class="cost-usd">$${d.estimated_cost_usd.toFixed(4)}</span>
+    `;
+    el.appendChild(row);
+  });
+  const total = document.createElement('div');
+  total.className = 'cost-total';
+  total.innerHTML = `<span>Total (${fmtToks(totalToks)})</span><span style="color:#56d364">$${totalCost.toFixed(4)}</span>`;
+  el.appendChild(total);
+  document.getElementById('stat-cost').textContent = totalCost.toFixed(4);
+}
+
+function fmtToks(n) {
+  if (n >= 1000) return (n/1000).toFixed(1)+'k';
+  return String(n);
+}
+
+// ── Wiki ──
+async function loadWiki() {
+  try {
+    const res = await fetch('/wiki');
+    if (!res.ok) return;
+    const articles = await res.json();
+    renderWikiList(articles);
+  } catch(e) { /* non-fatal */ }
+}
+
+function renderWikiList(articles) {
+  const el = document.getElementById('wiki-list');
+  if (!articles || articles.length === 0) {
+    el.innerHTML = '<div style="font-size:10px;color:var(--muted);padding:4px">No articles yet</div>';
+    return;
+  }
+  el.innerHTML = '';
+  articles.forEach(a => {
+    const item = document.createElement('div');
+    item.className = 'wiki-article';
+    item.innerHTML = `<div class="wiki-title">${escHtml(a.title)}</div><div class="wiki-author">by ${a.author}</div>`;
+    item.addEventListener('click', () => openWikiModal(a));
+    el.appendChild(item);
+  });
+}
+
+function openWikiModal(article) {
+  document.getElementById('wiki-modal-title').textContent = article.title;
+  document.getElementById('wiki-modal-body').textContent = article.content;
+  document.getElementById('wiki-modal').classList.add('open');
+}
+function closeWikiModal() {
+  document.getElementById('wiki-modal').classList.remove('open');
+}
+document.getElementById('wiki-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeWikiModal();
+});
+
+// ── CI Results ──
+async function loadCIResults() {
+  try {
+    const [listRes, trendRes] = await Promise.all([
+      fetch('/ci-results'),
+      fetch('/ci-results/trend'),
+    ]);
+    if (listRes.ok)  renderCIResults(await listRes.json());
+    if (trendRes.ok) renderCISparkline(await trendRes.json());
+  } catch(e) { /* non-fatal */ }
+}
+
+function renderCISparkline(trend) {
+  const container = document.getElementById('ci-sparkline');
+  if (!container) return;
+  container.innerHTML = '';
+  const recent = trend.slice(-15);
+  recent.forEach(r => {
+    const dot = document.createElement('span');
+    dot.className = `ci-dot ${r.exit_code === 0 ? 'pass' : 'fail'}`;
+    dot.title = `${r.exit_code === 0 ? '✅' : '❌'} ${r.passed}/${r.total} · ${formatTime(r.ran_at)}`;
+    container.appendChild(dot);
+  });
+}
+
+function renderCIResults(results) {
+  const el = document.getElementById('ci-list');
+  if (!results || results.length === 0) {
+    el.innerHTML = '<div style="font-size:10px;color:var(--muted);padding:4px">No runs yet</div>';
+    return;
+  }
+  el.innerHTML = '';
+  results.slice(0, 5).forEach(r => {
+    const badge = r.exit_code === 0 ? '✅' : '❌';
+    const time  = formatTime(r.ran_at);
+    const row   = document.createElement('div');
+    row.className = 'ci-row';
+    row.innerHTML = `
+      <span class="ci-badge">${badge}</span>
+      <span class="ci-counts">${r.passed}/${r.total} passed</span>
+      <span class="ci-time">${time}</span>
+    `;
+    el.appendChild(row);
+  });
+}
+
+// ── Kanban Tasks ──
+async function loadTasks() {
+  try {
+    const url = currentThread ? `/tasks?thread_id=${currentThread}` : '/tasks';
+    const res  = await fetch(url);
+    if (!res.ok) return;
+    const tasks = await res.json();
+    renderTasks(tasks.slice(0, 8));
+  } catch(e) { /* non-fatal */ }
+}
+
+function renderTasks(tasks) {
+  const el = document.getElementById('task-list');
+  if (!tasks || tasks.length === 0) {
+    el.innerHTML = '<div style="font-size:10px;color:var(--muted);padding:4px">No tasks yet</div>';
+    return;
+  }
+  el.innerHTML = '';
+  tasks.forEach(t => {
+    const row = document.createElement('div');
+    row.className = 'task-row';
+    row.innerHTML = `
+      <div class="task-title">${escHtml(t.title)}</div>
+      <div class="task-meta">
+        <span class="task-assignee">${t.assignee || 'unassigned'}</span>
+        <span class="task-status ${t.status}">${t.status.replace('_',' ')}</span>
+      </div>
+    `;
+    el.appendChild(row);
+  });
+}
+
+// ── Standup modal ──
+async function openStandupModal() {
+  document.getElementById('standup-modal').classList.add('open');
+  document.getElementById('standup-publish-status').textContent = '';
+  document.getElementById('standup-content').innerHTML = '<div class="empty">Loading…</div>';
+  try {
+    const res = await fetch('/standup?hours=24');
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    renderStandupReport(data);
+  } catch(e) {
+    document.getElementById('standup-content').innerHTML = `<div class="empty">Failed to load standup: ${e.message}</div>`;
+  }
+}
+
+function closeStandupModal() {
+  document.getElementById('standup-modal').classList.remove('open');
+}
+
+document.getElementById('standup-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeStandupModal();
+});
+
+function renderStandupReport(d) {
+  const el = document.getElementById('standup-content');
+  const genAt = d.generated_at ? new Date(d.generated_at).toLocaleString() : '—';
+
+  let html = `<div style="font-size:10px;color:var(--muted);margin-bottom:12px">Generated ${genAt} · last ${d.period_hours}h</div>`;
+
+  // Active threads
+  html += `<div class="standup-section"><h4>Active Threads (${d.active_threads.length})</h4>`;
+  if (d.active_threads.length === 0) {
+    html += '<div class="standup-none">No active threads</div>';
+  } else {
+    d.active_threads.forEach(t => {
+      html += `<div class="standup-row"><span class="standup-label">${escHtml(t.title || t.id)}</span><span class="standup-value">${t.messages} msgs</span><span style="font-size:10px;color:var(--muted)">${t.status}</span></div>`;
+    });
+  }
+  html += '</div>';
+
+  // Tasks done
+  html += `<div class="standup-section"><h4>Completed Tasks (${d.tasks_completed.length})</h4>`;
+  if (d.tasks_completed.length === 0) {
+    html += '<div class="standup-none">None</div>';
+  } else {
+    d.tasks_completed.forEach(t => {
+      html += `<div class="standup-row"><span class="standup-label">✅ ${escHtml(t.title)}</span><span style="font-size:10px;color:var(--muted)">${t.assignee || '—'}</span></div>`;
+    });
+  }
+  html += '</div>';
+
+  // WIP
+  html += `<div class="standup-section"><h4>In Progress (${d.tasks_in_progress.length})</h4>`;
+  if (d.tasks_in_progress.length === 0) {
+    html += '<div class="standup-none">None</div>';
+  } else {
+    d.tasks_in_progress.forEach(t => {
+      html += `<div class="standup-row"><span class="standup-label">🔄 ${escHtml(t.title)}</span><span style="font-size:10px;color:var(--muted)">${t.assignee || '—'}</span></div>`;
+    });
+  }
+  html += '</div>';
+
+  // CI summary
+  const ci = d.ci_summary || {};
+  html += `<div class="standup-section"><h4>CI Summary</h4>`;
+  html += `<div class="standup-row"><span class="standup-label">Passed / Failed / Total</span><span class="standup-value" style="color:${ci.failed > 0 ? '#ff7b72' : '#56d364'}">${ci.passed} / ${ci.failed} / ${ci.total}</span></div>`;
+  html += '</div>';
+
+  // Message activity
+  html += `<div class="standup-section"><h4>Message Activity</h4>`;
+  const agents = Object.entries(d.messages_by_agent || {});
+  if (agents.length === 0) {
+    html += '<div class="standup-none">No messages</div>';
+  } else {
+    agents.forEach(([role, cnt]) => {
+      html += `<div class="standup-row"><span class="standup-label">${role.replace(/_/g,' ')}</span><span class="standup-value">${cnt}</span></div>`;
+    });
+  }
+  html += '</div>';
+
+  // Token cost
+  const cost = d.token_cost || {};
+  html += `<div class="standup-section"><h4>Token Cost</h4>`;
+  html += `<div class="standup-row"><span class="standup-label">Input tokens</span><span class="standup-value">${fmtToks(cost.total_input || 0)}</span></div>`;
+  html += `<div class="standup-row"><span class="standup-label">Output tokens</span><span class="standup-value">${fmtToks(cost.total_output || 0)}</span></div>`;
+  html += `<div class="standup-row"><span class="standup-label">Estimated cost</span><span class="standup-value" style="color:#56d364">$${(cost.estimated_cost_usd || 0).toFixed(4)}</span></div>`;
+  html += '</div>';
+
+  // Blockers
+  if (d.recent_blockers && d.recent_blockers.length > 0) {
+    html += `<div class="standup-section"><h4>Recent Blockers (${d.recent_blockers.length})</h4>`;
+    d.recent_blockers.forEach(b => {
+      html += `<div class="standup-row" style="flex-direction:column;gap:2px"><span style="font-size:10px;color:var(--muted)">${b.from_role}</span><span style="font-size:11px">${escHtml(b.excerpt)}</span></div>`;
+    });
+    html += '</div>';
+  }
+
+  el.innerHTML = html;
+}
+
+async function publishStandup() {
+  const btn = document.getElementById('standup-publish-btn');
+  const status = document.getElementById('standup-publish-status');
+  btn.disabled = true;
+  status.textContent = 'Publishing…';
+  try {
+    const res = await fetch('/standup/publish', {method: 'POST'});
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    status.textContent = `✅ Published: "${data.title}"`;
+    status.style.color = '#56d364';
+    loadWiki();
+  } catch(e) {
+    status.textContent = `❌ Failed: ${e.message}`;
+    status.style.color = '#ff7b72';
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ── Thread budget bar ──
+async function loadBudget(threadId) {
+  const wrap = document.getElementById('budget-bar-wrap');
+  if (!threadId) { wrap.classList.remove('visible'); return; }
+  try {
+    const res = await fetch(`/threads/${threadId}/budget`);
+    if (!res.ok) { wrap.classList.remove('visible'); return; }
+    const data = await res.json();
+    renderBudgetBar(data);
+  } catch(e) { wrap.classList.remove('visible'); }
+}
+
+function renderBudgetBar(data) {
+  const wrap  = document.getElementById('budget-bar-wrap');
+  const fill  = document.getElementById('budget-fill');
+  const label = document.getElementById('budget-label');
+  if (data.status === 'unlimited') {
+    const used = data.tokens_used > 0 ? fmtToks(data.tokens_used) + ' tokens used' : 'no budget set';
+    label.textContent = used;
+    fill.style.width = '0%';
+    wrap.classList.add('visible');
+    return;
+  }
+  const pct = Math.min(data.pct_used, 100);
+  fill.style.width = pct + '%';
+  fill.style.background = data.status === 'exceeded' ? '#ff7b72' : data.status === 'warning' ? '#ffa657' : '#56d364';
+  label.textContent = `${data.pct_used.toFixed(0)}% · ${fmtToks(data.tokens_used)}/${fmtToks(data.budget)}`;
+  wrap.classList.add('visible');
+}
+
+// ── Tool Activity ──
+async function loadToolActivity() {
+  try {
+    const [histRes, statsRes] = await Promise.all([
+      fetch('/tool-history?limit=8'),
+      fetch('/tool-history/stats'),
+    ]);
+    if (histRes.ok)  renderToolActivity(await histRes.json());
+    if (statsRes.ok) renderToolStats(await statsRes.json());
+  } catch(e) { /* non-fatal */ }
+}
+
+function renderToolActivity(records) {
+  const el = document.getElementById('tool-activity-list');
+  if (!records || records.length === 0) {
+    el.innerHTML = '<div style="font-size:10px;color:var(--muted);padding:4px">No tool calls yet</div>';
+    return;
+  }
+  el.innerHTML = '';
+  records.forEach(r => {
+    const row = document.createElement('div');
+    row.className = 'tool-row';
+    const statusIcon = r.success
+      ? '<span class="tool-status-ok">✅</span>'
+      : '<span class="tool-status-err">❌</span>';
+    const shortAgent = (r.agent_role || '').replace(/_/g,' ').substring(0,12);
+    const shortTool  = (r.tool_name  || '').substring(0,18);
+    row.innerHTML = `
+      ${statusIcon}
+      <span class="tool-agent" title="${r.agent_role}">${shortAgent}</span>
+      <span class="tool-name"  title="${r.tool_name}">${shortTool}</span>
+      <span class="tool-duration">${r.duration_ms}ms</span>
+    `;
+    if (!r.success && r.error) row.title = r.error;
+    el.appendChild(row);
+  });
+}
+
+function renderToolStats(stats) {
+  const el = document.getElementById('tool-stats-list');
+  if (!stats || stats.length === 0) { el.innerHTML = ''; return; }
+  let html = '<div style="display:flex;gap:4px;padding:3px 4px;font-size:9px;color:var(--muted);border-bottom:1px solid var(--border)">'
+    + '<span style="flex:1">tool</span><span style="min-width:26px;text-align:right">calls</span>'
+    + '<span style="min-width:34px;text-align:right">ok%</span><span style="min-width:36px;text-align:right">avg ms</span></div>';
+  stats.slice(0, 8).forEach(s => {
+    const srPct  = (s.success_rate * 100).toFixed(0);
+    const srColor = s.success_rate >= 0.9 ? '#56d364' : s.success_rate >= 0.7 ? '#ffa657' : '#ff7b72';
+    html += `<div class="tool-stats-row">
+      <span class="tool-stats-name" title="${s.tool_name}">${s.tool_name.substring(0,18)}</span>
+      <span class="tool-stats-calls">${s.total_calls}</span>
+      <span class="tool-stats-sr" style="color:${srColor}">${srPct}%</span>
+      <span class="tool-stats-avg">${s.avg_duration_ms.toFixed(0)}ms</span>
+    </div>`;
+  });
+  el.innerHTML = html;
+}
+
+// ── Thread close ──
+async function closeCurrentThread() {
+  if (!currentThread) return;
+  const t = threads[currentThread];
+  const title = t ? t.title : currentThread.substring(0,8);
+  if (!confirm(`Close thread "${title}"? This cannot be undone.`)) return;
+  try {
+    const res = await fetch(`/threads/${currentThread}/close`, {method: 'POST'});
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({detail: `HTTP ${res.status}`}));
+      showToast(`Failed to close thread: ${err.detail || res.status}`, 'error');
+      return;
+    }
+    if (threads[currentThread]) {
+      threads[currentThread].status = 'closed';
+    }
+    document.getElementById('close-thread-btn').style.display = 'none';
+    renderThreadList();
+    showToast(`🔒 Thread "${title}" closed`, 'info');
+  } catch(e) {
+    showToast(`Failed to close thread: ${e.message}`, 'error');
+  }
+}
+
+// Periodic refresh: metrics every 15s, agents/ci/tasks every 20s, wiki every 30s
+setInterval(loadMetrics, 15000);
+setInterval(loadAgentStatus, 20000);
+setInterval(loadCIResults, 20000);
+setInterval(loadTasks, 20000);
+setInterval(loadWiki, 30000);
+setInterval(loadToolActivity, 15000);
+
+renderAgents();
+loadHistory().then(() => connectSSE());
+loadMetrics();
+loadAgentStatus();
+loadCIResults();
+loadTasks();
+loadWiki();
+loadToolActivity();
+</script>
+</body>
+</html>

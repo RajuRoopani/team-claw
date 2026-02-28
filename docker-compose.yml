@@ -1,0 +1,190 @@
+version: '3.9'
+
+networks:
+  team-claw:
+    driver: bridge
+
+volumes:
+  workspace:
+  redis-data:
+  postgres-data:
+
+x-agent-base: &agent-base
+  build:
+    context: ./agents/base
+  networks: [team-claw]
+  depends_on:
+    redis:
+      condition: service_healthy
+  restart: unless-stopped
+  volumes:
+    - workspace:/workspace
+
+services:
+  # ─────────────────────────────────────────────
+  # Infrastructure
+  # ─────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    networks: [team-claw]
+    volumes: [redis-data:/data]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  postgres:
+    image: postgres:16-alpine
+    networks: [team-claw]
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./shared/db/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    environment:
+      POSTGRES_DB: team_claw
+      POSTGRES_USER: ${DB_USER:-teamclaw}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-teamclaw}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-teamclaw}"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ─────────────────────────────────────────────
+  # Code execution sandbox (read-only workspace)
+  # ─────────────────────────────────────────────
+  sandbox:
+    build: ./sandbox
+    networks: [team-claw]
+    volumes:
+      - workspace:/workspace:ro
+    environment:
+      WORKSPACE_ROOT: /workspace
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+
+  # ─────────────────────────────────────────────
+  # Orchestrator (human-facing API)
+  # ─────────────────────────────────────────────
+  orchestrator:
+    build: ./orchestrator
+    networks: [team-claw]
+    ports: ["8080:8080"]
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    environment:
+      REDIS_URL: redis://redis:6379
+      DB_URL: postgresql://${DB_USER:-teamclaw}:${DB_PASSWORD:-teamclaw}@postgres:5432/team_claw
+      SANDBOX_URL: http://sandbox:8081
+      WEBHOOK_URL: ${WEBHOOK_URL:-}
+      THREAD_BUDGET_TOKENS: ${THREAD_BUDGET_TOKENS:-0}
+      IDLE_THREAD_MINUTES: ${IDLE_THREAD_MINUTES:-0}
+    volumes:
+      - workspace:/workspace
+
+  # ─────────────────────────────────────────────
+  # Agent team
+  # ─────────────────────────────────────────────
+  product-owner:
+    <<: *agent-base
+    volumes:
+      - ./agents/product_owner:/agent
+      - workspace:/workspace
+    environment:
+      ROLE: product_owner
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      REDIS_URL: redis://redis:6379
+      MODEL: ${PO_MODEL:-claude-opus-4-6}
+      ORCHESTRATOR_URL: http://orchestrator:8080
+
+  engineering-manager:
+    <<: *agent-base
+    volumes:
+      - ./agents/engineering_manager:/agent
+      - workspace:/workspace
+    environment:
+      ROLE: engineering_manager
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      REDIS_URL: redis://redis:6379
+      MODEL: ${EM_MODEL:-claude-opus-4-6}
+      SANDBOX_URL: http://sandbox:8081
+      ORCHESTRATOR_URL: http://orchestrator:8080
+
+  architect:
+    <<: *agent-base
+    volumes:
+      - ./agents/architect:/agent
+      - workspace:/workspace
+    environment:
+      ROLE: architect
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      REDIS_URL: redis://redis:6379
+      MODEL: ${ARCH_MODEL:-claude-sonnet-4-6}
+      ORCHESTRATOR_URL: http://orchestrator:8080
+
+  senior-dev-1:
+    <<: *agent-base
+    volumes:
+      - ./agents/senior_dev:/agent
+      - workspace:/workspace
+    environment:
+      ROLE: senior_dev_1
+      INSTANCE_ID: "1"
+      MENTEE_ROLE: junior_dev_1
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      REDIS_URL: redis://redis:6379
+      MODEL: ${SR_MODEL:-claude-sonnet-4-6}
+      SANDBOX_URL: http://sandbox:8081
+      ORCHESTRATOR_URL: http://orchestrator:8080
+
+  senior-dev-2:
+    <<: *agent-base
+    volumes:
+      - ./agents/senior_dev:/agent
+      - workspace:/workspace
+    environment:
+      ROLE: senior_dev_2
+      INSTANCE_ID: "2"
+      MENTEE_ROLE: junior_dev_2
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      REDIS_URL: redis://redis:6379
+      MODEL: ${SR_MODEL:-claude-sonnet-4-6}
+      SANDBOX_URL: http://sandbox:8081
+      ORCHESTRATOR_URL: http://orchestrator:8080
+
+  junior-dev-1:
+    <<: *agent-base
+    volumes:
+      - ./agents/junior_dev:/agent
+      - workspace:/workspace
+    environment:
+      ROLE: junior_dev_1
+      INSTANCE_ID: "1"
+      MENTOR_ROLE: senior_dev_1
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      REDIS_URL: redis://redis:6379
+      MODEL: ${JR_MODEL:-claude-haiku-4-5-20251001}
+      SANDBOX_URL: http://sandbox:8081
+      ORCHESTRATOR_URL: http://orchestrator:8080
+
+  junior-dev-2:
+    <<: *agent-base
+    volumes:
+      - ./agents/junior_dev:/agent
+      - workspace:/workspace
+    environment:
+      ROLE: junior_dev_2
+      INSTANCE_ID: "2"
+      MENTOR_ROLE: senior_dev_2
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      REDIS_URL: redis://redis:6379
+      MODEL: ${JR_MODEL:-claude-haiku-4-5-20251001}
+      SANDBOX_URL: http://sandbox:8081
+      ORCHESTRATOR_URL: http://orchestrator:8080
