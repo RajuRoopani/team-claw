@@ -2,7 +2,7 @@
 
 An autonomous AI software development team running in Docker. Eight Claude agents — each playing a real SDLC role — receive requirements, design, implement, test, review, and ship working code to GitHub without human intervention.
 
-Built across 11 phases, from a minimal 2-agent loop to a full team with a dedicated UX Engineer, CI, human-in-the-loop escalation, live dashboard, tool telemetry, and persistent agent memory that evolves with every task. Latest additions: dashboard theme selector (7 themes), agent loop detection, and file ownership protocol to eliminate inter-agent conflicts.
+Built across 18 phases, from a minimal 2-agent loop to a full team with a dedicated UX Engineer, CI, human-in-the-loop escalation, live dashboard, tool telemetry, and persistent agent memory that evolves with every task. Latest: message durability fix (pending-queue drain + XAUTOCLAIM on startup) ensures no message is silently dropped across container restarts.
 
 ![Team Claw Dashboard](docs/dashboard.png)
 
@@ -538,6 +538,7 @@ Waiting On
 | 15 | Dashboard theme selector: 7 selectable themes (Void, Ocean, Dracula, Nord, Cyberpunk, Forest, Solar) with CSS custom-property swapping, color dot + swatch preview, localStorage persistence |
 | 16 | Agent reliability: **loop detection** in `_agentic_loop` (circuit-breaks when same tool+inputs repeats 3×); **file ownership protocol** in EM + dev prompts (explicit per-file assignments prevent overwrite conflicts); **status noise reduction** (devs only message on blockers/questions/completion); `execute_code` removed from EM tools; `write_file` now returns actionable error when `content` param is missing |
 | 17 | **Per-task isolated git repos**: `git_commit`, `git_status`, `git_push` all support a `subdirectory` param — agents write to `/workspace/{project}/` and push only that folder as a clean isolated repo. No more slack_app/uber_app files bleeding into unrelated repos. Enables true parallel agent work with zero cross-task contamination. |
+| 18 | **Message durability fix**: `receive()` in `MessageBus` now drains the pending queue (`"0"`) before blocking on new messages (`">"`). `setup()` calls `XAUTOCLAIM(min_idle_time=0)` on startup to reclaim orphaned pending messages from any previous (dead) consumer. Agents that restart mid-task now pick up exactly where they left off — no message is ever silently abandoned. |
 
 ---
 
