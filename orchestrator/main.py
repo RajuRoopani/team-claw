@@ -45,9 +45,10 @@ THREAD_BUDGET_TOKENS = int(os.environ.get("THREAD_BUDGET_TOKENS", "0"))  # 0 = d
 IDLE_THREAD_MINUTES = int(os.environ.get("IDLE_THREAD_MINUTES", "0"))    # 0 = disabled
 GITHUB_TOKEN    = os.environ.get("GITHUB_TOKEN", "")
 GITHUB_USERNAME = os.environ.get("GITHUB_USERNAME", "RajuRoopani")
-AUDIT_STREAM = "team:audit"
-AUDIT_GROUP = "grp:orchestrator-audit"
-AUDIT_CONSUMER = "orchestrator-0"
+AUDIT_STREAM    = "team:audit"
+ACTIVITY_STREAM = "team:activity"   # ephemeral working signals — not persisted to DB
+AUDIT_GROUP     = "grp:orchestrator-audit"
+AUDIT_CONSUMER  = "orchestrator-0"
 
 ALL_AGENT_ROLES = [
     "product_owner", "engineering_manager", "architect", "ux_engineer",
@@ -67,6 +68,7 @@ class AppState:
     budget_warnings_fired: set[str] = set()  # "{thread_id}:{threshold}"
     idle_alerts_fired: set[str] = set()      # thread_ids already alerted
     idle_task: asyncio.Task | None = None
+    thread_last_activity: dict[str, dict] = {}  # thread_id → {role, ts}
 
 
 state = AppState()
@@ -81,6 +83,7 @@ async def lifespan(app: FastAPI):
     state.budget_warnings_fired = set()
     state.idle_alerts_fired = set()
     state.idle_task = None
+    state.thread_last_activity = {}
     await _setup_audit_consumer()
     await _ensure_phase4_tables()
     await _ensure_phase5_tables()
@@ -128,6 +131,8 @@ class ThreadSummary(BaseModel):
     message_count: int
     created_at: str
     github_repo: str = ""
+    last_active_role: str = ""
+    last_active_at: str = ""
 
 
 class MessageOut(BaseModel):
@@ -395,6 +400,8 @@ async def list_threads() -> list[ThreadSummary]:
             message_count=r["message_count"],
             created_at=r["created_at"].isoformat(),
             github_repo=r["github_repo"] or "",
+            last_active_role=state.thread_last_activity.get(str(r["id"]), {}).get("role", ""),
+            last_active_at=state.thread_last_activity.get(str(r["id"]), {}).get("ts", ""),
         )
         for r in rows
     ]
@@ -594,6 +601,18 @@ async def record_metrics(rec: MetricsRecord) -> dict:
             """,
             rec.agent_role, rec.thread_id, rec.model, rec.input_tokens, rec.output_tokens,
         )
+    # Track last activity per thread (in-memory, for /threads response)
+    if rec.thread_id:
+        now_str = datetime.now(timezone.utc).isoformat()
+        state.thread_last_activity[rec.thread_id] = {"role": rec.agent_role, "ts": now_str}
+        # Publish ephemeral working signal to activity stream (not persisted to DB)
+        activity_payload = {
+            "type": "agent_working",
+            "from_role": rec.agent_role,
+            "thread_id": rec.thread_id,
+            "ts": now_str,
+        }
+        await state.redis.xadd(ACTIVITY_STREAM, _encode(activity_payload), maxlen=500)
     # Budget monitoring
     if THREAD_BUDGET_TOKENS > 0 and rec.thread_id:
         used = await _compute_thread_tokens(rec.thread_id)
@@ -1226,17 +1245,22 @@ async def ci_trend() -> list[CITrendPoint]:
 
 @app.get("/stream/all")
 async def stream_all():
-    """Server-Sent Events stream of ALL audit messages (for the dashboard)."""
+    """Server-Sent Events stream of audit messages + ephemeral agent_working signals."""
     async def event_gen() -> AsyncGenerator[str, None]:
-        last_id = "$"
+        last_audit_id    = "$"
+        last_activity_id = "$"
         while True:
             result = await state.redis.xread(
-                {AUDIT_STREAM: last_id}, count=50, block=3000
+                {AUDIT_STREAM: last_audit_id, ACTIVITY_STREAM: last_activity_id},
+                count=50, block=3000,
             )
             if result:
-                for _stream, entries in result:
+                for stream_name, entries in result:
                     for redis_id, fields in entries:
-                        last_id = redis_id
+                        if stream_name == AUDIT_STREAM.encode():
+                            last_audit_id = redis_id
+                        else:
+                            last_activity_id = redis_id
                         decoded = _decode(fields)
                         yield f"data: {json.dumps(decoded)}\n\n"
             await asyncio.sleep(0)

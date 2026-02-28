@@ -134,6 +134,27 @@
   .thread-item.complete { border-left-color: var(--green); }
   .thread-item.closed   { border-left-color: var(--border); opacity: 0.55; }
   .thread-item.waiting  { border-left-color: var(--amber); }
+  .thread-item.working  { border-left-color: var(--green); }
+
+  @keyframes working-pulse {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.4; }
+  }
+  .t-activity {
+    font-size: 9px; color: var(--muted); margin-top: 2px;
+    display: flex; align-items: center; gap: 4px;
+  }
+  .t-activity-dot {
+    width: 5px; height: 5px; border-radius: 50%; background: var(--muted); flex-shrink: 0;
+  }
+  .t-activity-dot.live { background: var(--green); animation: working-pulse 1.2s ease-in-out infinite; }
+
+  .thinking-card {
+    padding: 6px 12px; font-size: 11px; color: var(--muted);
+    display: flex; align-items: center; gap: 6px;
+    border-left: 2px solid var(--border); margin: 2px 0;
+    animation: working-pulse 1.4s ease-in-out infinite;
+  }
 
   .t-title {
     font-size: 11px; color: var(--text);
@@ -1440,6 +1461,12 @@ function addMessage(msg, isNew=false) {
   totalMsgs++;
   document.getElementById('stat-msgs').textContent = totalMsgs;
 
+  // A real message arrived — remove the thinking indicator for this thread
+  if (isNew && msg.thread_id === currentThread) {
+    const card = document.querySelector('.thinking-card');
+    if (card) { card.remove(); if (_thinkingTimer) clearTimeout(_thinkingTimer); }
+  }
+
   // Thread registry
   if (msg.thread_id) {
     if (!threads[msg.thread_id]) {
@@ -1536,6 +1563,17 @@ function renderThreadList() {
     const ghLink = t.github_repo
       ? `<div><a class="t-github" href="${escHtml(t.github_repo)}" target="_blank" rel="noopener">⎇ GitHub</a></div>`
       : '';
+
+    // Last-activity indicator
+    let activityHtml = '';
+    if (t.last_active_at) {
+      const secsAgo = Math.round((Date.now() - new Date(t.last_active_at).getTime()) / 1000);
+      const isLive  = secsAgo < 20;
+      const label   = secsAgo < 60 ? `${secsAgo}s ago` : secsAgo < 3600 ? `${Math.round(secsAgo/60)}m ago` : `${Math.round(secsAgo/3600)}h ago`;
+      const role    = t.last_active_role ? humanRole(t.last_active_role) : '';
+      if (isLive) cls.push('working');
+      activityHtml = `<div class="t-activity"><span class="t-activity-dot${isLive ? ' live' : ''}"></span><span>${role ? role + ' · ' : ''}${label}</span></div>`;
+    }
     item.innerHTML = `
       <div style="display:flex;align-items:flex-start;gap:4px">
         <div class="t-title" style="flex:1;min-width:0">${escHtml(t.title)}</div>
@@ -1545,6 +1583,7 @@ function renderThreadList() {
         <span>${t.id.substring(0,8)}${statusLabel}</span>
         <span class="t-badge">${t.count}</span>
       </div>
+      ${activityHtml}
       ${ghLink}
     `;
     // Click on item body → select thread
@@ -1566,6 +1605,28 @@ function renderThreadList() {
     });
     el.appendChild(item);
   });
+}
+
+// Show a fading "thinking" indicator in the active thread's feed
+let _thinkingTimer = null;
+function showThinkingIndicator(threadId, role) {
+  if (currentThread !== threadId) return;   // only show in the selected thread's feed
+  const feed = document.getElementById('msg-feed');
+  if (!feed) return;
+
+  // Remove any existing thinking card
+  const existing = feed.querySelector('.thinking-card');
+  if (existing) existing.remove();
+  if (_thinkingTimer) clearTimeout(_thinkingTimer);
+
+  const card = document.createElement('div');
+  card.className = 'thinking-card';
+  card.innerHTML = `<span>⟳</span><span>${humanRole(role)} is thinking…</span>`;
+  feed.appendChild(card);
+  card.scrollIntoView({ behavior: 'smooth', block: 'end' });
+
+  // Auto-remove after 12s if no new signal arrives
+  _thinkingTimer = setTimeout(() => { card.remove(); }, 12000);
 }
 
 function refreshThreadSelection() {
@@ -1744,7 +1805,7 @@ async function loadHistory() {
     const res = await fetch('/threads');
     const threadList = await res.json();
     for (const t of threadList) {
-      threads[t.id] = { id: t.id, title: t.title || t.id.substring(0,8), count: 0, status: t.status, github_repo: t.github_repo || '' };
+      threads[t.id] = { id: t.id, title: t.title || t.id.substring(0,8), count: 0, status: t.status, github_repo: t.github_repo || '', last_active_role: t.last_active_role || '', last_active_at: t.last_active_at || '' };
     }
     document.getElementById('stat-threads').textContent = threadList.length;
     renderThreadList();
@@ -1769,6 +1830,19 @@ function connectSSE() {
   sseSource.onmessage = (e) => {
     try {
       const msg = JSON.parse(e.data);
+
+      // agent_working is ephemeral — update sidebar state but don't add to feed
+      if (msg.type === 'agent_working') {
+        if (msg.thread_id && threads[msg.thread_id]) {
+          threads[msg.thread_id].last_active_role = msg.from_role;
+          threads[msg.thread_id].last_active_at   = msg.ts;
+          renderThreadList();
+          showThinkingIndicator(msg.thread_id, msg.from_role);
+        }
+        return;
+      }
+
+      // All other message types go into the feed
       addMessage(msg, true);
 
       switch (msg.type) {
