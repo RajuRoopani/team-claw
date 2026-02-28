@@ -163,6 +163,7 @@ Open `http://localhost:8080` for the live web dashboard:
 - **Budget bar** — token usage bar (green → amber → red) below the feed header
 - **Agent heartbeat dots** — green/amber/gray per agent (30s heartbeat)
 - **Standup modal** — one-click standup report
+- **⚡ Status tab** — right panel tab showing the current thread's waiting state, which agents have unresolved delegations, and any pending human question (see below)
 
 ---
 
@@ -478,6 +479,44 @@ No changes to `agent.py` were needed — the existing metrics hook was sufficien
 
 ---
 
+## Status Tab
+
+The **⚡ Status** tab in the right panel gives you a real-time answer to "what is the team waiting on right now?" without scrolling through the message feed.
+
+**Thread Status section:**
+- A pill badge (`Active` / `Waiting for you` / `Complete` / `Closed`) with an animated dot for active threads
+- The last agent to make a Claude API call and how long ago (live-updated via `agent_working` SSE events and every 15 seconds for elapsed-time ticking)
+
+**Human Input Needed section** (shown only when thread is paused):
+- The agent's question and optional context, with a "↓ Reply in feed" button that switches back to the Work tab and focuses the reply textarea
+
+**Waiting On section:**
+- Computed by scanning all messages for the current thread:
+  - `task_assignment` is pending until `task_complete` arrives from that agent
+  - `question` is pending until `answer` arrives from that agent
+- Each pending item shows: agent name (in their role color), type badge (`task` or `question`), who assigned them, elapsed time, and a one-line preview of what was delegated
+
+**What it looks like in practice:**
+
+```
+⚡ Status
+
+Thread Status
+● Active
+  engineering_manager · ⚡ active now
+
+Waiting On
+🎯 senior_dev_1   [task]   3m ago
+   assigned by engineering_manager
+   Implement the REST API endpoints...
+
+❓ architect       [question]   8m ago
+   assigned by engineering_manager
+   Should we use PostgreSQL or SQLite...
+```
+
+---
+
 ## What's Been Built (Phase History)
 
 | Phase | What was added |
@@ -494,6 +533,7 @@ No changes to `agent.py` were needed — the existing metrics hook was sufficien
 | 10 | GitHub integration: `git_push`/`git_checkout_branch`/`git_merge` tools, auto-repo creation, branch strategy, ⎇ link in dashboard |
 | 11 | UX Engineer agent; `max_tokens` resilience fix in the agentic loop; agent memory evolution (all agents reflect and write memories after every task) |
 | 12 | Live activity signals: thread cards show last-active agent + pulsing dot; `⟳ thinking…` indicator in feed; `team:activity` ephemeral Redis stream; no agent changes needed |
+| 13 | ⚡ Status tab: right panel tab with thread status pill, "Waiting On" section (unresolved `task_assignment`/`question` messages diffed against `task_complete`/`answer`), and Human Input Needed section |
 
 ---
 
