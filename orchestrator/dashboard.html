@@ -1543,9 +1543,15 @@ function addMessage(msg, isNew=false) {
       document.getElementById('stat-threads').textContent = Object.keys(threads).length;
     }
     threads[msg.thread_id].count++;
+    // Only set title from human_input if it's still the default UUID prefix
+    // (i.e. the thread appeared via SSE before a proper title was loaded).
+    // Steering messages sent mid-task must not overwrite the original task title.
     if (msg.type === 'human_input' && msg.content) {
-      const first = msg.content.split('\n')[0].replace(/\*\*/g,'').trim();
-      threads[msg.thread_id].title = first.substring(0,42);
+      const cur = threads[msg.thread_id].title || '';
+      if (!cur || /^[0-9a-f]{8}$/.test(cur)) {
+        const first = msg.content.split('\n')[0].replace(/\*\*/g,'').trim();
+        threads[msg.thread_id].title = first.substring(0,42);
+      }
     }
     if (msg.type === 'thread_complete') {
       threads[msg.thread_id].status = 'complete';
