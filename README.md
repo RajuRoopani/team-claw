@@ -1,8 +1,8 @@
 # Team Claw
 
-An autonomous AI software development team running in Docker. Seven Claude agents — each playing a real SDLC role — receive requirements, design, implement, test, review, and ship working code to GitHub without human intervention.
+An autonomous AI software development team running in Docker. Eight Claude agents — each playing a real SDLC role — receive requirements, design, implement, test, review, and ship working code to GitHub without human intervention.
 
-Built across 9 phases, from a minimal 2-agent loop to a full team with CI, human-in-the-loop escalation, live dashboard, and tool telemetry.
+Built across 11 phases, from a minimal 2-agent loop to a full team with a dedicated UX Engineer, CI, human-in-the-loop escalation, live dashboard, tool telemetry, and persistent agent memory that evolves with every task.
 
 ![Team Claw Dashboard](docs/dashboard.png)
 
@@ -185,8 +185,9 @@ Open `http://localhost:8080` for the live web dashboard:
 | `update_task_status` | Update task status (todo/in_progress/done) | All |
 | `wiki_write` | Write to the team wiki | EM, Arch, PO |
 | `wiki_read` | Read from the team wiki | All |
-| `write_memory` | Persist a note to agent memory | All |
-| `read_memory` | Read agent memory | All |
+| `write_memory` | Persist a key-value fact to agent memory (survives restarts) | All |
+| `read_memory` | Recall a specific memory by key | All |
+| `list_memories` | List all persisted memory keys for this agent | All |
 | `check_budget` | Check token budget for current thread | All |
 | `ask_human` | Pause thread and submit a question to the human | All |
 
@@ -417,6 +418,41 @@ Set `WEBHOOK_URL` in `.env` to receive POST notifications:
 
 ---
 
+## Agent Learning & Memory
+
+Every agent accumulates knowledge across tasks. At the end of each task, agents call `write_memory` to save what they learned. At the start of the next task, they call `list_memories` to recall it. Memories are stored in Postgres and injected into each agent's system prompt at container startup — so knowledge persists across restarts.
+
+Each role has a structured key schema so memories stay queryable and meaningful:
+
+| Role | Key pattern | What accumulates |
+|------|-------------|-----------------|
+| Product Owner | `requirement:pattern:*`, `scope:pitfall:*`, `ac:template:*` | Better user stories, recurring scope traps, reusable AC patterns |
+| Engineering Manager | `delegation:pattern:*`, `team:performance:*`, `workflow:lesson:*` | Smarter task decomposition, team calibration, process improvements |
+| Architect | `pattern:arch:*`, `decision:*`, `mistake:*` | Reusable design decisions, ADR muscle memory, rework avoidance |
+| UX Engineer | `pattern:ux:*`, `component:*`, `constraint:*` | Reusable component specs, design patterns, tech constraints that shaped layout |
+| Senior Dev | `pattern:code:*`, `lesson:debug:*`, `tech:choice:*` | Code patterns, debugging playbook, library decisions |
+| Junior Dev | `learned:*`, `mistake:*`, `mentor:advice:*` | Lessons from mentor, mistakes not to repeat, new techniques |
+
+You can inspect any agent's memory bank via the API:
+
+```bash
+curl http://localhost:8080/memory/senior_dev_1
+curl http://localhost:8080/memory/ux_engineer/pattern:ux:empty-state
+```
+
+---
+
+## Agentic Loop Resilience
+
+If the Claude API returns `stop_reason: max_tokens` (response truncated mid-generation), the agent loop no longer silently dies. Instead:
+
+- **If tool calls are present** in the partial response — they are executed and the loop continues normally.
+- **If no tool calls were made** — the loop injects a continuation nudge telling the agent to use tools rather than writing long text responses, then makes another API call.
+
+This prevents agents from consuming their inbox message and producing nothing when a task generates a large initial response.
+
+---
+
 ## What's Been Built (Phase History)
 
 | Phase | What was added |
@@ -431,7 +467,7 @@ Set `WEBHOOK_URL` in `.env` to receive POST notifications:
 | 8 | `edit_file` tool, tool telemetry (duration + success per call), thread close endpoint, idle thread alerts |
 | 9 | Human-in-the-loop: `ask_human` tool, `human_questions` table, pending questions panel, `git_diff` tool, context-aware chat bar (new task vs. steer mode), `questions`/`reply` CLI commands |
 | 10 | GitHub integration: `git_push`/`git_checkout_branch`/`git_merge` tools, auto-repo creation, branch strategy, ⎇ link in dashboard |
-| 11 | UX Engineer agent: wireframes, user flows, component specs in `/workspace/designs/`; EM assigns UX tasks in parallel with Architect for user-facing features |
+| 11 | UX Engineer agent; `max_tokens` resilience fix in the agentic loop; agent memory evolution (all agents reflect and write memories after every task) |
 
 ---
 
@@ -454,6 +490,19 @@ python3 cli.py reply <thread_id> "Your answer here"
 ```
 
 **Watching costs** — each agent reports token usage; budget bars turn amber at 80%, red at 100%.
+
+**UI tasks get a design doc first** — for any user-facing feature, the UX Engineer writes a wireframe + component spec to `/workspace/designs/` before devs write a line of code:
+```bash
+python3 cli.py submit "Build a dashboard" "... GitHub Repo: my-dashboard"
+# UX engineer writes /workspace/designs/dashboard-ux.md
+# Devs read it as their spec
+```
+
+**Inspect what agents have learned** — memories accumulate across tasks and persist in Postgres:
+```bash
+curl http://localhost:8080/memory/engineering_manager   # all EM memories
+curl http://localhost:8080/memory/senior_dev_1          # all Sr Dev 1 memories
+```
 
 ---
 
