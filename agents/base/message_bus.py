@@ -34,7 +34,7 @@ class MessageBus:
         self._consumer = f"{role}-0"
 
     async def setup(self) -> None:
-        """Create consumer group (idempotent)."""
+        """Create consumer group (idempotent) and reclaim orphaned pending messages."""
         for stream in [self._inbox]:
             try:
                 await self._redis.xgroup_create(
@@ -44,6 +44,24 @@ class MessageBus:
             except aioredis.ResponseError as exc:
                 if "BUSYGROUP" not in str(exc):
                     raise
+
+        # Reclaim any messages stuck in pending from a previous (now dead) consumer.
+        # XAUTOCLAIM with min-idle-time=0 transfers all pending entries to this consumer
+        # regardless of which consumer they were originally delivered to.
+        try:
+            claimed = await self._redis.xautoclaim(
+                self._inbox, self._group, self._consumer,
+                min_idle_time=0, start_id="0-0", count=100,
+            )
+            # claimed is (next_start_id, entries, deleted_ids)
+            reclaimed_entries = claimed[1] if isinstance(claimed, (list, tuple)) and len(claimed) > 1 else []
+            if reclaimed_entries:
+                logger.info(
+                    "[%s] Reclaimed %d orphaned pending messages on startup",
+                    self.role, len(reclaimed_entries),
+                )
+        except Exception as exc:
+            logger.debug("[%s] xautoclaim on startup skipped: %s", self.role, exc)
 
     async def send(self, message: Message) -> int:
         """
@@ -113,9 +131,35 @@ class MessageBus:
         self, count: int = 5, block_ms: int = 2000
     ) -> list[tuple[bytes, Message]]:
         """
-        Read up to `count` undelivered messages.
-        Returns list of (redis_stream_id, Message) pairs.
+        Read up to `count` messages — checks pending queue first, then new messages.
+        Pending messages accumulate when a container restarts mid-processing.
+        By draining pending first, we guarantee no message is ever silently dropped.
         """
+        # ── 1. Drain any pending (delivered but un-ack'd) messages first ──────
+        pending = await self._redis.xreadgroup(
+            self._group,
+            self._consumer,
+            {self._inbox: "0"},   # "0" = read pending for this consumer
+            count=count,
+        )
+        if pending:
+            out: list[tuple[bytes, Message]] = []
+            for _stream, entries in pending:
+                for redis_id, fields in entries:
+                    if not fields:          # message was deleted (XTRIM) — just ack it
+                        await self._ack(redis_id)
+                        continue
+                    try:
+                        msg = Message.from_redis_dict(fields)
+                        out.append((redis_id, msg))
+                    except Exception as exc:
+                        logger.warning("[%s] Failed to parse pending message: %s", self.role, exc)
+                        await self._ack(redis_id)
+            if out:
+                logger.info("[%s] Drained %d pending messages from inbox", self.role, len(out))
+                return out
+
+        # ── 2. Block-read new messages (nothing pending) ───────────────────────
         result = await self._redis.xreadgroup(
             self._group,
             self._consumer,
@@ -126,7 +170,7 @@ class MessageBus:
         if not result:
             return []
 
-        out: list[tuple[bytes, Message]] = []
+        out = []
         for _stream, entries in result:
             for redis_id, fields in entries:
                 try:
