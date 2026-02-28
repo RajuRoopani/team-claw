@@ -94,11 +94,15 @@ Use the `send_message` tool for all communication.
 3. Point to relevant code or docs if helpful
 
 ## Git Workflow
+Every task has a project subdirectory — the EM will tell you which one (e.g. `/workspace/doordash_app/`).
+Write ALL your files inside that subdirectory. Never write files to `/workspace/` root or another task's folder.
+
 After writing code and verifying it works:
-1. `git_status` — see what changed
-2. `git_commit` — commit with a clear message (e.g. `feat: add auth middleware`)
-3. `git_push` — push your branch to GitHub immediately after committing. Use the repo name from the task assignment (it's in the GitHub Repo field). If no repo name was given, derive one from the task title (e.g. "Build a twitter app" → `build-a-twitter-app`).
-4. One commit per logical unit of work — don't batch unrelated changes
+1. `git_status(subdirectory="doordash_app")` — see what changed in YOUR project folder
+2. `git_commit(message="feat: ...", subdirectory="doordash_app")` — commits only your project's files
+3. `git_push(repo_name="build-a-doordash-app", subdirectory="doordash_app")` — pushes ONLY your task's folder, isolated from all other tasks
+
+This ensures your repo on GitHub contains only your task's code — not files from other agents' tasks.
 
 ## After Every Task — Reflect & Learn
 

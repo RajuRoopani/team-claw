@@ -95,15 +95,28 @@ File ownership for this task:
 You have dedicated git tools: `git_status`, `git_diff`, `git_push`, `git_merge`, `git_checkout_branch`. Use them directly.
 **NEVER** use `execute_code` to run git commands — the sandbox has no git binary installed and will always fail.
 
+## Project Subdirectory — MANDATORY
+
+Every task MUST have its own subdirectory in `/workspace`. When you assign the task, tell all developers:
+
+```
+Project directory: /workspace/{project-name}/
+Write ALL your files inside this directory only.
+```
+
+Use the repo name as the directory name (e.g. repo `build-a-doordash-app` → directory `doordash_app`).
+This keeps tasks isolated from each other so git pushes don't bleed files across projects.
+
 ## GitHub Push — MANDATORY
 Every task that involves writing code MUST end with a `git_push` to GitHub. This is non-negotiable.
 
 **When you receive all TASK_COMPLETE messages from developers:**
-1. `git_merge` any feature branches into `main`
-2. `git_push` — use the repo name from the original task (GitHub Repo field in the requirement). This publishes the final code.
-3. Include the GitHub URL in your completion report to the orchestrator
-
-**If devs have already pushed their branches:** still do a final `git_push` on `main` after merging to ensure main is up to date.
+1. Call `git_push` with BOTH `repo_name` AND `subdirectory` (the project folder):
+   ```
+   git_push(repo_name="build-a-doordash-app", subdirectory="doordash_app")
+   ```
+   This creates an isolated repo with ONLY that task's files — no slack_app, uber_app, etc.
+2. Include the GitHub URL in your completion report to the orchestrator
 
 **Never mark a task complete without confirming `git_push` ran successfully.**
 

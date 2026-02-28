@@ -88,10 +88,15 @@ When sending `task_complete` to EM, always include:
 ```
 
 ## Git Workflow
+Every task has a project subdirectory — the EM will tell you which one (e.g. `/workspace/doordash_app/`).
+Write ALL your files inside that subdirectory. Never write files to `/workspace/` root.
+
 After your code passes tests:
-1. `git_status` — confirm what files changed
-2. `git_commit` — commit with a meaningful message (e.g. `test: add todo api test suite`)
-3. `git_push` — push to GitHub immediately after committing. Use the repo name from the task assignment (GitHub Repo field). If not provided, derive it from the task title (e.g. "Twitter app" → `build-a-twitter-app`).
+1. `git_status(subdirectory="doordash_app")` — confirm what changed in YOUR folder
+2. `git_commit(message="test: add api test suite", subdirectory="doordash_app")` — commits only your task's files
+3. `git_push(repo_name="build-a-doordash-app", subdirectory="doordash_app")` — pushes ONLY your task's folder
+
+This keeps your GitHub repo clean — only the files for this task, nothing from other agents' work.
 
 ## After Every Task — Reflect & Learn
 

@@ -154,8 +154,9 @@ _EXECUTE_CODE_SCHEMA = {
 _GIT_COMMIT_SCHEMA = {
     "name": "git_commit",
     "description": (
-        "Stage and commit files to the workspace git repository. "
-        "Call this after writing code to create a checkpoint. "
+        "Stage and commit files in your project subdirectory. "
+        "ALWAYS pass `subdirectory` — the folder in /workspace that contains only your task's files "
+        "(e.g. 'doordash_app'). This keeps each agent's commits isolated. "
         "Use conventional commits: feat:, fix:, test:, docs:, refactor:"
     ),
     "input_schema": {
@@ -166,10 +167,18 @@ _GIT_COMMIT_SCHEMA = {
                 "type": "string",
                 "description": "Commit message. E.g. 'feat: add user auth middleware'",
             },
+            "subdirectory": {
+                "type": "string",
+                "description": (
+                    "RECOMMENDED. Project folder relative to /workspace (e.g. 'doordash_app'). "
+                    "When set, git init is run in that folder if needed, and only files in "
+                    "that folder are staged and committed. Keeps agents isolated from each other."
+                ),
+            },
             "files": {
                 "type": "array",
                 "items": {"type": "string"},
-                "description": "Specific file paths to stage (relative to /workspace). Leave empty to stage all.",
+                "description": "Specific file paths to stage (relative to /workspace or subdirectory). Leave empty to stage all.",
             },
         },
     },
@@ -177,8 +186,19 @@ _GIT_COMMIT_SCHEMA = {
 
 _GIT_STATUS_SCHEMA = {
     "name": "git_status",
-    "description": "Show git status of the workspace — staged, unstaged, and untracked files.",
-    "input_schema": {"type": "object", "properties": {}},
+    "description": (
+        "Show git status of your project directory. "
+        "Pass `subdirectory` (e.g. 'doordash_app') to see status of just your task's folder."
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "subdirectory": {
+                "type": "string",
+                "description": "Project folder relative to /workspace. Shows status of that folder only.",
+            },
+        },
+    },
 }
 
 _GIT_LOG_SCHEMA = {
@@ -452,10 +472,11 @@ _GIT_MERGE_SCHEMA = {
 _GIT_PUSH_SCHEMA = {
     "name": "git_push",
     "description": (
-        "Push committed workspace code to a GitHub repository under the configured account. "
+        "Push code to a GitHub repository. "
+        "IMPORTANT: Always specify `subdirectory` — the folder inside /workspace that contains "
+        "ONLY this task's files (e.g. 'doordash_app', 'card-shuffle'). This pushes just that "
+        "folder's contents as a clean repo, preventing files from other tasks bleeding in. "
         "Creates the GitHub repo automatically if it doesn't exist. "
-        "Call this after git_commit when a task or feature is complete, so the work is "
-        "published to GitHub for the human to review. "
         "Use a descriptive repo_name based on the task (e.g. 'todo-app-planner', 'auth-service'). "
         "Requires GITHUB_TOKEN to be set in the environment."
     ),
@@ -466,6 +487,15 @@ _GIT_PUSH_SCHEMA = {
             "repo_name": {
                 "type": "string",
                 "description": "GitHub repository name (lowercase, hyphens). Created if it doesn't exist.",
+            },
+            "subdirectory": {
+                "type": "string",
+                "description": (
+                    "RECOMMENDED. Path relative to /workspace containing only this task's files "
+                    "(e.g. 'doordash_app'). When set, a fresh isolated git repo is created "
+                    "from this folder and pushed — other task files are excluded. "
+                    "If omitted, the entire /workspace is pushed (includes all past task files)."
+                ),
             },
             "branch": {
                 "type": "string",
@@ -567,7 +597,7 @@ async def execute_tool(
         elif name == "git_commit":
             return _exec_git_commit(inputs)
         elif name == "git_status":
-            return _exec_git_status()
+            return _exec_git_status(inputs)
         elif name == "git_log":
             return _exec_git_log(inputs)
         elif name == "write_memory":
@@ -678,42 +708,74 @@ def _exec_list_files(inputs: dict) -> dict:
 
 def _exec_git_commit(inputs: dict) -> dict:
     import subprocess
-    cwd = WORKSPACE_ROOT
+    import os
+
+    subdirectory = inputs.get("subdirectory", "").strip()
     files: list[str] = inputs.get("files") or []
     message: str = inputs["message"]
 
-    # Stage files
-    if files:
-        for f in files:
-            try:
-                safe = _safe_path(f)
-                subprocess.run(["git", "add", str(safe)], cwd=cwd, capture_output=True)
-            except PermissionError as exc:
-                return {"error": str(exc)}
+    env = {**os.environ,
+           "GIT_AUTHOR_NAME": "Team Claw", "GIT_AUTHOR_EMAIL": "agents@teamclaw.ai",
+           "GIT_COMMITTER_NAME": "Team Claw", "GIT_COMMITTER_EMAIL": "agents@teamclaw.ai"}
+
+    if subdirectory:
+        # Per-task isolated git repo inside subdirectory
+        cwd = _safe_path(subdirectory)
+        if not cwd.exists():
+            cwd.mkdir(parents=True, exist_ok=True)
+        # Init git repo in subdir if not already initialized
+        git_dir = cwd / ".git"
+        if not git_dir.exists():
+            subprocess.run(["git", "init", "-b", "main"], cwd=str(cwd), capture_output=True, env=env)
+        # Stage: if files specified, stage those; otherwise stage all in subdir
+        if files:
+            for f in files:
+                f_path = cwd / f if not pathlib.Path(f).is_absolute() else pathlib.Path(f)
+                subprocess.run(["git", "add", str(f_path)], cwd=str(cwd), capture_output=True, env=env)
+        else:
+            subprocess.run(["git", "add", "."], cwd=str(cwd), capture_output=True, env=env)
     else:
-        subprocess.run(["git", "add", "-A"], cwd=cwd, capture_output=True)
+        # Fallback: commit to shared workspace root git repo
+        cwd = WORKSPACE_ROOT
+        if files:
+            for f in files:
+                try:
+                    safe = _safe_path(f)
+                    subprocess.run(["git", "add", str(safe)], cwd=str(cwd), capture_output=True, env=env)
+                except PermissionError as exc:
+                    return {"error": str(exc)}
+        else:
+            subprocess.run(["git", "add", "-A"], cwd=str(cwd), capture_output=True, env=env)
 
     result = subprocess.run(
         ["git", "commit", "-m", message],
-        cwd=cwd, capture_output=True, text=True,
+        cwd=str(cwd), capture_output=True, text=True, env=env,
     )
     if result.returncode == 0:
-        # Extract short hash from output
         short = result.stdout.split("]")[0].split("[")[-1].strip() if "]" in result.stdout else "?"
-        return {"status": "committed", "ref": short, "message": message, "output": result.stdout.strip()}
+        return {"status": "committed", "ref": short, "message": message,
+                "directory": str(cwd), "output": result.stdout.strip()}
     else:
         err = result.stderr.strip() or result.stdout.strip()
+        # "nothing to commit" is not a real error
+        if "nothing to commit" in err:
+            return {"status": "nothing_to_commit", "message": "All files already committed — ready to git_push"}
         return {"status": "failed", "error": err}
 
 
-def _exec_git_status() -> dict:
+def _exec_git_status(inputs: dict) -> dict:
     import subprocess
+    subdirectory = inputs.get("subdirectory", "").strip() if inputs else ""
+    cwd = _safe_path(subdirectory) if subdirectory else WORKSPACE_ROOT
+    if not cwd.exists():
+        return {"status": "(directory does not exist yet)", "exit_code": 1}
     result = subprocess.run(
         ["git", "status", "--short"],
-        cwd=WORKSPACE_ROOT, capture_output=True, text=True,
+        cwd=str(cwd), capture_output=True, text=True,
     )
     return {
         "status": result.stdout.strip() or "(clean — nothing to commit)",
+        "directory": str(cwd),
         "exit_code": result.returncode,
     }
 
@@ -1102,6 +1164,8 @@ def _exec_git_push(inputs: dict) -> dict:
     import json
     import os
     import re
+    import tempfile
+    import shutil
 
     token    = os.environ.get("GITHUB_TOKEN", "").strip()
     username = os.environ.get("GITHUB_USERNAME", "RajuRoopani").strip()
@@ -1119,17 +1183,9 @@ def _exec_git_push(inputs: dict) -> dict:
 
     branch  = inputs.get("branch", "main")
     private = bool(inputs.get("private", False))
-    ws      = str(WORKSPACE_ROOT)
+    subdirectory = inputs.get("subdirectory", "").strip()
 
-    # ── 1. Ensure workspace has at least one commit ─────────────────
-    log_check = subprocess.run(
-        ["git", "-C", ws, "log", "--oneline", "-1"],
-        capture_output=True, text=True,
-    )
-    if log_check.returncode != 0 or not log_check.stdout.strip():
-        return {"error": "No commits in /workspace. Run git_commit first before pushing."}
-
-    # ── 2. Create GitHub repo (idempotent — 422 means already exists) ─
+    # ── 1. Create GitHub repo (idempotent — 422 means already exists) ─
     api_payload = json.dumps({
         "name": repo_name, "private": private,
         "auto_init": False,
@@ -1168,22 +1224,76 @@ def _exec_git_push(inputs: dict) -> dict:
     except Exception as exc:
         return {"error": f"GitHub API call failed: {exc}"}
 
-    # ── 3. Push directly to URL (no persistent remote credential stored) ─
     remote_url = f"https://{token}@github.com/{username}/{repo_name}.git"
-    env = {**os.environ, "GIT_TERMINAL_PROMPT": "0"}
+    env = {**os.environ, "GIT_TERMINAL_PROMPT": "0",
+           "GIT_AUTHOR_NAME": "Team Claw", "GIT_AUTHOR_EMAIL": "agents@teamclaw.ai",
+           "GIT_COMMITTER_NAME": "Team Claw", "GIT_COMMITTER_EMAIL": "agents@teamclaw.ai"}
+
+    # ── 2a. Subdirectory mode: push ONLY that folder as a fresh isolated repo ─
+    if subdirectory:
+        src_dir = _safe_path(subdirectory)
+        if not src_dir.exists():
+            return {"error": f"Subdirectory '{subdirectory}' does not exist in /workspace. Create your files there first."}
+
+        tmp_dir = pathlib.Path(tempfile.mkdtemp(prefix="teamclaw_push_"))
+        try:
+            # Copy only the subdirectory contents into a temp dir
+            shutil.copytree(str(src_dir), str(tmp_dir), dirs_exist_ok=True,
+                            ignore=shutil.ignore_patterns(".git", "__pycache__", "*.pyc", ".pytest_cache"))
+
+            # Init fresh git repo
+            subprocess.run(["git", "init", "-b", branch], cwd=str(tmp_dir), capture_output=True, env=env)
+            subprocess.run(["git", "add", "."], cwd=str(tmp_dir), capture_output=True, env=env)
+
+            # Check if there's anything to commit
+            status = subprocess.run(["git", "status", "--porcelain"], cwd=str(tmp_dir),
+                                     capture_output=True, text=True, env=env)
+            if status.stdout.strip():
+                subprocess.run(
+                    ["git", "commit", "-m", f"feat: {repo_name} — delivered by Team Claw AI agents"],
+                    cwd=str(tmp_dir), capture_output=True, env=env,
+                )
+
+            push = subprocess.run(
+                ["git", "push", remote_url, f"HEAD:{branch}", "--force"],
+                cwd=str(tmp_dir), capture_output=True, text=True, timeout=60, env=env,
+            )
+        finally:
+            shutil.rmtree(str(tmp_dir), ignore_errors=True)
+
+        if push.returncode != 0:
+            err = push.stderr.replace(token, "***")[:500]
+            return {"error": f"git push failed: {err}"}
+
+        return {
+            "status":   "pushed",
+            "repo_url": repo_url,
+            "branch":   branch,
+            "created":  created,
+            "isolated": True,
+            "message":  f"{'Created and pushed' if created else 'Pushed'} {subdirectory}/ to {repo_url} (branch: {branch}) — isolated, no other task files included",
+        }
+
+    # ── 2b. Fallback: push entire /workspace (legacy, includes all task files) ─
+    ws = str(WORKSPACE_ROOT)
+    log_check = subprocess.run(
+        ["git", "-C", ws, "log", "--oneline", "-1"],
+        capture_output=True, text=True,
+    )
+    if log_check.returncode != 0 or not log_check.stdout.strip():
+        return {"error": "No commits in /workspace. Run git_commit first before pushing."}
 
     push = subprocess.run(
         ["git", "-C", ws, "push", remote_url, f"HEAD:{branch}", "--force-with-lease"],
         capture_output=True, text=True, timeout=60, env=env,
     )
     if push.returncode != 0:
-        # First push to a brand-new repo has no upstream to lease against — force
         push = subprocess.run(
             ["git", "-C", ws, "push", remote_url, f"HEAD:{branch}", "--force"],
             capture_output=True, text=True, timeout=60, env=env,
         )
     if push.returncode != 0:
-        err = push.stderr.replace(token, "***")[:500]   # redact token from logs
+        err = push.stderr.replace(token, "***")[:500]
         return {"error": f"git push failed: {err}"}
 
     return {
@@ -1191,5 +1301,6 @@ def _exec_git_push(inputs: dict) -> dict:
         "repo_url": repo_url,
         "branch":   branch,
         "created":  created,
+        "isolated": False,
         "message":  f"{'Created and pushed' if created else 'Pushed'} to {repo_url} (branch: {branch})",
     }
