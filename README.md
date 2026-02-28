@@ -152,6 +152,8 @@ python3 cli.py budget 550e8400-e29b-41d4-a716-446655440000
 Open `http://localhost:8080` for the live web dashboard:
 
 - **Thread sidebar** — all threads with live status (active / waiting / complete)
+- **Live activity indicator** — each thread card shows which agent last worked on it and how long ago (`⬤ engineering_manager · 3s ago`); dot pulses green when activity happened < 20 seconds ago; thread border turns green while an agent is actively processing
+- **Thinking indicator** — a fading `⟳ role is thinking…` row appears at the bottom of the selected thread's feed between messages; disappears when the next real message arrives or after 12 seconds
 - **Message feed** — real-time SSE stream of every inter-agent message
 - **Context-aware chat bar** — submits a new task when no thread is selected; steers the active thread when one is selected (injects a human reply into the team's inbox)
 - **Pending Questions panel** — shows unanswered `ask_human` questions; reply inline
@@ -453,6 +455,29 @@ This prevents agents from consuming their inbox message and producing nothing wh
 
 ---
 
+## Live Activity Signals
+
+The dashboard shows real-time agent activity even between messages, so you always know whether a task is running or hung.
+
+**How it works:**
+
+1. `POST /metrics` fires on every Claude API call inside the agentic loop (already existed for token tracking). It now also writes an ephemeral `agent_working` event to a separate Redis stream `team:activity` (never persisted to Postgres) and updates an in-memory `thread_last_activity` map.
+2. `GET /stream/all` reads from both `team:audit` (messages) and `team:activity` (working signals) in a single `xread` call — both streams flow through the same SSE connection.
+3. The dashboard filters `agent_working` events out of the message feed and uses them only for the sidebar and thinking indicator.
+
+**What you see:**
+
+| Signal | Where | Meaning |
+|--------|-------|---------|
+| Pulsing green dot + `role · Xs ago` | Thread card | An agent made a Claude API call in the last 20 seconds |
+| Green left border on thread card | Thread sidebar | Agent is actively processing right now |
+| `⟳ role is thinking…` | Bottom of feed | Same signal — visible in the feed view; fades after 12s |
+| Dot turns gray, time grows | Thread card | Agent finished or is waiting — no recent API calls |
+
+No changes to `agent.py` were needed — the existing metrics hook was sufficient.
+
+---
+
 ## What's Been Built (Phase History)
 
 | Phase | What was added |
@@ -468,6 +493,7 @@ This prevents agents from consuming their inbox message and producing nothing wh
 | 9 | Human-in-the-loop: `ask_human` tool, `human_questions` table, pending questions panel, `git_diff` tool, context-aware chat bar (new task vs. steer mode), `questions`/`reply` CLI commands |
 | 10 | GitHub integration: `git_push`/`git_checkout_branch`/`git_merge` tools, auto-repo creation, branch strategy, ⎇ link in dashboard |
 | 11 | UX Engineer agent; `max_tokens` resilience fix in the agentic loop; agent memory evolution (all agents reflect and write memories after every task) |
+| 12 | Live activity signals: thread cards show last-active agent + pulsing dot; `⟳ thinking…` indicator in feed; `team:activity` ephemeral Redis stream; no agent changes needed |
 
 ---
 
