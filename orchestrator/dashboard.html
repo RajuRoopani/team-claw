@@ -89,6 +89,64 @@
   .hdr-stat .ci-ok  { color: var(--green); }
   .hdr-stat .ci-err { color: var(--red);   }
 
+  /* ══════════════════════════════
+     THEME SELECTOR
+  ══════════════════════════════ */
+  .theme-selector { position: relative; }
+
+  .theme-toggle-btn {
+    display: flex; align-items: center; gap: 6px;
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--muted); padding: 4px 10px; border-radius: 6px;
+    cursor: pointer; font-size: 11px; font-family: inherit;
+    white-space: nowrap; transition: all 0.12s;
+  }
+  .theme-toggle-btn:hover { border-color: var(--accent); color: var(--text); }
+  .theme-toggle-btn.open  { border-color: var(--accent); color: var(--text); background: var(--surface); }
+
+  .theme-current-dot {
+    width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0;
+    box-shadow: 0 0 5px currentColor;
+  }
+
+  .theme-dropdown {
+    display: none; position: absolute; top: calc(100% + 8px); right: 0;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 8px; width: 210px;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.6); z-index: 300;
+    animation: themeDropIn 0.15s ease;
+  }
+  @keyframes themeDropIn {
+    from { opacity:0; transform: translateY(-6px) scale(0.97); }
+    to   { opacity:1; transform: none; }
+  }
+  .theme-dropdown.open { display: block; }
+
+  .theme-dropdown-title {
+    font-size: 9px; text-transform: uppercase; letter-spacing: 0.8px;
+    color: var(--muted); font-weight: 600; padding: 4px 10px 8px;
+    border-bottom: 1px solid var(--border); margin-bottom: 6px;
+  }
+
+  .theme-option {
+    display: flex; align-items: center; gap: 10px;
+    padding: 7px 10px; border-radius: 8px; cursor: pointer;
+    transition: background 0.1s; font-size: 12px; color: var(--text);
+  }
+  .theme-option:hover   { background: var(--surface2); }
+  .theme-option.active  { background: var(--surface2); }
+
+  .theme-swatches {
+    display: flex; gap: 3px; flex-shrink: 0;
+  }
+  .theme-swatch {
+    width: 10px; height: 10px; border-radius: 50%;
+    border: 1.5px solid rgba(255,255,255,0.08);
+  }
+  .theme-name { flex: 1; font-weight: 500; }
+  .theme-check { font-size: 11px; opacity: 0; color: var(--green); }
+  .theme-option.active .theme-check { opacity: 1; }
+
   /* Action buttons */
   .hdr-actions { margin-left: auto; display: flex; gap: 6px; align-items: center; }
   .hdr-btn {
@@ -966,6 +1024,17 @@
       🔔 Questions
       <span id="questions-badge"></span>
     </button>
+    <div class="theme-selector" id="theme-selector">
+      <button class="theme-toggle-btn" id="theme-toggle-btn" onclick="toggleThemeDropdown()">
+        <span class="theme-current-dot" id="theme-current-dot"></span>
+        <span id="theme-current-name">Void</span>
+        ▾
+      </button>
+      <div class="theme-dropdown" id="theme-dropdown">
+        <div class="theme-dropdown-title">Color Theme</div>
+        <div id="theme-options-list"></div>
+      </div>
+    </div>
   </div>
 </header>
 
@@ -3002,6 +3071,157 @@ setInterval(() => { if (activeTab === 'status') renderStatusTab(); }, 15000);
 document.getElementById('wb-reply').addEventListener('keydown', e => {
   if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); sendWaitingReply(); }
 });
+
+/* ══════════════════════════════════════════════════════════
+   THEME SYSTEM
+══════════════════════════════════════════════════════════ */
+const THEMES = {
+  void: {
+    label: 'Void',
+    swatches: ['#0d1117', '#161b22', '#58a6ff'],
+    vars: {
+      '--bg': '#0d1117', '--surface': '#161b22', '--surface2': '#21262d',
+      '--border': '#30363d', '--text': '#c9d1d9', '--muted': '#8b949e',
+      '--accent': '#58a6ff', '--green': '#56d364', '--amber': '#f59e0b', '--red': '#ff7b72',
+    },
+  },
+  ocean: {
+    label: 'Ocean',
+    swatches: ['#0a1628', '#0f2240', '#00d4ff'],
+    vars: {
+      '--bg': '#0a1628', '--surface': '#0f2240', '--surface2': '#163055',
+      '--border': '#1e3d66', '--text': '#b8d4f0', '--muted': '#6a9fc0',
+      '--accent': '#00d4ff', '--green': '#00e5a0', '--amber': '#ffc542', '--red': '#ff6b8a',
+    },
+  },
+  dracula: {
+    label: 'Dracula',
+    swatches: ['#282a36', '#383a4a', '#bd93f9'],
+    vars: {
+      '--bg': '#282a36', '--surface': '#383a4a', '--surface2': '#44475a',
+      '--border': '#555770', '--text': '#f8f8f2', '--muted': '#6272a4',
+      '--accent': '#bd93f9', '--green': '#50fa7b', '--amber': '#ffb86c', '--red': '#ff5555',
+    },
+  },
+  nord: {
+    label: 'Nord',
+    swatches: ['#2e3440', '#3b4252', '#88c0d0'],
+    vars: {
+      '--bg': '#2e3440', '--surface': '#3b4252', '--surface2': '#434c5e',
+      '--border': '#4c566a', '--text': '#d8dee9', '--muted': '#7e8fa3',
+      '--accent': '#88c0d0', '--green': '#a3be8c', '--amber': '#ebcb8b', '--red': '#bf616a',
+    },
+  },
+  cyberpunk: {
+    label: 'Cyberpunk',
+    swatches: ['#0a0a0f', '#12121f', '#ff007f'],
+    vars: {
+      '--bg': '#0a0a0f', '--surface': '#12121f', '--surface2': '#1a1a2e',
+      '--border': '#2a1a3e', '--text': '#e0e0ff', '--muted': '#6060a0',
+      '--accent': '#ff007f', '--green': '#00ff9f', '--amber': '#ffcc00', '--red': '#ff3c38',
+    },
+  },
+  forest: {
+    label: 'Forest',
+    swatches: ['#0d1a0e', '#162118', '#4ec94e'],
+    vars: {
+      '--bg': '#0d1a0e', '--surface': '#162118', '--surface2': '#1e2e1f',
+      '--border': '#2a3d2c', '--text': '#c8ddc9', '--muted': '#6b8a6d',
+      '--accent': '#4ec94e', '--green': '#6ee86e', '--amber': '#d4a843', '--red': '#e05a5a',
+    },
+  },
+  solar: {
+    label: 'Solar',
+    swatches: ['#002b36', '#073642', '#268bd2'],
+    vars: {
+      '--bg': '#002b36', '--surface': '#073642', '--surface2': '#0d4050',
+      '--border': '#17555e', '--text': '#839496', '--muted': '#586e75',
+      '--accent': '#268bd2', '--green': '#859900', '--amber': '#b58900', '--red': '#dc322f',
+    },
+  },
+};
+
+let currentTheme = 'void';
+
+function applyTheme(id) {
+  const t = THEMES[id];
+  if (!t) return;
+  const root = document.documentElement;
+  for (const [k, v] of Object.entries(t.vars)) {
+    root.style.setProperty(k, v);
+  }
+  currentTheme = id;
+  localStorage.setItem('tc-theme', id);
+  // Update toggle button
+  const dot  = document.getElementById('theme-current-dot');
+  const name = document.getElementById('theme-current-name');
+  dot.style.background = t.vars['--accent'];
+  dot.style.color       = t.vars['--accent'];
+  name.textContent      = t.label;
+  // Update active state in list
+  document.querySelectorAll('.theme-option').forEach(el => {
+    el.classList.toggle('active', el.dataset.theme === id);
+  });
+}
+
+function buildThemeDropdown() {
+  const list = document.getElementById('theme-options-list');
+  list.innerHTML = Object.entries(THEMES).map(([id, t]) => {
+    const swatches = t.swatches.map(c =>
+      `<span class="theme-swatch" style="background:${c}"></span>`
+    ).join('');
+    return `
+      <div class="theme-option${id === currentTheme ? ' active' : ''}" data-theme="${id}" onclick="selectTheme('${id}')">
+        <div class="theme-swatches">${swatches}</div>
+        <span class="theme-name">${t.label}</span>
+        <span class="theme-check">✓</span>
+      </div>`;
+  }).join('');
+}
+
+function selectTheme(id) {
+  applyTheme(id);
+  closeThemeDropdown();
+}
+
+function toggleThemeDropdown() {
+  const dd  = document.getElementById('theme-dropdown');
+  const btn = document.getElementById('theme-toggle-btn');
+  const isOpen = dd.classList.contains('open');
+  if (isOpen) {
+    closeThemeDropdown();
+  } else {
+    buildThemeDropdown();
+    dd.classList.add('open');
+    btn.classList.add('open');
+  }
+}
+
+function closeThemeDropdown() {
+  document.getElementById('theme-dropdown').classList.remove('open');
+  document.getElementById('theme-toggle-btn').classList.remove('open');
+}
+
+// Close on outside click
+document.addEventListener('click', e => {
+  if (!document.getElementById('theme-selector').contains(e.target)) {
+    closeThemeDropdown();
+  }
+});
+
+// Init theme from localStorage
+(function initTheme() {
+  const saved = localStorage.getItem('tc-theme');
+  if (saved && THEMES[saved]) {
+    applyTheme(saved);
+  } else {
+    // Apply void defaults (just set the dot)
+    const t = THEMES.void;
+    const dot  = document.getElementById('theme-current-dot');
+    dot.style.background = t.vars['--accent'];
+    dot.style.color       = t.vars['--accent'];
+  }
+})();
 </script>
 </body>
 </html>
