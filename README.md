@@ -534,6 +534,7 @@ Waiting On
 | 11 | UX Engineer agent; `max_tokens` resilience fix in the agentic loop; agent memory evolution (all agents reflect and write memories after every task) |
 | 12 | Live activity signals: thread cards show last-active agent + pulsing dot; `⟳ thinking…` indicator in feed; `team:activity` ephemeral Redis stream; no agent changes needed |
 | 13 | ⚡ Status tab: right panel tab with thread status pill, "Waiting On" section (unresolved `task_assignment`/`question` messages diffed against `task_complete`/`answer`), and Human Input Needed section |
+| 14 | Bug fixes: thread sidebar title no longer overwritten by mid-task steering messages; `execute_code` tool no longer loops silently when called without `code` or `file_path` |
 
 ---
 
@@ -543,6 +544,8 @@ Waiting On
 ```
 "... GitHub Repo: build-a-todo-app"
 ```
+
+**Thread titles are permanent** — the sidebar title is set when the task is submitted and never overwritten, even when you send steering messages mid-task.
 
 **Steering a running task** — select the thread in the dashboard and type in the chat bar, or:
 ```bash
