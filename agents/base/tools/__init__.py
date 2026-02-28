@@ -121,18 +121,20 @@ _EXECUTE_CODE_SCHEMA = {
         "Execute code in the sandboxed environment. "
         "Use this to run tests, verify code outputs, or check for errors. "
         "PYTHONPATH is set to /workspace root so 'from src.foo import bar' works. "
-        "Always run your code before marking a task complete."
+        "Always run your code before marking a task complete. "
+        "REQUIRED: you MUST supply either 'code' (inline source) or 'file_path' — "
+        "calling this tool with only 'language' will always fail."
     ),
     "input_schema": {
         "type": "object",
         "properties": {
             "code": {
                 "type": "string",
-                "description": "Inline code to execute. Provide this OR file_path.",
+                "description": "Inline code to execute. REQUIRED unless file_path is given.",
             },
             "file_path": {
                 "type": "string",
-                "description": "Path relative to /workspace to execute. Provide this OR code.",
+                "description": "Path relative to /workspace to execute. REQUIRED unless code is given.",
             },
             "language": {
                 "type": "string",
@@ -727,6 +729,13 @@ def _exec_git_log(inputs: dict) -> dict:
 
 async def _exec_execute_code(inputs: dict) -> dict:
     import httpx
+
+    if not inputs.get("code") and not inputs.get("file_path"):
+        return {
+            "stdout": "", "stderr": "",
+            "exit_code": 1, "timed_out": False,
+            "summary": "❌ execute_code requires 'code' or 'file_path' — you provided neither. Pass the source code you want to run as the 'code' parameter.",
+        }
 
     sandbox_url = os.environ.get("SANDBOX_URL", "http://sandbox:8081")
     payload = {
