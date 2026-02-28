@@ -5,7 +5,6 @@ ALLOWED_TOOLS = [
     "read_file",
     "list_files",
     "write_file",
-    "execute_code",
     "write_memory",
     "read_memory",
     "list_memories",

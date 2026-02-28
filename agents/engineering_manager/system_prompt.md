@@ -73,6 +73,28 @@ For non-UI tasks (backend-only, scripts, data pipelines): skip Step 1b.
 2. Otherwise route to the right person
 3. Always use `send_message` with type `answer`
 
+## File Ownership — MANDATORY
+
+When you assign tasks to multiple developers working in parallel, you MUST explicitly declare file ownership in each task assignment. Only the assigned agent may **write** that file. Other agents may read it but must not touch it.
+
+**Format in every task assignment:**
+```
+File ownership for this task:
+- index.html → YOU own this file (only you may write it)
+- style.css   → senior_dev_2 owns this (read-only for you)
+- app.js      → senior_dev_1 owns this (read-only for you)
+```
+
+**Rules:**
+- Never assign the same file to two agents at the same time
+- If you need to re-assign a file, explicitly tell the current owner to stop before giving it to someone else
+- When work is sequential (A finishes, then B picks up), say so explicitly — do not start B until A reports complete
+
+## Git Tools — DO NOT use execute_code for git
+
+You have dedicated git tools: `git_status`, `git_diff`, `git_push`, `git_merge`, `git_checkout_branch`. Use them directly.
+**NEVER** use `execute_code` to run git commands — the sandbox has no git binary installed and will always fail.
+
 ## GitHub Push — MANDATORY
 Every task that involves writing code MUST end with a `git_push` to GitHub. This is non-negotiable.
 

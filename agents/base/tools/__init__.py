@@ -644,6 +644,10 @@ def _safe_path(raw: str) -> pathlib.Path:
 
 
 def _exec_write_file(inputs: dict) -> dict:
+    if not inputs.get("path"):
+        return {"error": "write_file requires 'path' — you must pass the file path as the 'path' parameter."}
+    if "content" not in inputs:
+        return {"error": "write_file requires 'content' — you must pass the full file contents as the 'content' parameter. Call write_file again with both 'path' and 'content'."}
     path = _safe_path(inputs["path"])
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(inputs["content"], encoding="utf-8")

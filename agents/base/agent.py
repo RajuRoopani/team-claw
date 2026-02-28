@@ -223,6 +223,11 @@ class Agent:
         """
         max_iterations = 25  # safety cap (increased for complex multi-step workflows)
 
+        # Loop detection: track (tool_name, frozen_inputs) of last N tool calls
+        _recent_calls: list[tuple[str, str]] = []
+        _LOOP_WINDOW = 4   # look back over last N tool calls
+        _LOOP_THRESHOLD = 3  # how many identical calls in window = stuck
+
         for iteration in range(max_iterations):
             response = await self.claude.messages.create(
                 model=self.model,
@@ -262,6 +267,40 @@ class Agent:
                 tool_results = await self._execute_tool_blocks(
                     response.content, context_message=context_message
                 )
+
+                # Loop detection: check if we're calling the same tool repeatedly
+                for block in response.content:
+                    if getattr(block, "type", None) == "tool_use":
+                        call_sig = (block.name, json.dumps(block.input, sort_keys=True))
+                        _recent_calls.append(call_sig)
+                        if len(_recent_calls) > _LOOP_WINDOW:
+                            _recent_calls.pop(0)
+
+                # If any single (tool, inputs) pair fills most of the window → stuck
+                if len(_recent_calls) >= _LOOP_THRESHOLD:
+                    from collections import Counter
+                    counts = Counter(_recent_calls)
+                    most_common_sig, most_common_count = counts.most_common(1)[0]
+                    if most_common_count >= _LOOP_THRESHOLD:
+                        loop_tool = most_common_sig[0]
+                        logger.warning(
+                            "[%s] Loop detected: '%s' called %d times with same inputs — injecting circuit-breaker",
+                            self.role, loop_tool, most_common_count,
+                        )
+                        _recent_calls.clear()
+                        conversation.append({
+                            "role": "user",
+                            "content": (
+                                f"⚠️ LOOP DETECTED: You have called `{loop_tool}` {most_common_count} times "
+                                f"in a row with the same inputs and it is not making progress. "
+                                f"STOP calling `{loop_tool}`. "
+                                f"Either the task is already complete and you should send `task_complete` to engineering_manager, "
+                                f"or you need a completely different approach. "
+                                f"Do NOT repeat the same failing tool call again. Make a decision and move on."
+                            ),
+                        })
+                        continue
+
                 conversation.append({"role": "user", "content": tool_results})
             elif response.stop_reason == "max_tokens":
                 # Response was cut off mid-generation. If there are tool_use blocks,

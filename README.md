@@ -2,7 +2,7 @@
 
 An autonomous AI software development team running in Docker. Eight Claude agents — each playing a real SDLC role — receive requirements, design, implement, test, review, and ship working code to GitHub without human intervention.
 
-Built across 11 phases, from a minimal 2-agent loop to a full team with a dedicated UX Engineer, CI, human-in-the-loop escalation, live dashboard, tool telemetry, and persistent agent memory that evolves with every task.
+Built across 11 phases, from a minimal 2-agent loop to a full team with a dedicated UX Engineer, CI, human-in-the-loop escalation, live dashboard, tool telemetry, and persistent agent memory that evolves with every task. Latest additions: dashboard theme selector (7 themes), agent loop detection, and file ownership protocol to eliminate inter-agent conflicts.
 
 ![Team Claw Dashboard](docs/dashboard.png)
 
@@ -535,6 +535,8 @@ Waiting On
 | 12 | Live activity signals: thread cards show last-active agent + pulsing dot; `⟳ thinking…` indicator in feed; `team:activity` ephemeral Redis stream; no agent changes needed |
 | 13 | ⚡ Status tab: right panel tab with thread status pill, "Waiting On" section (unresolved `task_assignment`/`question` messages diffed against `task_complete`/`answer`), and Human Input Needed section |
 | 14 | Bug fixes: thread sidebar title no longer overwritten by mid-task steering messages; `execute_code` tool no longer loops silently when called without `code` or `file_path` |
+| 15 | Dashboard theme selector: 7 selectable themes (Void, Ocean, Dracula, Nord, Cyberpunk, Forest, Solar) with CSS custom-property swapping, color dot + swatch preview, localStorage persistence |
+| 16 | Agent reliability: **loop detection** in `_agentic_loop` (circuit-breaks when same tool+inputs repeats 3×); **file ownership protocol** in EM + dev prompts (explicit per-file assignments prevent overwrite conflicts); **status noise reduction** (devs only message on blockers/questions/completion); `execute_code` removed from EM tools; `write_file` now returns actionable error when `content` param is missing |
 
 ---
 
@@ -546,6 +548,14 @@ Waiting On
 ```
 
 **Thread titles are permanent** — the sidebar title is set when the task is submitted and never overwritten, even when you send steering messages mid-task.
+
+**If agents stall**, flush stale inbox messages from completed threads:
+```bash
+for role in engineering_manager architect ux_engineer senior_dev_1 senior_dev_2 junior_dev_1 junior_dev_2 product_owner; do
+  docker exec team-claw-redis-1 redis-cli XTRIM "agent:${role}:inbox" MAXLEN 0
+done
+```
+Then send a human message to the active thread asking the EM to re-engage.
 
 **Steering a running task** — select the thread in the dashboard and type in the chat bar, or:
 ```bash
