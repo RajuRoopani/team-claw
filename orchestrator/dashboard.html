@@ -504,6 +504,50 @@
   .d-to   { color: var(--muted); white-space: nowrap; }
   .d-task { color: var(--text); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-left: 4px; }
 
+  /* ── Status tab ── */
+  .status-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 700;
+    margin-bottom: 10px;
+  }
+  .status-pill.active   { background: rgba(86,211,100,0.12); color: var(--green); border: 1px solid rgba(86,211,100,0.3); }
+  .status-pill.waiting  { background: rgba(245,158,11,0.12); color: var(--amber); border: 1px solid rgba(245,158,11,0.3); }
+  .status-pill.complete { background: rgba(88,166,255,0.12); color: var(--accent); border: 1px solid rgba(88,166,255,0.3); }
+  .status-pill.closed   { background: var(--surface2); color: var(--muted); border: 1px solid var(--border); }
+  .status-pill-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+  .status-pill.active .status-pill-dot { animation: working-pulse 1.2s ease-in-out infinite; }
+
+  .waiting-on-item {
+    display: flex; align-items: flex-start; gap: 8px;
+    padding: 8px 10px; margin-bottom: 6px;
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: 8px; border-left: 3px solid var(--amber);
+  }
+  .waiting-on-item.woi-question { border-left-color: var(--accent); }
+  .wo-icon   { font-size: 14px; flex-shrink: 0; margin-top: 1px; }
+  .wo-body   { flex: 1; min-width: 0; }
+  .wo-header { display: flex; align-items: center; gap: 6px; margin-bottom: 3px; flex-wrap: wrap; }
+  .wo-agent  { font-size: 12px; font-weight: 700; }
+  .wo-type   { font-size: 9px; color: var(--muted); background: var(--border); padding: 1px 5px; border-radius: 4px; text-transform: uppercase; }
+  .wo-elapsed{ font-size: 10px; color: var(--amber); margin-left: auto; white-space: nowrap; }
+  .woi-question .wo-elapsed { color: var(--accent); }
+  .wo-from   { font-size: 10px; color: var(--muted); margin-bottom: 3px; }
+  .wo-preview{ font-size: 11px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .wo-none   { font-size: 11px; color: var(--green); display: flex; align-items: center; gap: 6px; padding: 6px 2px; }
+
+  .status-human-card {
+    background: rgba(245,158,11,0.06); border: 1px solid rgba(245,158,11,0.3);
+    border-radius: 8px; padding: 10px 11px; margin-bottom: 8px;
+  }
+  .status-human-q { font-size: 12px; font-weight: 600; color: var(--text); line-height: 1.45; margin-bottom: 6px; }
+  .status-human-ctx { font-size: 11px; color: var(--muted); border-left: 2px solid var(--amber); padding-left: 8px; margin-bottom: 8px; line-height: 1.4; }
+  .status-human-from { font-size: 10px; color: var(--muted); margin-bottom: 8px; }
+  .status-reply-btn {
+    background: var(--amber); color: #0d1117; border: none; border-radius: 6px;
+    padding: 5px 12px; font-size: 11px; font-weight: 700; cursor: pointer; font-family: inherit;
+  }
+  .status-reply-btn:hover { opacity: 0.85; }
+
   /* ── Stats tab ── */
   .stat-row {
     display: flex; justify-content: space-between; align-items: center;
@@ -1010,9 +1054,10 @@
 <!-- ══ RIGHT PANEL ══════════════════════════════════════════════════════ -->
 <aside id="panel">
   <div class="panel-tabs">
-    <button class="panel-tab active" data-tab="work"  onclick="switchTab('work')">📋 Work</button>
-    <button class="panel-tab"        data-tab="team"  onclick="switchTab('team')">👥 Team</button>
-    <button class="panel-tab"        data-tab="stats" onclick="switchTab('stats')">📈 Stats</button>
+    <button class="panel-tab active" data-tab="work"   onclick="switchTab('work')">📋 Work</button>
+    <button class="panel-tab"        data-tab="team"   onclick="switchTab('team')">👥 Team</button>
+    <button class="panel-tab"        data-tab="status" onclick="switchTab('status')">⚡ Status</button>
+    <button class="panel-tab"        data-tab="stats"  onclick="switchTab('stats')">📈 Stats</button>
   </div>
 
   <!-- Work tab: Kanban board -->
@@ -1041,6 +1086,26 @@
     <div class="panel-section">
       <div class="panel-section-title">Delegation Chain</div>
       <div id="delegation-list"><div style="font-size:10px;color:var(--muted)">No delegations yet</div></div>
+    </div>
+  </div>
+
+  <!-- Status tab -->
+  <div class="panel-body" id="tab-status">
+    <div class="panel-section">
+      <div class="panel-section-title">Thread Status</div>
+      <div id="status-thread-state">
+        <div style="font-size:11px;color:var(--muted)">Select a thread to see its status</div>
+      </div>
+    </div>
+    <div class="panel-section" id="status-human-section" style="display:none">
+      <div class="panel-section-title" style="color:var(--amber)">⏸ Human Input Needed</div>
+      <div id="status-human-question"></div>
+    </div>
+    <div class="panel-section">
+      <div class="panel-section-title">Waiting On</div>
+      <div id="status-waiting-on">
+        <div style="font-size:11px;color:var(--muted)">Select a thread to see pending delegations</div>
+      </div>
     </div>
   </div>
 
@@ -1293,9 +1358,10 @@ function switchTab(name) {
   activeTab = name;
   document.querySelectorAll('.panel-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
   document.querySelectorAll('.panel-body').forEach(b => b.classList.toggle('active', b.id === `tab-${name}`));
-  if (name === 'team')  renderAgentCards();
-  if (name === 'stats') { loadMetrics(); loadCIResults(); loadToolStats(); }
-  if (name === 'work')  loadTasks();
+  if (name === 'team')   renderAgentCards();
+  if (name === 'stats')  { loadMetrics(); loadCIResults(); loadToolStats(); }
+  if (name === 'work')   loadTasks();
+  if (name === 'status') renderStatusTab();
 }
 
 // ══════════════════════════════════════════════════════════
@@ -1520,7 +1586,8 @@ function addMessage(msg, isNew=false) {
     if (isNew) list.scrollTop = list.scrollHeight;
   }
 
-  if (activeTab === 'team') renderAgentCards();
+  if (activeTab === 'team')   renderAgentCards();
+  if (activeTab === 'status') renderStatusTab();
 }
 
 // ══════════════════════════════════════════════════════════
@@ -1634,6 +1701,7 @@ function refreshThreadSelection() {
     el.classList.toggle('active', el.dataset.id === currentThread || (!currentThread && !el.dataset.id));
   });
   rerender();
+  if (activeTab === 'status') renderStatusTab();
 }
 
 function updateNewTaskBtn() {
@@ -1757,6 +1825,164 @@ function renderAgentCards() {
 }
 
 // ══════════════════════════════════════════════════════════
+// Status tab
+// ══════════════════════════════════════════════════════════
+
+/**
+ * Scan all messages for a thread and compute which agents have received a
+ * task_assignment or question that hasn't been resolved by a task_complete
+ * or answer (respectively).
+ *
+ * Returns: { role → [{type:'task'|'question', from, content, ts}] }
+ */
+function computeWaitingOn(threadId) {
+  const msgs = allMessages.filter(m => m.thread_id === threadId);
+  const pending = {}; // to_role → [{type, from, content, ts}]
+
+  for (const msg of msgs) {
+    if (msg.type === 'task_assignment') {
+      if (!pending[msg.to_role]) pending[msg.to_role] = [];
+      pending[msg.to_role].push({
+        type: 'task', from: msg.from_role,
+        content: msg.content, ts: msg.timestamp || msg.created_at,
+      });
+    } else if (msg.type === 'task_complete' || msg.type === 'status_update') {
+      // msg.from_role finished their task — remove their pending task entries
+      if (msg.type === 'task_complete' && pending[msg.from_role]) {
+        pending[msg.from_role] = pending[msg.from_role].filter(p => p.type !== 'task');
+        if (!pending[msg.from_role].length) delete pending[msg.from_role];
+      }
+    } else if (msg.type === 'question') {
+      if (!pending[msg.to_role]) pending[msg.to_role] = [];
+      pending[msg.to_role].push({
+        type: 'question', from: msg.from_role,
+        content: msg.content, ts: msg.timestamp || msg.created_at,
+      });
+    } else if (msg.type === 'answer') {
+      // msg.from_role is answering — remove the oldest pending question for them
+      if (pending[msg.from_role]) {
+        const idx = pending[msg.from_role].findIndex(p => p.type === 'question');
+        if (idx !== -1) pending[msg.from_role].splice(idx, 1);
+        if (!pending[msg.from_role].length) delete pending[msg.from_role];
+      }
+    }
+  }
+
+  return pending;
+}
+
+function renderStatusTab() {
+  const stateEl   = document.getElementById('status-thread-state');
+  const waitingEl = document.getElementById('status-waiting-on');
+  const humanSec  = document.getElementById('status-human-section');
+  const humanEl   = document.getElementById('status-human-question');
+
+  if (!currentThread || !threads[currentThread]) {
+    stateEl.innerHTML   = '<div style="font-size:11px;color:var(--muted)">Select a thread to see its status</div>';
+    waitingEl.innerHTML = '<div style="font-size:11px;color:var(--muted)">Select a thread to see pending delegations</div>';
+    humanSec.style.display = 'none';
+    return;
+  }
+
+  const t = threads[currentThread];
+
+  // ── Thread status pill ──────────────────────────────────────────
+  const statusMap = {
+    active:   { label: 'Active',              cls: 'active' },
+    waiting:  { label: 'Waiting for you',     cls: 'waiting' },
+    complete: { label: 'Complete',            cls: 'complete' },
+    closed:   { label: 'Closed',              cls: 'closed' },
+  };
+  const s = statusMap[t.status] || { label: t.status, cls: 'active' };
+
+  let stateHtml = `<span class="status-pill ${s.cls}"><span class="status-pill-dot"></span>${s.label}</span>`;
+
+  if (t.last_active_role && t.last_active_at) {
+    const secsAgo = Math.round((Date.now() - new Date(t.last_active_at).getTime()) / 1000);
+    const isLive  = secsAgo < 30;
+    const elapsed = secsAgo < 60 ? `${secsAgo}s ago` : secsAgo < 3600 ? `${Math.round(secsAgo/60)}m ago` : `${Math.round(secsAgo/3600)}h ago`;
+    const roleColor = ROLE_COLOR[t.last_active_role] || 'var(--muted)';
+    stateHtml += `
+      <div style="font-size:11px;color:var(--muted);margin-top:6px;display:flex;align-items:center;gap:6px">
+        <span style="color:${roleColor};font-weight:700">${humanRole(t.last_active_role)}</span>
+        <span>${isLive ? '⚡ active now' : `· ${elapsed}`}</span>
+      </div>`;
+  }
+  stateEl.innerHTML = stateHtml;
+
+  // ── Human input section ─────────────────────────────────────────
+  const isWaiting = t.status === 'waiting';
+  const q = pendingQuestions.find(pq => pq.thread_id === currentThread);
+  if (isWaiting || q) {
+    humanSec.style.display = '';
+    if (q) {
+      const fromColor = ROLE_COLOR[q.from_role] || 'var(--muted)';
+      const ctxHtml = q.context
+        ? `<div class="status-human-ctx">${escHtml(q.context)}</div>`
+        : '';
+      humanEl.innerHTML = `
+        <div class="status-human-card">
+          <div class="status-human-q">${escHtml(q.question)}</div>
+          ${ctxHtml}
+          <div class="status-human-from">from <strong style="color:${fromColor}">${humanRole(q.from_role)}</strong></div>
+          <button class="status-reply-btn" onclick="scrollToWaitingBanner()">↓ Reply in feed</button>
+        </div>
+      `;
+    } else {
+      humanEl.innerHTML = '<div style="font-size:11px;color:var(--muted)">Loading question…</div>';
+    }
+  } else {
+    humanSec.style.display = 'none';
+  }
+
+  // ── Waiting On section ──────────────────────────────────────────
+  const pending = computeWaitingOn(currentThread);
+  const entries = Object.entries(pending);
+
+  if (!entries.length) {
+    waitingEl.innerHTML = '<div class="wo-none">✅ No pending delegations</div>';
+    return;
+  }
+
+  waitingEl.innerHTML = '';
+  for (const [role, items] of entries) {
+    items.forEach(item => {
+      const color   = ROLE_COLOR[role] || 'var(--muted)';
+      const preview = (item.content || '').split('\n')[0].replace(/^#+\s*/,'').replace(/\*\*/g,'').trim().substring(0, 65);
+      const icon    = item.type === 'task' ? '🎯' : '❓';
+      const typeLbl = item.type === 'task' ? 'task' : 'question';
+      const elapsed = relTime(item.ts);
+      const div     = document.createElement('div');
+      div.className = `waiting-on-item${item.type === 'question' ? ' woi-question' : ''}`;
+      div.innerHTML = `
+        <span class="wo-icon">${icon}</span>
+        <div class="wo-body">
+          <div class="wo-header">
+            <span class="wo-agent" style="color:${color}">${humanRole(role)}</span>
+            <span class="wo-type">${typeLbl}</span>
+            <span class="wo-elapsed">${elapsed}</span>
+          </div>
+          <div class="wo-from">assigned by ${humanRole(item.from)}</div>
+          <div class="wo-preview" title="${escHtml(item.content||'')}">${escHtml(preview)}${preview.length>=65?'…':''}</div>
+        </div>
+      `;
+      waitingEl.appendChild(div);
+    });
+  }
+}
+
+function scrollToWaitingBanner() {
+  switchTab('work'); // Switch back to work tab so the feed is visible
+  setTimeout(() => {
+    const banner = document.getElementById('waiting-banner');
+    if (banner && banner.classList.contains('visible')) {
+      banner.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      setTimeout(() => document.getElementById('wb-reply').focus(), 200);
+    }
+  }, 100);
+}
+
+// ══════════════════════════════════════════════════════════
 // Delegation chain
 // ══════════════════════════════════════════════════════════
 
@@ -1838,6 +2064,7 @@ function connectSSE() {
           threads[msg.thread_id].last_active_at   = msg.ts;
           renderThreadList();
           showThinkingIndicator(msg.thread_id, msg.from_role);
+          if (activeTab === 'status' && msg.thread_id === currentThread) renderStatusTab();
         }
         return;
       }
@@ -2188,6 +2415,7 @@ function refreshWaitingBanner() {
   banner.dataset.fromRole   = q.from_role;
   banner.dataset.threadId   = q.thread_id;
   banner.classList.add('visible');
+  if (activeTab === 'status') renderStatusTab();
 }
 
 async function sendWaitingReply() {
@@ -2761,6 +2989,8 @@ setInterval(loadTasks,           15000);
 setInterval(loadWiki,            30000);
 setInterval(loadToolStats,       20000);
 setInterval(loadPendingQuestions, 10000);
+// Refresh status tab elapsed times even when no new messages arrive
+setInterval(() => { if (activeTab === 'status') renderStatusTab(); }, 15000);
 
 // Cmd/Ctrl+Enter submits the waiting-banner reply textarea
 document.getElementById('wb-reply').addEventListener('keydown', e => {
