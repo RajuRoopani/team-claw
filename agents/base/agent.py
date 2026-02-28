@@ -263,6 +263,29 @@ class Agent:
                     response.content, context_message=context_message
                 )
                 conversation.append({"role": "user", "content": tool_results})
+            elif response.stop_reason == "max_tokens":
+                # Response was cut off mid-generation. If there are tool_use blocks,
+                # execute them and continue. Otherwise inject a nudge to use tools.
+                tool_blocks = [b for b in response.content if b.type == "tool_use"]
+                if tool_blocks:
+                    tool_results = await self._execute_tool_blocks(
+                        response.content, context_message=context_message
+                    )
+                    conversation.append({"role": "user", "content": tool_results})
+                else:
+                    logger.warning(
+                        "[%s] max_tokens hit with no tool calls — injecting continuation nudge",
+                        self.role,
+                    )
+                    conversation.append({
+                        "role": "user",
+                        "content": (
+                            "Your response was cut off because it exceeded the token limit. "
+                            "Please continue by calling the appropriate tools now (write_file, "
+                            "send_message, etc.) rather than writing long text responses. "
+                            "Use tools to complete your task."
+                        ),
+                    })
             else:
                 logger.warning("[%s] Unexpected stop_reason: %s", self.role, response.stop_reason)
                 break

@@ -24,6 +24,7 @@
     --c-product_owner:        #d2a8ff;
     --c-engineering_manager:  #ffa657;
     --c-architect:            #79c0ff;
+    --c-ux_engineer:          #f0abfc;
     --c-senior_dev_1:         #56d364;
     --c-senior_dev_2:         #3fb950;
     --c-junior_dev_1:         #ffa198;
@@ -297,6 +298,7 @@
   .msg-card.role-product_owner       { border-left-color: var(--c-product_owner); }
   .msg-card.role-engineering_manager { border-left-color: var(--c-engineering_manager); }
   .msg-card.role-architect           { border-left-color: var(--c-architect); }
+  .msg-card.role-ux_engineer         { border-left-color: var(--c-ux_engineer); }
   .msg-card.role-senior_dev_1        { border-left-color: var(--c-senior_dev_1); }
   .msg-card.role-senior_dev_2        { border-left-color: var(--c-senior_dev_2); }
   .msg-card.role-junior_dev_1        { border-left-color: var(--c-junior_dev_1); }
@@ -312,6 +314,7 @@
   .role-product_owner       .msg-from { color: var(--c-product_owner); }
   .role-engineering_manager .msg-from { color: var(--c-engineering_manager); }
   .role-architect           .msg-from { color: var(--c-architect); }
+  .role-ux_engineer         .msg-from { color: var(--c-ux_engineer); }
   .role-senior_dev_1        .msg-from { color: var(--c-senior_dev_1); }
   .role-senior_dev_2        .msg-from { color: var(--c-senior_dev_2); }
   .role-junior_dev_1        .msg-from { color: var(--c-junior_dev_1); }
@@ -1084,7 +1087,7 @@
 // ══════════════════════════════════════════════════════════
 
 const ALL_AGENTS = [
-  'product_owner','engineering_manager','architect',
+  'product_owner','engineering_manager','architect','ux_engineer',
   'senior_dev_1','senior_dev_2','junior_dev_1','junior_dev_2'
 ];
 
@@ -1093,6 +1096,7 @@ const ROLE_COLOR = {
   product_owner:       'var(--c-product_owner)',
   engineering_manager: 'var(--c-engineering_manager)',
   architect:           'var(--c-architect)',
+  ux_engineer:         'var(--c-ux_engineer)',
   senior_dev_1:        'var(--c-senior_dev_1)',
   senior_dev_2:        'var(--c-senior_dev_2)',
   junior_dev_1:        'var(--c-junior_dev_1)',
@@ -1103,7 +1107,8 @@ const ROLE_COLOR = {
 const ROLE_MODEL = {
   product_owner:       'opus-4',
   engineering_manager: 'opus-4',
-  architect:           'opus-4',
+  architect:           'sonnet-4',
+  ux_engineer:         'sonnet-4',
   senior_dev_1:        'sonnet-4',
   senior_dev_2:        'sonnet-4',
   junior_dev_1:        'haiku-4',

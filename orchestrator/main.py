@@ -50,7 +50,7 @@ AUDIT_GROUP = "grp:orchestrator-audit"
 AUDIT_CONSUMER = "orchestrator-0"
 
 ALL_AGENT_ROLES = [
-    "product_owner", "engineering_manager", "architect",
+    "product_owner", "engineering_manager", "architect", "ux_engineer",
     "senior_dev_1", "senior_dev_2", "junior_dev_1", "junior_dev_2",
 ]
 

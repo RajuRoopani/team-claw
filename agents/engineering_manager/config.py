@@ -29,6 +29,7 @@ AVAILABLE_ROLES = [
     "orchestrator",
     "product_owner",
     "architect",
+    "ux_engineer",
     "senior_dev_1",
     "senior_dev_2",
     "junior_dev_1",

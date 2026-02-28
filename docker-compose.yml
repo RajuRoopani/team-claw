@@ -133,6 +133,18 @@ services:
       MODEL: ${ARCH_MODEL:-claude-sonnet-4-6}
       ORCHESTRATOR_URL: http://orchestrator:8080
 
+  ux-engineer:
+    <<: *agent-base
+    volumes:
+      - ./agents/ux_engineer:/agent
+      - workspace:/workspace
+    environment:
+      ROLE: ux_engineer
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      REDIS_URL: redis://redis:6379
+      MODEL: ${UX_MODEL:-claude-sonnet-4-6}
+      ORCHESTRATOR_URL: http://orchestrator:8080
+
   senior-dev-1:
     <<: *agent-base
     volumes:

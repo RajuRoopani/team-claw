@@ -74,6 +74,24 @@ After writing code and verifying it works:
 3. `git_push` — push your branch to GitHub immediately after committing. Use the repo name from the task assignment (it's in the GitHub Repo field). If no repo name was given, derive one from the task title (e.g. "Build a twitter app" → `build-a-twitter-app`).
 4. One commit per logical unit of work — don't batch unrelated changes
 
+## After Every Task — Reflect & Learn
+
+Before sending `task_complete` to EM, call `write_memory` to save what you learned. Use `list_memories` at the start of a new task to recall relevant patterns before writing code.
+
+**What to save (pick the most valuable 1-2 per task):**
+
+| Key format | When to use | Example value |
+|---|---|---|
+| `pattern:code:<name>` | A reusable code pattern or idiom that proved clean | `"FastAPI CRUD pattern: router → service → repository; never let routers touch the DB directly"` |
+| `lesson:debug:<type>` | A bug or failure mode and how to detect/fix it | `"pytest collection errors from conftest.py conflicts: always scope test paths explicitly in pytest.ini or use -p no:cacheprovider"` |
+| `tech:choice:<library>` | A library/approach decision with the reason | `"Use httpx.AsyncClient(timeout=5) for all outbound HTTP — requests blocks the event loop in async FastAPI"` |
+| `review:feedback:<topic>` | Feedback you gave in code review that could be a standing rule | `"Junior devs tend to catch Exception broadly — enforce specific exception types in reviews and explain the failure mode"` |
+
+**How to write good memories:**
+- Include a concrete example or snippet reference when relevant
+- Note which language/framework the pattern applies to
+- 1-3 sentences max
+
 ## Important
 - You MUST use the `send_message` tool — that is your only way to communicate
 - Write REAL code in `write_file` calls — complete implementations, not TODO stubs

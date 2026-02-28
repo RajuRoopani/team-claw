@@ -15,6 +15,7 @@ Built across 9 phases, from a minimal 2-agent loop to a full team with CI, human
 | `product-owner` | Product Owner | claude-opus-4-6 | Refines requirements, defines acceptance criteria, signs off on delivery |
 | `engineering-manager` | Engineering Manager | claude-opus-4-6 | Decomposes tasks, assigns work, tracks progress, unblocks team, triggers git push |
 | `architect` | Architect | claude-sonnet-4-6 | Makes architecture/design decisions before implementation begins |
+| `ux-engineer` | UX Engineer | claude-sonnet-4-6 | Produces wireframes, user flows, and component specs before UI implementation begins |
 | `senior-dev-1` | Senior Dev 1 | claude-sonnet-4-6 | Implements features, reviews code, mentors Junior Dev 1 |
 | `senior-dev-2` | Senior Dev 2 | claude-sonnet-4-6 | Implements features, reviews code, mentors Junior Dev 2 |
 | `junior-dev-1` | Junior Dev 1 | claude-haiku-4-5 | Well-defined tasks, writes tests, asks Sr Dev 1 when blocked |
@@ -33,8 +34,9 @@ Orchestrator API (:8080)           FastAPI — task router, audit logger, SSE br
         ├──→ Redis Streams          agent:{role}:inbox per agent + team:audit
         │
         ├── product_owner           Refines requirements → Engineering Manager
-        ├── engineering_manager     Breaks down tasks → assigns to devs + architect
+        ├── engineering_manager     Breaks down tasks → assigns to devs + architect + UX
         ├── architect               Reviews design → reports back to EM
+        ├── ux_engineer             Wireframes + component specs → /workspace/designs/
         ├── senior_dev_1/2          Implements, commits, pushes → task_complete to EM
         └── junior_dev_1/2          Implements with mentor support → task_complete to EM
                 │
@@ -77,7 +79,7 @@ GITHUB_USERNAME=your-github-username
 docker compose up --build
 ```
 
-All 10 containers start: Redis, Postgres, Sandbox, Orchestrator, and 7 agent containers.
+All 11 containers start: Redis, Postgres, Sandbox, Orchestrator, and 8 agent containers.
 
 ### 3. Install the CLI
 
@@ -169,11 +171,11 @@ Open `http://localhost:8080` for the live web dashboard:
 | `send_message` | Route a message to another agent via Redis | All |
 | `read_file` | Read a file from /workspace | All |
 | `write_file` | Write/overwrite a file in /workspace | All except PO |
-| `edit_file` | Search-and-replace within a file | EM, Arch, Sr, Jr |
+| `edit_file` | Search-and-replace within a file | EM, Arch, UX, Sr, Jr |
 | `list_files` | List files under a path in /workspace | All |
 | `execute_code` | Run code in the sandbox (pytest, python, etc.) | EM, Sr, Jr |
-| `search_code` | Grep for a pattern across /workspace | EM, Arch, Sr, Jr |
-| `find_files` | Glob pattern match across /workspace | EM, Arch, Sr, Jr |
+| `search_code` | Grep for a pattern across /workspace | EM, Arch, UX, Sr, Jr |
+| `find_files` | Glob pattern match across /workspace | EM, Arch, UX, Sr, Jr |
 | `git_status` | Show git status of /workspace | EM, Sr, Jr |
 | `git_commit` | Commit staged changes in /workspace | EM, Sr, Jr |
 | `git_push` | Push a branch to GitHub | EM, Sr, Jr |
@@ -199,11 +201,12 @@ Open `http://localhost:8080` for the live web dashboard:
         ↓
 3. Product Owner refines requirements → sends to Engineering Manager
         ↓
-4. Engineering Manager decomposes into tasks → assigns to Architect + Devs
+4. Engineering Manager decomposes into tasks → assigns to Architect + UX Engineer + Devs
         ↓
 5. Architect reviews design decisions → reports back to EM
+   UX Engineer produces wireframes + component specs → /workspace/designs/ → reports back to EM
         ↓
-6. Senior/Junior Devs implement → write tests → execute_code to verify
+6. Senior/Junior Devs implement (using design doc as spec) → write tests → execute_code to verify
         ↓
 7. Each Dev: git_status → git_commit → git_push → task_complete to EM
         ↓
@@ -341,6 +344,9 @@ team-claw/
 │   ├── architect/
 │   │   ├── system_prompt.md
 │   │   └── config.py
+│   ├── ux_engineer/
+│   │   ├── system_prompt.md
+│   │   └── config.py
 │   ├── senior_dev/
 │   │   ├── system_prompt.md
 │   │   └── config.py
@@ -387,6 +393,7 @@ IDLE_THREAD_MINUTES=0           # Alert on threads idle > N minutes (0 = disable
 PO_MODEL=claude-opus-4-6
 EM_MODEL=claude-opus-4-6
 ARCH_MODEL=claude-sonnet-4-6
+UX_MODEL=claude-sonnet-4-6
 SR_MODEL=claude-sonnet-4-6
 JR_MODEL=claude-haiku-4-5-20251001
 ```
@@ -423,6 +430,8 @@ Set `WEBHOOK_URL` in `.env` to receive POST notifications:
 | 7 | `search_code`, `find_files`, `check_budget` tools; standup report; budget bar in dashboard |
 | 8 | `edit_file` tool, tool telemetry (duration + success per call), thread close endpoint, idle thread alerts |
 | 9 | Human-in-the-loop: `ask_human` tool, `human_questions` table, pending questions panel, `git_diff` tool, context-aware chat bar (new task vs. steer mode), `questions`/`reply` CLI commands |
+| 10 | GitHub integration: `git_push`/`git_checkout_branch`/`git_merge` tools, auto-repo creation, branch strategy, ⎇ link in dashboard |
+| 11 | UX Engineer agent: wireframes, user flows, component specs in `/workspace/designs/`; EM assigns UX tasks in parallel with Architect for user-facing features |
 
 ---
 

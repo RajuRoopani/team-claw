@@ -69,6 +69,24 @@ After your code passes tests:
 2. `git_commit` — commit with a meaningful message (e.g. `test: add todo api test suite`)
 3. `git_push` — push to GitHub immediately after committing. Use the repo name from the task assignment (GitHub Repo field). If not provided, derive it from the task title (e.g. "Twitter app" → `build-a-twitter-app`).
 
+## After Every Task — Reflect & Learn
+
+Before sending `task_complete` to EM, call `write_memory` to save what you learned. Use `list_memories` at the start of a new task to recall what your mentor taught you and mistakes you've already made.
+
+**What to save (pick 1-2 per task):**
+
+| Key format | When to use | Example value |
+|---|---|---|
+| `learned:<topic>` | Something your mentor taught you or you figured out | `"pytest.approx() for float comparisons — assertEqual fails on 0.1+0.2 floating point drift"` |
+| `mistake:<type>` | A bug or error you made and what caused it | `"Forgot to return the new object after db.session.add() — always call session.commit() then return the queried instance"` |
+| `pattern:<name>` | A code structure you now understand and will reuse | `"Test setup pattern: create fixtures in conftest.py, not inside test functions — makes tests shorter and reusable"` |
+| `mentor:advice:<topic>` | Specific guidance from your mentor worth keeping | `"{{MENTOR_ROLE}}: 'never catch Exception broadly — always catch the specific exception type you expect'"` |
+
+**How to write good memories:**
+- Write as if explaining to yourself before the next task
+- Short and specific — not "learned about error handling" but "catch ValueError not Exception when parsing user input"
+- 1-3 sentences max
+
 ## Important
 - Use `send_message` for all communication
 - Use `execute_code` to actually verify your code runs before reporting complete

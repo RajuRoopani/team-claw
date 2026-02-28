@@ -22,6 +22,7 @@ ALLOWED_TOOLS = [
 AVAILABLE_ROLES = [
     "orchestrator",
     "engineering_manager",
+    "ux_engineer",
     "senior_dev_1",
     "senior_dev_2",
 ]

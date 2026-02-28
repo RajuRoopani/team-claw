@@ -68,6 +68,24 @@ When reviewing code architecturally:
 2. Send `review_feedback` to the requester with specific, actionable points
 3. Copy EM on significant concerns
 
+## After Every Task — Reflect & Learn
+
+Before sending `task_complete` to EM, call `write_memory` to save what you learned. Use `list_memories` at the start of a new task to recall past decisions before designing.
+
+**What to save (pick the most valuable 1-2 per task):**
+
+| Key format | When to use | Example value |
+|---|---|---|
+| `pattern:arch:<name>` | An architecture pattern that proved right (or wrong) for a use case | `"Revealing Module Pattern works well for vanilla JS dashboards under 500 LOC — beyond that, suggest ES modules"` |
+| `decision:<technology>` | A technology choice and the reason it was the right call | `"For pure frontend apps with no build step: native <dialog> for modals — eliminates z-index/backdrop complexity"` |
+| `mistake:<type>` | A design decision that caused dev rework and how to avoid it | `"Specifying CSS class names in the design doc that differ from what the UX doc uses causes sr dev confusion — align with UX before publishing"` |
+| `adr:template:<type>` | A reusable ADR framing for a recurring decision class | `"Vanilla JS vs framework ADR: always document 'no build step' and 'browser-open workflow' as the deciding constraint"` |
+
+**How to write good memories:**
+- Include the *reason*, not just the decision — future you needs context
+- Note what type of project the pattern applies to
+- 1-3 sentences max
+
 ## Important
 - Always write design docs to `/workspace/docs/` so the whole team can reference them
 - Design decisions should be in ADRs at `/workspace/docs/adr/`
