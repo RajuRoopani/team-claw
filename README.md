@@ -2,7 +2,7 @@
 
 An autonomous AI software development team running in Docker. Eight Claude agents — each playing a real SDLC role — receive requirements, design, implement, test, review, and ship working code to GitHub without human intervention.
 
-Built across 18 phases, from a minimal 2-agent loop to a full team with a dedicated UX Engineer, CI, human-in-the-loop escalation, live dashboard, tool telemetry, and persistent agent memory that evolves with every task. Latest: message durability fix (pending-queue drain + XAUTOCLAIM on startup) ensures no message is silently dropped across container restarts.
+Built across 18 phases, from a minimal 2-agent loop to a full team with a dedicated UX Engineer, CI, human-in-the-loop escalation, live dashboard, tool telemetry, and persistent agent memory that evolves with every task. Latest: Phase 19 — agent auto-recovery (exponential backoff, exhaustion rescue), thread close guard, GitHub push reminders, and Architect git tools. Runs on macOS, Linux, and Windows (Docker Desktop).
 
 ![Team Claw Dashboard](docs/dashboard.png)
 
@@ -55,17 +55,34 @@ Orchestrator API (:8080)           FastAPI — task router, audit logger, SSE br
 ## Quick Start
 
 ### Prerequisites
-- Docker + Docker Compose
-- An Anthropic API key
-- A GitHub token (for agents to push code)
+
+| | macOS / Linux | Windows |
+|--|---------------|---------|
+| **Container runtime** | Docker Desktop or `docker` + `docker-compose` CLI | [Docker Desktop for Windows](https://www.docker.com/products/docker-desktop/) (WSL 2 backend recommended) |
+| **Python** (CLI only) | Python 3.9+ | Python 3.9+ from [python.org](https://www.python.org/downloads/) |
+| **Git** | Any | [Git for Windows](https://git-scm.com/download/win) |
+| **API keys** | Anthropic API key + GitHub token | same |
+
+> **Windows users — clone with LF line endings** (the repo ships a `.gitattributes` that handles this automatically, but if you have `core.autocrlf=true` set globally, override it for this clone):
+> ```powershell
+> git clone -c core.autocrlf=false https://github.com/RajuRoopani/team-claw.git
+> ```
+
+---
 
 ### 1. Configure
 
+**macOS / Linux**
 ```bash
 cp .env.example .env
 ```
 
-Edit `.env`:
+**Windows (PowerShell)**
+```powershell
+Copy-Item .env.example .env
+```
+
+Edit `.env` and fill in your keys:
 
 ```env
 ANTHROPIC_API_KEY=sk-ant-...
@@ -79,26 +96,38 @@ GITHUB_USERNAME=your-github-username
 docker compose up --build
 ```
 
-All 11 containers start: Redis, Postgres, Sandbox, Orchestrator, and 8 agent containers.
+All 11 containers start: Redis, Postgres, Sandbox, Orchestrator, and 8 agent containers. Wait ~30 seconds for the Postgres healthcheck to pass before submitting tasks.
 
 ### 3. Install the CLI
 
 ```bash
-pip install httpx
+pip install -r requirements.txt
 ```
 
 ### 4. Submit a task
 
+**macOS / Linux**
 ```bash
 python3 cli.py submit \
   "Build a REST API for a todo app" \
   "Create a FastAPI service with CRUD endpoints for todos. Include pytest tests. GitHub Repo: build-a-todo-app"
 ```
 
+**Windows (PowerShell / CMD)**
+```powershell
+python cli.py submit "Build a REST API for a todo app" "Create a FastAPI service with CRUD endpoints for todos. Include pytest tests. GitHub Repo: build-a-todo-app"
+```
+
 ### 5. Watch the team work
 
+**macOS / Linux**
 ```bash
 python3 cli.py watch <thread_id>
+```
+
+**Windows**
+```powershell
+python cli.py watch <thread_id>
 ```
 
 Or open the live dashboard at `http://localhost:8080`.
@@ -108,7 +137,11 @@ Or open the live dashboard at `http://localhost:8080`.
 ## CLI Reference
 
 ```
+# macOS / Linux
 python3 cli.py <command> [options]
+
+# Windows
+python cli.py <command> [options]
 ```
 
 | Command | Description |
@@ -553,16 +586,27 @@ Waiting On
 **Thread titles are permanent** — the sidebar title is set when the task is submitted and never overwritten, even when you send steering messages mid-task.
 
 **If agents stall**, flush stale inbox messages from completed threads:
+
+macOS / Linux:
 ```bash
 for role in engineering_manager architect ux_engineer senior_dev_1 senior_dev_2 junior_dev_1 junior_dev_2 product_owner; do
   docker exec team-claw-redis-1 redis-cli XTRIM "agent:${role}:inbox" MAXLEN 0
 done
 ```
+
+Windows (PowerShell):
+```powershell
+foreach ($role in @("engineering_manager","architect","ux_engineer","senior_dev_1","senior_dev_2","junior_dev_1","junior_dev_2","product_owner")) {
+  docker exec team-claw-redis-1 redis-cli XTRIM "agent:${role}:inbox" MAXLEN 0
+}
+```
+
 Then send a human message to the active thread asking the EM to re-engage.
 
 **Steering a running task** — select the thread in the dashboard and type in the chat bar, or:
 ```bash
-python3 cli.py reply <thread_id> "Switch from SQLite to PostgreSQL"
+python3 cli.py reply <thread_id> "Switch from SQLite to PostgreSQL"   # macOS/Linux
+python  cli.py reply <thread_id> "Switch from SQLite to PostgreSQL"   # Windows
 ```
 
 **Checking for questions** — agents call `ask_human` when genuinely blocked:
@@ -584,6 +628,45 @@ python3 cli.py submit "Build a dashboard" "... GitHub Repo: my-dashboard"
 ```bash
 curl http://localhost:8080/memory/engineering_manager   # all EM memories
 curl http://localhost:8080/memory/senior_dev_1          # all Sr Dev 1 memories
+```
+
+---
+
+## Windows Troubleshooting
+
+**`python3` not found**
+Windows ships Python as `python`, not `python3`. Either use `python cli.py ...` or create an alias:
+```powershell
+Set-Alias python3 python
+```
+
+**Docker daemon not running**
+Start Docker Desktop from the Start Menu. Wait for the whale icon in the system tray to show "Docker Desktop is running" before running `docker compose up`.
+
+**WSL 2 backend warning / Hyper-V errors**
+Open Docker Desktop → Settings → General → enable "Use the WSL 2 based engine". Requires Windows 10 version 2004+ or Windows 11.
+
+**Line endings corrupted (`git status` shows every file as modified)**
+The repo ships a `.gitattributes` that enforces LF. If you cloned before this file existed, renormalize:
+```powershell
+git rm --cached -r .
+git reset --hard
+```
+
+**Port 8080 already in use**
+Another service is on 8080. Either stop it or override the port:
+```powershell
+$env:ORCHESTRATOR_PORT=9090; docker compose up
+```
+Then open `http://localhost:9090`.
+
+**Containers exit immediately after start**
+Check logs: `docker compose logs orchestrator`. Most common cause is a missing or invalid `.env` file — make sure `ANTHROPIC_API_KEY` is set.
+
+**`docker exec` commands differ slightly on Windows**
+In PowerShell, use double quotes and escape if needed:
+```powershell
+docker exec team-claw-redis-1 redis-cli XTRIM "agent:engineering_manager:inbox" MAXLEN 0
 ```
 
 ---

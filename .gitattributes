@@ -1,0 +1,38 @@
+# Enforce LF line endings in the repo so files land correctly inside
+# Linux Docker containers regardless of the OS the developer clones from.
+# Windows Git defaults to CRLF checkout; .gitattributes overrides that.
+
+* text=auto eol=lf
+
+# Explicit overrides for file types that must never have CRLF
+*.py    text eol=lf
+*.sh    text eol=lf
+*.md    text eol=lf
+*.yml   text eol=lf
+*.yaml  text eol=lf
+*.json  text eol=lf
+*.sql   text eol=lf
+*.txt   text eol=lf
+*.html  text eol=lf
+*.css   text eol=lf
+*.js    text eol=lf
+*.ts    text eol=lf
+*.env   text eol=lf
+*.example text eol=lf
+Dockerfile text eol=lf
+.gitignore text eol=lf
+.gitattributes text eol=lf
+
+# True binaries — no line-ending conversion
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.woff  binary
+*.woff2 binary
+*.ttf   binary
+*.eot   binary
+*.zip   binary
+*.gz    binary
+*.tar   binary

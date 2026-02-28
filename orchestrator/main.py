@@ -1818,6 +1818,16 @@ def _init_workspace_git() -> None:
             ["git", "config", "user.name", "Team Claw"],
             cwd=str(workspace), check=True, capture_output=True,
         )
+        # Disable CRLF conversion so files committed from Windows hosts
+        # don't corrupt line endings inside the Linux container.
+        subprocess.run(
+            ["git", "config", "core.autocrlf", "false"],
+            cwd=str(workspace), check=True, capture_output=True,
+        )
+        subprocess.run(
+            ["git", "config", "core.safecrlf", "warn"],
+            cwd=str(workspace), check=True, capture_output=True,
+        )
         gitignore = workspace / ".gitignore"
         gitignore.write_text("__pycache__/\n*.pyc\n.pytest_cache/\n*.egg-info/\n")
         subprocess.run(

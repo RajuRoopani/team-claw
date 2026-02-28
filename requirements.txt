@@ -1,0 +1,3 @@
+# CLI dependencies — install these on your host machine (not inside Docker)
+# Usage: pip install -r requirements.txt
+httpx>=0.27.0
