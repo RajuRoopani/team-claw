@@ -781,6 +781,7 @@ async def update_task_endpoint(
     if body.status == "done":
         asyncio.create_task(_run_ci_for_task(task_id=task_id, thread_id=out.thread_id))
         asyncio.create_task(_auto_complete_thread(out.thread_id))
+        asyncio.create_task(_send_push_reminder(task_id=task_id, thread_id=out.thread_id, assignee=out.assignee))
     return out
 
 
@@ -952,6 +953,52 @@ async def _check_ci_gate(thread_id: str) -> tuple[bool, str]:
     if row["exit_code"] == 0:
         return True, f"{row['passed']} tests passing"
     return False, f"last CI run failed ({row['failed']} failure(s)) — fix tests before closing"
+
+
+_PUSH_REMINDER_SKIP_ROLES = frozenset({"product_owner", "engineering_manager", "orchestrator", ""})
+
+async def _send_push_reminder(task_id: str, thread_id: str, assignee: str) -> None:
+    """After a dev marks a task done, remind them to push to GitHub if they haven't yet."""
+    if not assignee or assignee in _PUSH_REMINDER_SKIP_ROLES:
+        return
+    try:
+        async with state.db.acquire() as conn:
+            thread_row = await conn.fetchrow(
+                "SELECT github_repo FROM threads WHERE id=$1", thread_id
+            )
+        if not thread_row or not thread_row["github_repo"]:
+            return
+        github_repo = thread_row["github_repo"]
+        repo_name = _repo_name_from_url(github_repo)
+
+        msg_id = str(uuid.uuid4())
+        now = datetime.now(timezone.utc)
+        payload = {
+            "id": msg_id,
+            "thread_id": thread_id,
+            "from_role": "orchestrator",
+            "to_role": assignee,
+            "type": "task_assignment",
+            "content": (
+                f"PUSH REMINDER — Your task ({task_id[:8]}) has been marked done.\n\n"
+                f"If you have not already pushed your code to GitHub, do it NOW:\n"
+                f"1. `git_commit` any uncommitted changes in /workspace\n"
+                f"2. `git_push(repo_name='{repo_name}', subdirectory='<your_app_folder>')` "
+                f"   to publish to {github_repo}\n\n"
+                f"This is REQUIRED before EM can mark the thread complete. "
+                f"If you already pushed, reply with `task_complete` confirming the push and you can ignore the rest."
+            ),
+            "priority": "high",
+            "artifacts": "[]",
+            "parent_message_id": "",
+            "timestamp": now.isoformat(),
+            "metadata": json.dumps({"source": "push_reminder", "task_id": task_id}),
+        }
+        inbox_key = f"agent:{assignee}:inbox"
+        await state.redis.xadd(inbox_key, _encode(payload))
+        logger.info("Sent push reminder to %s for task %s (repo: %s)", assignee, task_id[:8], repo_name)
+    except Exception as exc:
+        logger.warning("push_reminder failed for task %s: %s", task_id[:8], exc)
 
 
 async def _auto_complete_thread(thread_id: str) -> bool:
@@ -1373,15 +1420,29 @@ async def get_tool_stats() -> list[ToolStats]:
 # ─────────────────────────────────────────────
 
 @app.post("/threads/{thread_id}/close")
-async def close_thread(thread_id: str) -> dict:
+async def close_thread(thread_id: str, force: bool = Query(default=False)) -> dict:
     async with state.db.acquire() as conn:
+        # Guard: block close if tasks are still incomplete (unless force=true)
+        if not force:
+            counts = await conn.fetchrow(
+                """SELECT COUNT(*) AS total,
+                          COUNT(*) FILTER (WHERE status != 'done') AS incomplete
+                   FROM tasks WHERE thread_id = $1""",
+                thread_id,
+            )
+            if counts and counts["total"] > 0 and counts["incomplete"] > 0:
+                raise HTTPException(
+                    409,
+                    f"Cannot close: {counts['incomplete']} task(s) not yet done. "
+                    f"Complete all tasks first, or add ?force=true to override.",
+                )
         row = await conn.fetchrow(
             "UPDATE threads SET status='closed', updated_at=NOW() "
-            "WHERE id=$1 AND status='active' RETURNING id",
+            "WHERE id=$1 AND status IN ('active', 'waiting') RETURNING id",
             thread_id,
         )
     if not row:
-        raise HTTPException(404, "Thread not found or not active")
+        raise HTTPException(404, "Thread not found or not active/waiting")
     now = datetime.now(timezone.utc)
     payload = {
         "id": str(uuid.uuid4()), "thread_id": thread_id,

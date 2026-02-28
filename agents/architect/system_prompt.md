@@ -86,6 +86,24 @@ Before sending `task_complete` to EM, call `write_memory` to save what you learn
 - Note what type of project the pattern applies to
 - 1-3 sentences max
 
+## Git & GitHub — Push Your Work
+
+After writing design docs and completing your task, commit and push your work to GitHub:
+
+```
+# 1. Commit everything you wrote to /workspace
+git_commit(message="docs: add architecture design for <feature>")
+
+# 2. Push to the project GitHub repo
+git_push(repo_name="<repo-name-from-task>", subdirectory="<app_folder>")
+```
+
+The repo name comes from the task assignment (e.g. `build-an-app-like-twitter-from-scratch`).
+The subdirectory is the app folder (e.g. `twitter_app`).
+
+**CRITICAL**: Always `git_commit` then `git_push` before sending `task_complete` to EM.
+Include the GitHub URL in your task_complete message so EM can verify.
+
 ## Important
 - Always write design docs to `/workspace/docs/` so the whole team can reference them
 - Design decisions should be in ADRs at `/workspace/docs/adr/`

@@ -213,6 +213,63 @@ class Agent:
     # Agentic tool-use loop
     # ─────────────────────────────────────────
 
+    async def _call_claude_with_retry(self, **kwargs) -> Any:
+        """Call Claude API with exponential backoff on transient errors (rate limits, 5xx)."""
+        last_exc: Exception | None = None
+        for attempt in range(3):
+            try:
+                return await self.claude.messages.create(**kwargs)
+            except anthropic.RateLimitError as exc:
+                wait = 5 * (2 ** attempt)  # 5s, 10s, 20s
+                logger.warning("[%s] Rate limited, retrying in %ds (attempt %d/3)", self.role, wait, attempt + 1)
+                last_exc = exc
+                await asyncio.sleep(wait)
+            except anthropic.InternalServerError as exc:
+                wait = 2 * (2 ** attempt)  # 2s, 4s, 8s
+                logger.warning("[%s] API 500 error, retrying in %ds (attempt %d/3)", self.role, wait, attempt + 1)
+                last_exc = exc
+                await asyncio.sleep(wait)
+            except anthropic.APIConnectionError as exc:
+                wait = 3 * (2 ** attempt)  # 3s, 6s, 12s
+                logger.warning("[%s] API connection error, retrying in %ds (attempt %d/3)", self.role, wait, attempt + 1)
+                last_exc = exc
+                await asyncio.sleep(wait)
+        raise last_exc  # type: ignore[misc]
+
+    async def _send_exhaustion_rescue(self, context_message: Message, max_iters: int) -> None:
+        """Notify EM when this agent exhausts its iteration limit without completing the task."""
+        import httpx
+        url = os.environ.get("ORCHESTRATOR_URL", "")
+        if not url:
+            return
+        rescue_id = __import__("uuid").uuid4().hex
+        from datetime import datetime, timezone
+        payload = {
+            "id": rescue_id,
+            "thread_id": context_message.thread_id,
+            "from_role": self.role,
+            "to_role": "engineering_manager",
+            "type": "status_update",
+            "content": (
+                f"⚠️ AGENT STUCK — I exhausted {max_iters} iteration steps without completing my task.\n\n"
+                f"Task: {context_message.content[:400]}\n\n"
+                f"I was unable to finish within the allowed steps. Please review and decide: "
+                f"reassign this task, break it into smaller pieces, or clarify what is needed. "
+                f"Any partial work I completed is saved in /workspace."
+            ),
+            "priority": "high",
+            "artifacts": "[]",
+            "parent_message_id": context_message.id,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "metadata": "{}",
+        }
+        try:
+            async with httpx.AsyncClient(timeout=5) as client:
+                await client.post(f"{url}/messages", json=payload)
+            logger.warning("[%s] Sent exhaustion rescue to EM for thread %s", self.role, context_message.thread_id[:8])
+        except Exception as exc:
+            logger.error("[%s] Failed to send exhaustion rescue: %s", self.role, exc)
+
     async def _agentic_loop(
         self, conversation: list[dict], *, context_message: Message
     ) -> None:
@@ -228,14 +285,25 @@ class Agent:
         _LOOP_WINDOW = 4   # look back over last N tool calls
         _LOOP_THRESHOLD = 3  # how many identical calls in window = stuck
 
+        # Persistent tool-error detection: if the same tool errors N times → recovery hint
+        _tool_error_streak: dict[str, int] = {}
+        _ERROR_STREAK_THRESHOLD = 3
+
+        _completed_naturally = False  # set True on end_turn break
+
         for iteration in range(max_iterations):
-            response = await self.claude.messages.create(
-                model=self.model,
-                max_tokens=8192,
-                system=self.system_prompt,
-                messages=conversation,
-                tools=self.tool_schemas,
-            )
+            try:
+                response = await self._call_claude_with_retry(
+                    model=self.model,
+                    max_tokens=8192,
+                    system=self.system_prompt,
+                    messages=conversation,
+                    tools=self.tool_schemas,
+                )
+            except Exception as api_exc:
+                logger.error("[%s] API call failed after retries: %s", self.role, api_exc)
+                await self._send_exhaustion_rescue(context_message, max_iterations)
+                return
 
             # Fire-and-forget token telemetry
             asyncio.create_task(
@@ -261,6 +329,7 @@ class Agent:
                 for block in response.content:
                     if hasattr(block, "text") and block.text:
                         logger.info("[%s] (thinking) %s", self.role, block.text[:200])
+                _completed_naturally = True
                 break
 
             if response.stop_reason == "tool_use":
@@ -268,7 +337,43 @@ class Agent:
                     response.content, context_message=context_message
                 )
 
-                # Loop detection: check if we're calling the same tool repeatedly
+                # ── Persistent tool-error detection ──────────────────────────
+                # Build id→name map so we can match results back to tool names
+                id_to_name = {
+                    b.id: b.name
+                    for b in response.content
+                    if getattr(b, "type", None) == "tool_use"
+                }
+                for result in tool_results:
+                    if result.get("type") != "tool_result":
+                        continue
+                    tool_name = id_to_name.get(result.get("tool_use_id", ""), "unknown")
+                    try:
+                        content_obj = json.loads(result.get("content", "{}"))
+                        if isinstance(content_obj, dict) and "error" in content_obj:
+                            _tool_error_streak[tool_name] = _tool_error_streak.get(tool_name, 0) + 1
+                            if _tool_error_streak[tool_name] >= _ERROR_STREAK_THRESHOLD:
+                                logger.warning(
+                                    "[%s] Tool '%s' errored %d consecutive times — injecting recovery hint",
+                                    self.role, tool_name, _tool_error_streak[tool_name],
+                                )
+                                _tool_error_streak[tool_name] = 0
+                                tool_results.append({
+                                    "type": "text",
+                                    "text": (
+                                        f"⚠️ RECOVERY: Tool `{tool_name}` has failed {_ERROR_STREAK_THRESHOLD} "
+                                        f"consecutive times. Stop using `{tool_name}` and either: "
+                                        f"(1) try a completely different approach to accomplish the same goal, "
+                                        f"or (2) send a `status_update` to `engineering_manager` describing "
+                                        f"the blocker so it can be escalated or reassigned."
+                                    ),
+                                })
+                        else:
+                            _tool_error_streak[tool_name] = 0  # success — reset streak
+                    except (json.JSONDecodeError, AttributeError):
+                        pass
+
+                # ── Loop detection ────────────────────────────────────────────
                 for block in response.content:
                     if getattr(block, "type", None) == "tool_use":
                         call_sig = (block.name, json.dumps(block.input, sort_keys=True))
@@ -305,6 +410,20 @@ class Agent:
                             ),
                         })
 
+                # ── Final-stretch warning ─────────────────────────────────────
+                # Warn agent in the last 3 iterations so it can wrap up gracefully
+                if iteration >= max_iterations - 3:
+                    remaining = max_iterations - iteration - 1
+                    tool_results.append({
+                        "type": "text",
+                        "text": (
+                            f"⚠️ FINAL STRETCH: You have ~{remaining} step(s) remaining in this session. "
+                            f"If your task is not fully complete, send a `status_update` to "
+                            f"`engineering_manager` NOW — describe what you finished, what files you wrote, "
+                            f"and what still needs doing. Do not let this session expire silently."
+                        ),
+                    })
+
                 conversation.append({"role": "user", "content": tool_results})
             elif response.stop_reason == "max_tokens":
                 # Response was cut off mid-generation. If there are tool_use blocks,
@@ -314,6 +433,37 @@ class Agent:
                     tool_results = await self._execute_tool_blocks(
                         response.content, context_message=context_message
                     )
+                    # Check if any write_file / execute_code calls had truncated inputs
+                    # (missing 'content' or 'code') and inject a specific chunking nudge
+                    truncated_files = [
+                        b.input.get("path", "?")
+                        for b in tool_blocks
+                        if b.name == "write_file" and "content" not in b.input
+                    ]
+                    truncated_code = any(
+                        b.name == "execute_code" and "code" not in b.input and "file_path" not in b.input
+                        for b in tool_blocks
+                    )
+                    if truncated_files or truncated_code:
+                        logger.warning(
+                            "[%s] max_tokens caused truncated tool inputs: files=%s code=%s",
+                            self.role, truncated_files, truncated_code,
+                        )
+                        nudge_parts = [
+                            "⚠️ Your previous tool call was cut off by the token limit — the file content was not written.",
+                        ]
+                        if truncated_files:
+                            nudge_parts.append(
+                                f"write_file for '{truncated_files[0]}' received no 'content'. "
+                                "Write it in chunks of ≤150 lines: "
+                                "call write_file(path='...', content='...first 150 lines...', append=False) NOW, "
+                                "then append=True for the rest. Start with the first chunk immediately."
+                            )
+                        if truncated_code:
+                            nudge_parts.append(
+                                "execute_code received no 'code'. Pass short inline code (≤50 lines) in the 'code' parameter."
+                            )
+                        tool_results.append({"type": "text", "text": " ".join(nudge_parts)})
                     conversation.append({"role": "user", "content": tool_results})
                 else:
                     logger.warning(
@@ -332,6 +482,13 @@ class Agent:
             else:
                 logger.warning("[%s] Unexpected stop_reason: %s", self.role, response.stop_reason)
                 break
+
+        if not _completed_naturally:
+            logger.error(
+                "[%s] Agentic loop ended without end_turn (exhausted=%s, thread=%s)",
+                self.role, not _completed_naturally, context_message.thread_id[:8],
+            )
+            await self._send_exhaustion_rescue(context_message, max_iterations)
 
     async def _execute_tool_blocks(
         self, content_blocks: list, *, context_message: Message

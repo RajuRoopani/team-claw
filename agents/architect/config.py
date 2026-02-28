@@ -17,6 +17,9 @@ ALLOWED_TOOLS = [
     "edit_file",
     "ask_human",
     "git_diff",
+    "git_commit",
+    "git_push",
+    "git_checkout_branch",
 ]
 
 AVAILABLE_ROLES = [

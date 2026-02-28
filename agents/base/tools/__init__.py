@@ -69,7 +69,11 @@ _WRITE_FILE_SCHEMA = {
         "Creates parent directories automatically. "
         "Path must be relative (e.g. 'src/auth/service.py'). "
         "IMPORTANT: You MUST provide BOTH 'path' AND 'content' in a SINGLE call. "
-        "Do NOT call write_file with only 'path' — always include the full file content."
+        "Do NOT call write_file with only 'path' — always include the full file content. "
+        "For LARGE files (>200 lines): set append=False for the first chunk, then append=True for subsequent chunks. "
+        "Each chunk should be ≤150 lines to avoid token cutoff. "
+        "Example: write_file(path='app.html', content='<!DOCTYPE html>...first 150 lines...', append=False) "
+        "then write_file(path='app.html', content='...next 150 lines...', append=True)"
     ),
     "input_schema": {
         "type": "object",
@@ -81,7 +85,12 @@ _WRITE_FILE_SCHEMA = {
             },
             "content": {
                 "type": "string",
-                "description": "Full file content to write. REQUIRED — must be provided in the same call as 'path'.",
+                "description": "File content to write. REQUIRED — must be provided in the same call as 'path'. For large files, write in ≤150-line chunks using append=True for subsequent chunks.",
+            },
+            "append": {
+                "type": "boolean",
+                "description": "If true, append content to existing file instead of overwriting. Use this for writing large files in chunks. Default: false.",
+                "default": False,
             },
         },
     },
@@ -681,18 +690,26 @@ def _exec_write_file(inputs: dict) -> dict:
     if "content" not in inputs:
         return {
             "error": (
-                "write_file called with ONLY 'path' — missing required 'content' parameter. "
-                "You MUST call write_file with BOTH 'path' AND 'content' in the SAME tool call. "
-                "Do NOT split writes across multiple calls. "
-                "Example: write_file(path='facebook_app/index.html', content='<html>...</html>') "
-                "Write the COMPLETE file content in the 'content' field right now."
+                "write_file called with ONLY 'path' — 'content' was missing (likely cut off by token limit). "
+                "For large files, write in chunks of ≤150 lines: "
+                "FIRST call: write_file(path='...', content='...first 150 lines...', append=False) "
+                "THEN: write_file(path='...', content='...next 150 lines...', append=True) "
+                "Start writing the first chunk NOW with append=False."
             )
         }
     path = _safe_path(inputs["path"])
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(inputs["content"], encoding="utf-8")
-    logger.info("write_file: %s (%d bytes)", path, len(inputs["content"]))
-    return {"status": "written", "path": str(path.relative_to(WORKSPACE_ROOT))}
+    append = inputs.get("append", False)
+    if append and path.exists():
+        with open(path, "a", encoding="utf-8") as f:
+            f.write(inputs["content"])
+        total = path.stat().st_size
+        logger.info("write_file (append): %s (+%d bytes, total %d)", path, len(inputs["content"]), total)
+        return {"status": "appended", "path": str(path.relative_to(WORKSPACE_ROOT)), "total_bytes": total}
+    else:
+        path.write_text(inputs["content"], encoding="utf-8")
+        logger.info("write_file: %s (%d bytes)", path, len(inputs["content"]))
+        return {"status": "written", "path": str(path.relative_to(WORKSPACE_ROOT))}
 
 
 def _exec_read_file(inputs: dict) -> dict:
