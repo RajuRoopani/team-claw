@@ -710,6 +710,40 @@
   .wiki-modal-title { font-size:16px; font-weight:700; color:var(--accent); margin-bottom:12px; }
   .wiki-modal-body  { font-size:12px; line-height:1.6; white-space:pre-wrap; }
 
+  /* Add Agent modal */
+  .form-group { margin-bottom:16px; }
+  .form-group label { display:block; font-size:11px; font-weight:600; color:var(--muted); margin-bottom:6px; text-transform:uppercase; letter-spacing:0.5px; }
+  .form-group input, .form-group textarea, .form-group select {
+    width:100%; background:var(--bg); border:1px solid var(--border); color:var(--text);
+    padding:9px 11px; border-radius:7px; font-family:inherit; font-size:13px;
+  }
+  .form-group input:focus, .form-group textarea:focus, .form-group select:focus { outline:none; border-color:var(--accent); }
+  .form-group textarea { resize:vertical; min-height:90px; line-height:1.5; }
+  .role-slug-preview { font-size:10px; color:var(--muted); margin-top:5px; font-family:'JetBrains Mono',monospace; }
+  .role-slug-preview span { color:var(--accent); }
+  .agent-create-btn {
+    width:100%; background:var(--green); color:#0d1117; border:none; padding:10px;
+    border-radius:7px; cursor:pointer; font-size:13px; font-weight:700; font-family:inherit;
+  }
+  .agent-create-btn:hover { background:#3fb950; }
+  .agent-create-btn:disabled { opacity:0.5; cursor:not-allowed; }
+  .agent-progress { padding:8px 0; }
+  .progress-step {
+    display:flex; align-items:center; gap:10px; padding:10px 12px;
+    border-radius:7px; margin-bottom:8px; background:var(--surface2);
+    font-size:12px; transition:all 0.2s;
+  }
+  .progress-step.active { border:1px solid var(--accent); background:rgba(88,166,255,0.08); }
+  .progress-step.done   { border:1px solid var(--green);  background:rgba(86,211,100,0.08); color:var(--green); }
+  .progress-step.error  { border:1px solid var(--red);    background:rgba(255,123,114,0.08); color:var(--red); }
+  .step-icon { font-size:14px; flex-shrink:0; }
+  .step-spinner { width:14px; height:14px; border:2px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin 0.7s linear infinite; flex-shrink:0; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .agent-done-card { text-align:center; padding:20px 0; }
+  .agent-done-icon { font-size:40px; margin-bottom:10px; }
+  .agent-done-title { font-size:16px; font-weight:700; color:var(--green); margin-bottom:6px; }
+  .agent-done-role { font-size:11px; color:var(--muted); font-family:'JetBrains Mono',monospace; }
+
   /* ══════════════════════════════
      TOASTS
   ══════════════════════════════ */
@@ -1019,6 +1053,7 @@
 
   <div class="hdr-actions">
     <button class="hdr-btn" id="new-task-btn" onclick="showHomeView()" style="border-color:var(--accent);color:var(--accent);font-weight:600">＋ New Task</button>
+    <button class="hdr-btn" onclick="openAddAgentModal()" style="border-color:var(--green);color:var(--green);font-weight:600">🤖 Add Agent</button>
     <button class="hdr-btn" onclick="openStandupModal()">📋 Standup</button>
     <button class="hdr-btn" id="questions-bell" onclick="openQuestionsModal()">
       🔔 Questions
@@ -1236,15 +1271,60 @@
   </div>
 </div>
 
+<!-- ══ ADD AGENT MODAL ══════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="add-agent-modal">
+  <div class="modal-box narrow">
+    <div class="modal-hdr">
+      <div class="modal-title" style="color:var(--green)">🤖 Add Agent to Team</div>
+      <span class="modal-close" onclick="closeAddAgentModal()">✕</span>
+    </div>
+
+    <!-- Step 1: Form -->
+    <div id="add-agent-form">
+      <div class="form-group">
+        <label>Agent Role</label>
+        <input type="text" id="add-agent-name" placeholder="e.g. Security Engineer" oninput="onAgentNameInput()">
+        <div class="role-slug-preview" id="add-agent-slug-preview"></div>
+      </div>
+      <div class="form-group">
+        <label>What this agent does</label>
+        <textarea id="add-agent-desc" placeholder="Describe the agent's responsibilities, what they produce, and who they collaborate with…"></textarea>
+      </div>
+      <div class="form-group">
+        <label>Model</label>
+        <select id="add-agent-model">
+          <option value="claude-sonnet-4-6">Sonnet 4.6 — Balanced (recommended)</option>
+          <option value="claude-opus-4-6">Opus 4.6 — Heavy reasoning</option>
+          <option value="claude-haiku-4-5-20251001">Haiku 4.5 — Fast &amp; lightweight</option>
+        </select>
+      </div>
+      <button class="agent-create-btn" id="agent-create-submit" onclick="submitCreateAgent()">Create Agent</button>
+    </div>
+
+    <!-- Step 2: Progress -->
+    <div id="add-agent-progress" style="display:none">
+      <div class="agent-progress" id="agent-progress-steps"></div>
+    </div>
+  </div>
+</div>
+
 <script>
 // ══════════════════════════════════════════════════════════
 // Constants & state
 // ══════════════════════════════════════════════════════════
 
+// ALL_AGENTS is mutable — dynamic agents are appended at runtime
 const ALL_AGENTS = [
   'product_owner','engineering_manager','architect','ux_engineer',
   'senior_dev_1','senior_dev_2','junior_dev_1','junior_dev_2'
 ];
+
+// Palette for dynamic agents (cycles through)
+const DYNAMIC_AGENT_PALETTE = [
+  '#a5d6ff','#ffd700','#ff9ff3','#00d2d3','#ff6b6b','#48dbfb','#f9ca24','#6c5ce7',
+];
+let _dynamicColorIdx = 0;
+function _nextDynamicColor() { return DYNAMIC_AGENT_PALETTE[_dynamicColorIdx++ % DYNAMIC_AGENT_PALETTE.length]; }
 
 const ROLE_COLOR = {
   orchestrator:        'var(--c-orchestrator)',
@@ -2132,6 +2212,12 @@ function connectSSE() {
     try {
       const msg = JSON.parse(e.data);
 
+      // agent_created — new dynamic agent joined the pool
+      if (msg.type === 'agent_created') {
+        addDynamicAgent(msg.role, msg.display_name, msg.model);
+        return;
+      }
+
       // agent_working is ephemeral — update sidebar state but don't add to feed
       if (msg.type === 'agent_working') {
         if (msg.thread_id && threads[msg.thread_id]) {
@@ -2218,7 +2304,13 @@ async function loadAgentStatus() {
     const res = await fetch('/agents');
     if (!res.ok) return;
     const agents = await res.json();
-    agents.forEach(a => { agentHeartbeat[a.role] = a; });
+    agents.forEach(a => {
+      agentHeartbeat[a.role] = a;
+      // Materialise any dynamic agents that exist in the DB but not yet in ALL_AGENTS
+      if (!ALL_AGENTS.includes(a.role) && a.role !== 'orchestrator') {
+        addDynamicAgent(a.role, a.display_name || a.role, a.model || 'claude-sonnet-4-6');
+      }
+    });
     if (activeTab === 'team') renderAgentCards();
   } catch {}
 }
@@ -2376,6 +2468,186 @@ function openWikiModal(a) {
 }
 function closeWikiModal() { document.getElementById('wiki-modal').classList.remove('open'); }
 document.getElementById('wiki-modal').addEventListener('click', e => { if (e.target===document.getElementById('wiki-modal')) closeWikiModal(); });
+
+// ══════════════════════════════════════════════════════════
+// Add Agent modal
+// ══════════════════════════════════════════════════════════
+
+function _slugifyRole(name) {
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+}
+
+function openAddAgentModal() {
+  // Reset to form view
+  document.getElementById('add-agent-form').style.display = 'block';
+  document.getElementById('add-agent-progress').style.display = 'none';
+  document.getElementById('add-agent-name').value = '';
+  document.getElementById('add-agent-desc').value = '';
+  document.getElementById('add-agent-slug-preview').innerHTML = '';
+  document.getElementById('agent-create-submit').disabled = false;
+  document.getElementById('add-agent-modal').classList.add('open');
+  setTimeout(() => document.getElementById('add-agent-name').focus(), 100);
+}
+
+function closeAddAgentModal() {
+  document.getElementById('add-agent-modal').classList.remove('open');
+}
+document.getElementById('add-agent-modal').addEventListener('click', e => {
+  if (e.target === document.getElementById('add-agent-modal')) closeAddAgentModal();
+});
+
+function onAgentNameInput() {
+  const val = document.getElementById('add-agent-name').value.trim();
+  const slug = _slugifyRole(val);
+  const preview = document.getElementById('add-agent-slug-preview');
+  preview.innerHTML = val ? `Role slug: <span>${slug}</span>` : '';
+}
+
+function _addProgressStep(id, icon, message, state='active') {
+  const steps = document.getElementById('agent-progress-steps');
+  const div = document.createElement('div');
+  div.className = `progress-step ${state}`;
+  div.id = `ps-${id}`;
+  if (state === 'active') {
+    div.innerHTML = `<div class="step-spinner"></div><span>${message}</span>`;
+  } else {
+    div.innerHTML = `<span class="step-icon">${icon}</span><span>${message}</span>`;
+  }
+  steps.appendChild(div);
+  return div;
+}
+
+function _updateProgressStep(id, icon, message, state) {
+  const el = document.getElementById(`ps-${id}`);
+  if (!el) return;
+  el.className = `progress-step ${state}`;
+  el.innerHTML = state === 'active'
+    ? `<div class="step-spinner"></div><span>${message}</span>`
+    : `<span class="step-icon">${icon}</span><span>${message}</span>`;
+}
+
+function addDynamicAgent(role, displayName, model) {
+  if (ALL_AGENTS.includes(role)) return;
+  ALL_AGENTS.push(role);
+  // Assign a color
+  const color = _nextDynamicColor();
+  ROLE_COLOR[role] = color;
+  // Inject CSS variable
+  document.documentElement.style.setProperty(`--c-${role}`, color);
+  // Add chip to filter bar
+  const bar = document.getElementById('agent-filters');
+  const chip = document.createElement('button');
+  chip.className = 'agent-chip';
+  const label = displayName || role.replace(/_/g, ' ');
+  chip.textContent = label.length > 14 ? label.slice(0, 12) + '…' : label;
+  chip.dataset.agent = role;
+  chip.style.borderColor = color;
+  chip.addEventListener('click', () => setAgentFilter(role));
+  bar.appendChild(chip);
+  // Re-render team tab if open
+  if (activeTab === 'team') renderAgentCards();
+}
+
+async function submitCreateAgent() {
+  const name = document.getElementById('add-agent-name').value.trim();
+  const desc = document.getElementById('add-agent-desc').value.trim();
+  const model = document.getElementById('add-agent-model').value;
+
+  if (!name) { document.getElementById('add-agent-name').focus(); return; }
+  if (!desc) { document.getElementById('add-agent-desc').focus(); return; }
+
+  // Switch to progress view
+  document.getElementById('add-agent-form').style.display = 'none';
+  document.getElementById('add-agent-progress').style.display = 'block';
+  document.getElementById('agent-progress-steps').innerHTML = '';
+
+  _addProgressStep('prompt', '✍️', `Generating system prompt for ${name}…`);
+
+  try {
+    const resp = await fetch('/agents/create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ display_name: name, description: desc, model }),
+    });
+
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({ detail: resp.statusText }));
+      throw new Error(err.detail || resp.statusText);
+    }
+
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      const lines = buf.split('\n');
+      buf = lines.pop();
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        let evt;
+        try { evt = JSON.parse(line.slice(6)); } catch { continue; }
+
+        if (evt.step === 'generating_prompt') {
+          _updateProgressStep('prompt', '✍️', evt.message, 'active');
+
+        } else if (evt.step === 'generating_config') {
+          _updateProgressStep('prompt', '✅', 'System prompt generated', 'done');
+          _addProgressStep('config', '⚙️', 'Config ready ✓', 'done');
+
+        } else if (evt.step === 'starting_container') {
+          _addProgressStep('docker', '🐳', 'Starting Docker container…', 'active');
+
+        } else if (evt.step === 'done') {
+          _updateProgressStep('docker', '🐳', `Container started (${evt.container_id})`, 'done');
+          // Success card
+          const steps = document.getElementById('agent-progress-steps');
+          const card = document.createElement('div');
+          card.className = 'agent-done-card';
+          card.innerHTML = `
+            <div class="agent-done-icon">🤖</div>
+            <div class="agent-done-title">${evt.display_name} joined the team!</div>
+            <div class="agent-done-role">${evt.role} · ${evt.model.replace('claude-','').replace('-20251001','')}</div>
+            <div style="margin-top:16px">
+              <button class="agent-create-btn" style="background:var(--accent);max-width:200px;margin:0 auto"
+                onclick="closeAddAgentModal()">Done</button>
+            </div>`;
+          steps.appendChild(card);
+          addDynamicAgent(evt.role, evt.display_name, evt.model);
+          showToast(`🤖 ${evt.display_name} joined the team!`, 'success');
+
+        } else if (evt.step === 'error') {
+          _updateProgressStep('prompt', '❌', 'Failed', 'error');
+          _addProgressStep('err', '❌', evt.message, 'error');
+          const steps = document.getElementById('agent-progress-steps');
+          const retryBtn = document.createElement('button');
+          retryBtn.className = 'agent-create-btn';
+          retryBtn.style.marginTop = '12px';
+          retryBtn.textContent = '← Try Again';
+          retryBtn.onclick = () => {
+            document.getElementById('add-agent-form').style.display = 'block';
+            document.getElementById('add-agent-progress').style.display = 'none';
+          };
+          steps.appendChild(retryBtn);
+        }
+      }
+    }
+  } catch (err) {
+    document.getElementById('agent-progress-steps').innerHTML = '';
+    _addProgressStep('err', '❌', `Error: ${err.message}`, 'error');
+    const retryBtn = document.createElement('button');
+    retryBtn.className = 'agent-create-btn';
+    retryBtn.style.marginTop = '12px';
+    retryBtn.textContent = '← Try Again';
+    retryBtn.onclick = () => {
+      document.getElementById('add-agent-form').style.display = 'block';
+      document.getElementById('add-agent-progress').style.display = 'none';
+    };
+    document.getElementById('agent-progress-steps').appendChild(retryBtn);
+  }
+}
 
 // ══════════════════════════════════════════════════════════
 // Budget bar

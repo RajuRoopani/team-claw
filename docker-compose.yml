@@ -8,6 +8,7 @@ volumes:
   workspace:
   redis-data:
   postgres-data:
+  dynamic-agents:
 
 x-agent-base: &agent-base
   build:
@@ -88,8 +89,11 @@ services:
       IDLE_THREAD_MINUTES: ${IDLE_THREAD_MINUTES:-0}
       GITHUB_TOKEN: ${GITHUB_TOKEN:-}
       GITHUB_USERNAME: ${GITHUB_USERNAME:-RajuRoopani}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      AGENT_BASE_IMAGE: team-claw-agent-base:latest
     volumes:
       - workspace:/workspace
+      - /var/run/docker.sock:/var/run/docker.sock
 
   # ─────────────────────────────────────────────
   # Agent team
@@ -150,6 +154,7 @@ services:
 
   senior-dev-1:
     <<: *agent-base
+    image: team-claw-agent-base:latest
     volumes:
       - ./agents/senior_dev:/agent
       - workspace:/workspace

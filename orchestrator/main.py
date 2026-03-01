@@ -13,17 +13,22 @@ Run: uvicorn main:app --host 0.0.0.0 --port 8080 --reload
 from __future__ import annotations
 
 import asyncio
+import io
 import json
 import logging
 import os
 import pathlib
+import re
 import subprocess
+import tarfile
 import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from typing import AsyncGenerator
 
+import anthropic
 import asyncpg
+import docker as docker_sdk
 import httpx
 import redis.asyncio as aioredis
 from fastapi import FastAPI, HTTPException, Query
@@ -43,17 +48,22 @@ SANDBOX_URL = os.environ.get("SANDBOX_URL", "http://sandbox:8081")
 WEBHOOK_URL = os.environ.get("WEBHOOK_URL", "")
 THREAD_BUDGET_TOKENS = int(os.environ.get("THREAD_BUDGET_TOKENS", "0"))  # 0 = disabled
 IDLE_THREAD_MINUTES = int(os.environ.get("IDLE_THREAD_MINUTES", "0"))    # 0 = disabled
-GITHUB_TOKEN    = os.environ.get("GITHUB_TOKEN", "")
-GITHUB_USERNAME = os.environ.get("GITHUB_USERNAME", "RajuRoopani")
-AUDIT_STREAM    = "team:audit"
+GITHUB_TOKEN      = os.environ.get("GITHUB_TOKEN", "")
+GITHUB_USERNAME   = os.environ.get("GITHUB_USERNAME", "RajuRoopani")
+ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
+AGENT_BASE_IMAGE  = os.environ.get("AGENT_BASE_IMAGE", "team-claw-agent-base:latest")
+AUDIT_STREAM      = "team:audit"
 ACTIVITY_STREAM = "team:activity"   # ephemeral working signals — not persisted to DB
 AUDIT_GROUP     = "grp:orchestrator-audit"
 AUDIT_CONSUMER  = "orchestrator-0"
 
-ALL_AGENT_ROLES = [
+STATIC_AGENT_ROLES = [
     "product_owner", "engineering_manager", "architect", "ux_engineer",
     "senior_dev_1", "senior_dev_2", "junior_dev_1", "junior_dev_2",
 ]
+# Keep ALL_AGENT_ROLES as a function so dynamic agents are always included
+def ALL_AGENT_ROLES() -> list[str]:
+    return STATIC_AGENT_ROLES + state.dynamic_agents
 
 
 # ─────────────────────────────────────────────
@@ -69,6 +79,7 @@ class AppState:
     idle_alerts_fired: set[str] = set()      # thread_ids already alerted
     idle_task: asyncio.Task | None = None
     thread_last_activity: dict[str, dict] = {}  # thread_id → {role, ts}
+    dynamic_agents: list[str] = []              # roles added at runtime
 
 
 state = AppState()
@@ -84,12 +95,15 @@ async def lifespan(app: FastAPI):
     state.idle_alerts_fired = set()
     state.idle_task = None
     state.thread_last_activity = {}
+    state.dynamic_agents = []
     await _setup_audit_consumer()
     await _ensure_phase4_tables()
     await _ensure_phase5_tables()
     await _ensure_phase8_tables()
     await _ensure_phase9_tables()
     await _ensure_phase10_tables()
+    await _ensure_dynamic_agents_table()
+    await _load_dynamic_agents()
     _init_workspace_git()
     state.audit_task = asyncio.create_task(_audit_loop(), name="audit-loop")
     state.idle_task = asyncio.create_task(_idle_monitor_loop(), name="idle-monitor")
@@ -110,6 +124,12 @@ app = FastAPI(title="Team Claw Orchestrator", lifespan=lifespan)
 # ─────────────────────────────────────────────
 # Pydantic schemas
 # ─────────────────────────────────────────────
+
+class CreateAgentRequest(BaseModel):
+    display_name: str                                    # "Security Engineer"
+    description: str                                     # what the agent does
+    model: str = "claude-sonnet-4-6"
+
 
 class TaskRequest(BaseModel):
     title: str
@@ -184,8 +204,10 @@ class AgentMetricsSummary(BaseModel):
 # Phase 5 models
 class AgentStatus(BaseModel):
     role: str
-    status: str          # online | stale | offline
+    status: str           # online | stale | offline
     last_seen: str | None
+    display_name: str = ""
+    model: str = ""
 
 
 class TaskCreate(BaseModel):
@@ -736,8 +758,18 @@ async def heartbeat(role: str) -> dict:
 @app.get("/agents", response_model=list[AgentStatus])
 async def get_agents() -> list[AgentStatus]:
     now = datetime.now(timezone.utc)
+    # Load dynamic agent metadata for display_name / model
+    dyn_meta: dict[str, dict] = {}
+    if state.dynamic_agents:
+        async with state.db.acquire() as conn:
+            rows = await conn.fetch(
+                "SELECT role, display_name, model FROM dynamic_agents WHERE role = ANY($1)",
+                state.dynamic_agents,
+            )
+        dyn_meta = {r["role"]: dict(r) for r in rows}
+
     result = []
-    for role in ALL_AGENT_ROLES:
+    for role in ALL_AGENT_ROLES():
         last = state.agent_last_seen.get(role)
         if last is None:
             status = "offline"
@@ -747,10 +779,13 @@ async def get_agents() -> list[AgentStatus]:
             status = "stale"
         else:
             status = "offline"
+        meta = dyn_meta.get(role, {})
         result.append(AgentStatus(
             role=role,
             status=status,
             last_seen=last.isoformat() if last else None,
+            display_name=meta.get("display_name", ""),
+            model=meta.get("model", ""),
         ))
     return result
 
@@ -1680,6 +1715,293 @@ async def _ensure_phase10_tables() -> None:
     async with state.db.acquire() as conn:
         await conn.execute(ddl)
     logger.info("Phase 10 migration: github_repo column ensured.")
+
+
+async def _ensure_dynamic_agents_table() -> None:
+    ddl = """
+    CREATE TABLE IF NOT EXISTS dynamic_agents (
+        role         TEXT PRIMARY KEY,
+        display_name TEXT NOT NULL,
+        description  TEXT DEFAULT '',
+        model        TEXT NOT NULL DEFAULT 'claude-sonnet-4-6',
+        container_id TEXT DEFAULT '',
+        created_at   TIMESTAMPTZ DEFAULT NOW()
+    );
+    """
+    async with state.db.acquire() as conn:
+        await conn.execute(ddl)
+    logger.info("Dynamic agents table ensured.")
+
+
+async def _load_dynamic_agents() -> None:
+    async with state.db.acquire() as conn:
+        rows = await conn.fetch("SELECT role FROM dynamic_agents ORDER BY created_at")
+    state.dynamic_agents = [r["role"] for r in rows]
+    if state.dynamic_agents:
+        logger.info("Loaded dynamic agents: %s", state.dynamic_agents)
+
+
+# ─────────────────────────────────────────────
+# Dynamic agent creation helpers
+# ─────────────────────────────────────────────
+
+def _slugify_role(name: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "_", name.lower()).strip("_")
+    return slug
+
+
+_UX_SYSTEM_PROMPT_EXAMPLE = """# UX Engineer — Team Claw
+You are the UX Engineer for Team Claw. You translate product requirements into
+developer-ready design artifacts (wireframes, user flows, component specs).
+You write design docs to /workspace/designs/{feature}-ux.md before any UI code
+is written. You use send_message for all communication. You save lessons to
+memory after every task."""
+
+_UX_CONFIG_EXAMPLE = """ALLOWED_TOOLS = [
+    "send_message", "write_file", "read_file", "list_files", "edit_file",
+    "search_code", "find_files", "wiki_write", "wiki_read",
+    "write_memory", "read_memory", "list_memories",
+    "create_task", "update_task_status", "check_budget", "ask_human",
+]
+AVAILABLE_ROLES = [
+    "orchestrator", "engineering_manager", "product_owner",
+    "architect", "senior_dev_1", "senior_dev_2",
+]"""
+
+ALL_AVAILABLE_TOOLS = [
+    "send_message", "write_file", "read_file", "list_files", "edit_file",
+    "execute_code", "search_code", "find_files",
+    "git_status", "git_commit", "git_push", "git_diff",
+    "git_checkout_branch", "git_merge",
+    "wiki_write", "wiki_read", "wiki_search",
+    "write_memory", "read_memory", "list_memories",
+    "create_task", "update_task_status", "check_budget", "ask_human",
+]
+
+
+async def _generate_agent_files(role: str, display_name: str, description: str, model: str) -> tuple[str, str]:
+    """Use Claude to generate system_prompt.md and config.py for a new agent."""
+    client = anthropic.AsyncAnthropic(api_key=ANTHROPIC_API_KEY)
+    all_roles = ALL_AGENT_ROLES() + [role]
+
+    prompt = f"""You are creating configuration files for a new AI agent joining the Team Claw autonomous software development team.
+
+Team Claw is a multi-agent system where 8+ Claude agents each play a software engineering role. They communicate via Redis message bus using structured JSON messages. Each agent has:
+1. system_prompt.md — defines identity, responsibilities, workflow, memory patterns
+2. config.py — ALLOWED_TOOLS list and AVAILABLE_ROLES list
+
+New agent to create:
+- Display Name: {display_name}
+- Role slug: {role}
+- Description: {description}
+- Model that will run this agent: {model}
+
+Available tools they can be assigned from: {json.dumps(ALL_AVAILABLE_TOOLS)}
+Available roles they can communicate with: {json.dumps(all_roles)}
+
+Example of a well-designed system_prompt.md (UX Engineer):
+{_UX_SYSTEM_PROMPT_EXAMPLE}
+
+Example config.py (UX Engineer):
+{_UX_CONFIG_EXAMPLE}
+
+Key conventions:
+- All communication MUST use send_message tool
+- Agents save lessons to memory after every task (write_memory/read_memory/list_memories)
+- Tool execute_code and git_* tools only for dev/engineering roles that actually write/run code
+- Send task_complete to engineering_manager when work is done
+- Keep messages brief; put detail in files (/workspace/)
+- Memory key format: "pattern:<type>:<name>", "lesson:<topic>:<name>", "mistake:<type>:<name>"
+
+Generate a high-quality system_prompt.md and config.py for the {display_name} role."""
+
+    tools = [{
+        "name": "generate_agent_config",
+        "description": "Output the two agent configuration files",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "system_prompt_md": {
+                    "type": "string",
+                    "description": "Full content of system_prompt.md — identity, responsibilities, workflow, memory patterns"
+                },
+                "config_py": {
+                    "type": "string",
+                    "description": "Full content of config.py — exactly ALLOWED_TOOLS list and AVAILABLE_ROLES list as Python"
+                },
+            },
+            "required": ["system_prompt_md", "config_py"],
+        },
+    }]
+
+    resp = await client.messages.create(
+        model="claude-sonnet-4-6",
+        max_tokens=4096,
+        tools=tools,
+        tool_choice={"type": "tool", "name": "generate_agent_config"},
+        messages=[{"role": "user", "content": prompt}],
+    )
+
+    for block in resp.content:
+        if block.type == "tool_use" and block.name == "generate_agent_config":
+            return block.input["system_prompt_md"], block.input["config_py"]
+
+    raise RuntimeError("Claude did not return agent config files")
+
+
+def _start_agent_container_sync(role: str, display_name: str, system_prompt: str, config_py: str, model: str) -> str:
+    """Spin up a new agent container using the Docker socket. Returns container ID."""
+    client = docker_sdk.from_env()
+
+    # Detect network and workspace volume from the orchestrator container itself
+    own_id = pathlib.Path("/etc/hostname").read_text().strip()
+    try:
+        own_container = client.containers.get(own_id)
+        networks = list(own_container.attrs["NetworkSettings"]["Networks"].keys())
+        network_name = networks[0] if networks else "team-claw_team-claw"
+        mounts = own_container.attrs.get("Mounts", [])
+        workspace_vol = next(
+            (m["Name"] for m in mounts if m.get("Destination") == "/workspace" and m.get("Type") == "volume"),
+            "team-claw_workspace",
+        )
+    except Exception:
+        network_name = "team-claw_team-claw"
+        workspace_vol = "team-claw_workspace"
+
+    container_name = f"team-claw-{role.replace('_', '-')}-1"
+
+    # Remove stale container with same name if it exists
+    try:
+        old = client.containers.get(container_name)
+        old.remove(force=True)
+    except docker_sdk.errors.NotFound:
+        pass
+
+    env = {
+        "ROLE": role,
+        "MODEL": model,
+        "ANTHROPIC_API_KEY": ANTHROPIC_API_KEY,
+        "REDIS_URL": "redis://redis:6379",
+        "ORCHESTRATOR_URL": "http://orchestrator:8080",
+        "SANDBOX_URL": "http://sandbox:8081",
+        "GITHUB_TOKEN": GITHUB_TOKEN,
+        "GITHUB_USERNAME": GITHUB_USERNAME,
+    }
+
+    container = client.containers.create(
+        image=AGENT_BASE_IMAGE,
+        name=container_name,
+        environment=env,
+        network=network_name,
+        volumes={workspace_vol: {"bind": "/workspace", "mode": "rw"}},
+        restart_policy={"Name": "unless-stopped"},
+        detach=True,
+        labels={"team.claw.dynamic": "true", "team.claw.role": role, "team.claw.display": display_name},
+    )
+
+    # Inject system_prompt.md and config.py into /agent/ inside the (stopped) container
+    tar_buf = io.BytesIO()
+    with tarfile.open(fileobj=tar_buf, mode="w") as tar:
+        for filename, content in [("system_prompt.md", system_prompt), ("config.py", config_py)]:
+            data = content.encode("utf-8")
+            info = tarfile.TarInfo(name=filename)
+            info.size = len(data)
+            info.mode = 0o644
+            tar.addfile(info, io.BytesIO(data))
+    tar_buf.seek(0)
+    container.put_archive("/", tar_buf)   # Docker creates /agent/ if missing
+
+    # Inject into /agent explicitly by creating the dir first via a second archive
+    tar_buf2 = io.BytesIO()
+    with tarfile.open(fileobj=tar_buf2, mode="w") as tar:
+        dir_info = tarfile.TarInfo(name="agent")
+        dir_info.type = tarfile.DIRTYPE
+        dir_info.mode = 0o755
+        tar.addfile(dir_info)
+        for filename, content in [("agent/system_prompt.md", system_prompt), ("agent/config.py", config_py)]:
+            data = content.encode("utf-8")
+            info = tarfile.TarInfo(name=filename)
+            info.size = len(data)
+            info.mode = 0o644
+            tar.addfile(info, io.BytesIO(data))
+    tar_buf2.seek(0)
+    container.put_archive("/", tar_buf2)
+
+    container.start()
+    return container.id
+
+
+# ─────────────────────────────────────────────
+# POST /agents/create  — streaming SSE response
+# ─────────────────────────────────────────────
+
+@app.post("/agents/create")
+async def create_agent(body: CreateAgentRequest) -> StreamingResponse:
+    role = _slugify_role(body.display_name)
+
+    if role in ALL_AGENT_ROLES():
+        raise HTTPException(409, f"Agent role '{role}' already exists")
+    if not ANTHROPIC_API_KEY:
+        raise HTTPException(500, "ANTHROPIC_API_KEY not set in orchestrator environment")
+
+    async def _stream():
+        def _sse(data: dict) -> str:
+            return f"data: {json.dumps(data)}\n\n"
+
+        try:
+            yield _sse({"step": "generating_prompt", "message": f"Generating system prompt for {body.display_name}…"})
+
+            system_prompt, config_py = await _generate_agent_files(
+                role, body.display_name, body.description, body.model
+            )
+
+            yield _sse({"step": "generating_config", "message": "Agent config generated ✓"})
+            yield _sse({"step": "starting_container", "message": "Starting Docker container…"})
+
+            container_id = await asyncio.get_event_loop().run_in_executor(
+                None,
+                _start_agent_container_sync,
+                role, body.display_name, system_prompt, config_py, body.model,
+            )
+
+            # Persist to DB
+            async with state.db.acquire() as conn:
+                await conn.execute(
+                    """INSERT INTO dynamic_agents (role, display_name, description, model, container_id)
+                       VALUES ($1, $2, $3, $4, $5)
+                       ON CONFLICT (role) DO UPDATE
+                       SET display_name=$2, description=$3, model=$4, container_id=$5""",
+                    role, body.display_name, body.description, body.model, container_id[:12],
+                )
+            state.dynamic_agents.append(role)
+
+            # Broadcast agent_created SSE to all connected dashboard clients
+            event_payload = json.dumps({
+                "type": "agent_created",
+                "role": role,
+                "display_name": body.display_name,
+                "model": body.model,
+            })
+            await state.redis.xadd(
+                AUDIT_STREAM,
+                {"payload": event_payload},
+                maxlen=10000,
+            )
+
+            yield _sse({
+                "step": "done",
+                "role": role,
+                "display_name": body.display_name,
+                "model": body.model,
+                "container_id": container_id[:12],
+                "message": f"🤖 {body.display_name} joined the team!",
+            })
+
+        except Exception as exc:
+            logger.exception("Failed to create agent %s", role)
+            yield _sse({"step": "error", "message": str(exc)})
+
+    return StreamingResponse(_stream(), media_type="text/event-stream")
 
 
 # ─────────────────────────────────────────────
