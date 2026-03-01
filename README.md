@@ -8,7 +8,7 @@
 
 **[Homepage](https://github.com/RajuRoopani/team-claw)** &nbsp;|&nbsp; **[Pitch Deck →  `/pitch`](https://github.com/RajuRoopani/team-claw)** &nbsp;|&nbsp; **[Live Dashboard →  `/dashboard`](https://github.com/RajuRoopani/team-claw)**
 
-`8 agents` &nbsp;·&nbsp; `12 containers` &nbsp;·&nbsp; `25 tools` &nbsp;·&nbsp; `38 API endpoints` &nbsp;·&nbsp; `19 build phases` &nbsp;·&nbsp; `~5,000 LOC`
+`8+ agents` &nbsp;·&nbsp; `12 containers` &nbsp;·&nbsp; `25 tools` &nbsp;·&nbsp; `40 API endpoints` &nbsp;·&nbsp; `20 build phases` &nbsp;·&nbsp; `~5,000 LOC` &nbsp;·&nbsp; `∞ extensible`
 
 </div>
 
@@ -168,7 +168,20 @@ curl http://localhost:8080/memory/engineering_manager # EM's delegation patterns
 
 ## Any Role Can Be Added
 
-The team is a plugin architecture. Adding a new specialist is two files and 8 lines of docker-compose:
+### Option 1: One click from the dashboard
+
+Click **🤖 Add Agent** in the dashboard header. Describe the role in plain English. Done.
+
+```
+1. Name the role (e.g. "Security Engineer")
+2. Describe what it does (2–3 sentences)
+3. Pick a model tier
+4. Click Create
+```
+
+Claude generates the `system_prompt.md` and `config.py` in real time. A new Docker container spins up from the pre-built base image. The agent joins the message bus and starts receiving tasks — all in under 30 seconds. No files to write, no YAML to edit, no rebuild required.
+
+### Option 2: Two files + 8 lines of docker-compose (the manual way)
 
 ```
 agents/security_engineer/
@@ -187,9 +200,9 @@ security-engineer:
     ROLE: security_engineer
 ```
 
-The new agent immediately inherits: Redis message bus, Postgres persistence, tool dispatcher, agentic loop with exponential backoff, max_tokens resilience, heartbeat, budget tracking, tool telemetry, memory system, and all 19 phases of production hardening.
+Either way, the new agent immediately inherits: Redis message bus, Postgres persistence, tool dispatcher, agentic loop with exponential backoff, max_tokens resilience, heartbeat, budget tracking, tool telemetry, memory system, and all 19 phases of production hardening.
 
-**The UX Engineer was added this way — 160 lines total, shipped in one day.**
+**The UX Engineer was added via Option 2 — 160 lines total, shipped in one day.**
 
 Next candidates: Security Engineer, QA Engineer, DevOps/SRE, Data Engineer, Tech Writer.
 
@@ -314,6 +327,7 @@ python3 cli.py watch <thread_id>
 | **Standup modal** | One-click standup report for the last 24h |
 | **7 themes** | Void, Ocean, Dracula, Nord, Cyberpunk, Forest, Solar |
 | **Chat bar** | Submit new task (no thread selected) or steer active thread (thread selected) |
+| **🤖 Add Agent** | Create a new specialist agent at runtime — Claude generates its files, container starts in 30s |
 
 ---
 
@@ -335,7 +349,7 @@ python3 cli.py reply <thread_id> "<answer>" [--to <role>]
 
 ## Production Features
 
-19 phases of engineering baked in. Not bolted on.
+20 phases of engineering baked in. Not bolted on.
 
 | Feature | Detail |
 |---------|--------|
@@ -392,6 +406,8 @@ GET    /agents                        Heartbeat status per agent
 GET    /standup                       Standup report
 GET    /events                        SSE stream
 GET    /memory/{role}                 Agent memory bank
+GET    /agents                        Heartbeat + model per agent (includes dynamic agents)
+POST   /agents/create                 Streaming SSE — generate files, spin up container, join team
 GET    /pitch                         Pitch deck
 ```
 
@@ -420,6 +436,7 @@ GET    /pitch                         Pitch deck
 | 17 | Per-task isolated git repos — zero cross-task contamination |
 | 18 | Message durability: XAUTOCLAIM on startup, pending-queue drain before blocking read |
 | 19 | Resilience: exponential backoff, exhaustion rescue, thread close guard, push reminders, Architect git tools |
+| 20 | Dynamic agent creation: `POST /agents/create` — Claude generates config, Docker container spins up at runtime |
 
 ---
 

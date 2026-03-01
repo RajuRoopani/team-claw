@@ -1195,7 +1195,7 @@ footer {
         <span class="grad">powered by AI</span>
       </h1>
       <p class="hero-sub reveal reveal-delay-2">
-        Submit a task in plain English. <strong>8 specialized AI agents</strong> — Product Owner, Engineering Manager, Architect, UX Engineer, and 4 developers — collaborate through the full SDLC and ship <strong>production code to GitHub</strong> in minutes.
+        Submit a task in plain English. <strong>8+ specialized AI agents</strong> — Product Owner, Engineering Manager, Architect, UX Engineer, and 4 developers — collaborate through the full SDLC and ship <strong>production code to GitHub</strong> in minutes. Grow the team at runtime: add any specialist with one click, no files required.
       </p>
       <div class="hero-actions reveal reveal-delay-3">
         <a class="btn btn-primary btn-lg" href="/dashboard">Open Dashboard →</a>
@@ -1203,7 +1203,7 @@ footer {
       </div>
       <div class="hero-meta reveal reveal-delay-4">
         <div>
-          <div class="hero-stat-n">8</div>
+          <div class="hero-stat-n">8<span style="font-size:1rem;color:var(--accent)">+</span></div>
           <div class="hero-stat-l">AI agents</div>
         </div>
         <div>
@@ -1285,7 +1285,7 @@ footer {
       <div class="task-arrow-wrap">
         <div class="task-arrow">→</div>
         <div class="task-arrow-label">~2 minutes</div>
-        <div class="task-arrow-label">8 agents working</div>
+        <div class="task-arrow-label">8+ agents working</div>
       </div>
       <div>
         <div class="task-output-label">Delivered to GitHub</div>
@@ -1308,7 +1308,7 @@ footer {
 <section id="arch">
   <div class="section-wrap">
     <div class="eyebrow reveal">Architecture</div>
-    <h2 class="section-title reveal reveal-delay-1">8 agents, one mission</h2>
+    <h2 class="section-title reveal reveal-delay-1">8+ agents, one mission</h2>
     <p class="section-sub reveal reveal-delay-2">Each agent owns a distinct SDLC role, communicates via Redis Streams, and persists memory across tasks. Click any node to learn more.</p>
 
     <div class="arch-diagram reveal reveal-delay-2">
@@ -1475,7 +1475,7 @@ footer {
 <section id="stats">
   <div class="stats-grid" style="max-width:1200px;margin:0 auto;">
     <div class="stat-item reveal">
-      <div class="stat-n" data-target="8">0</div>
+      <div class="stat-n">8<span style="font-size:1.5rem;color:var(--accent)">+</span></div>
       <div class="stat-l">Specialized AI agents<br>covering every SDLC role</div>
     </div>
     <div class="stat-item reveal reveal-delay-1">
@@ -1683,10 +1683,21 @@ footer {
         <div class="bento-desc">When agents are stuck or need a decision, they surface a question to you through the dashboard. You reply, they continue — keeping you in control without blocking progress.</div>
       </div>
 
+      <div class="bento-card reveal reveal-delay-2">
+        <div class="bento-icon">🤖</div>
+        <div class="bento-title">Grow the team at runtime</div>
+        <div class="bento-desc">Click "+ Add Agent" in the dashboard. Describe the role. Claude generates the config files, a Docker container spins up from the pre-built base image, and the new specialist joins the team — in under 30 seconds. No files to write.</div>
+        <div style="margin-top:.8rem">
+          <span class="bento-tag bt-pur">Claude generates config</span>
+          <span class="bento-tag bt-grn">Docker SDK</span>
+          <span class="bento-tag bt-ind">&lt;30 seconds</span>
+        </div>
+      </div>
+
       <div class="bento-card reveal reveal-delay-3">
         <div class="bento-icon">🐳</div>
         <div class="bento-title">One command deploy</div>
-        <div class="bento-desc">The entire team — 11 Docker containers including Redis, PostgreSQL, sandbox, and all 8 agents — starts with a single command. No cloud accounts needed.</div>
+        <div class="bento-desc">The entire team — 12 Docker containers including Redis, PostgreSQL, sandbox, and 8+ agents — starts with a single command. No cloud accounts needed.</div>
         <div style="margin-top:.8rem">
           <span class="bento-tag bt-cyn">docker compose up</span>
         </div>
