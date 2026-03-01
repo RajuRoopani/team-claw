@@ -1328,6 +1328,15 @@ async def dashboard():
     return HTMLResponse("<h1>Dashboard not found</h1>", status_code=404)
 
 
+@app.get("/pitch", response_class=HTMLResponse)
+async def pitch_deck():
+    """Serve the Team Claw pitch deck."""
+    pitch_file = pathlib.Path(__file__).parent / "pitch-deck.html"
+    if pitch_file.exists():
+        return FileResponse(str(pitch_file), media_type="text/html")
+    return HTMLResponse("<h1>Pitch deck not found</h1>", status_code=404)
+
+
 @app.get("/health")
 async def health() -> dict:
     return {"status": "ok", "service": "orchestrator"}
