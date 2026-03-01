@@ -6,11 +6,57 @@
 
 <div align="center">
 
-**[Live Pitch Deck](https://rhjrjl9w-8080.usw2.devtunnels.ms/pitch)** &nbsp;|&nbsp; **[Live Dashboard](https://rhjrjl9w-8080.usw2.devtunnels.ms/dashboard)** &nbsp;|&nbsp; **[GitHub](https://github.com/RajuRoopani/team-claw)**
+**[Homepage](https://github.com/RajuRoopani/team-claw)** &nbsp;|&nbsp; **[Pitch Deck →  `/pitch`](https://github.com/RajuRoopani/team-claw)** &nbsp;|&nbsp; **[Live Dashboard →  `/dashboard`](https://github.com/RajuRoopani/team-claw)**
 
 `8 agents` &nbsp;·&nbsp; `12 containers` &nbsp;·&nbsp; `25 tools` &nbsp;·&nbsp; `38 API endpoints` &nbsp;·&nbsp; `19 build phases` &nbsp;·&nbsp; `~5,000 LOC`
 
 </div>
+
+---
+
+## Screenshots
+
+<table>
+<tr>
+<td colspan="2">
+
+### Homepage — Hero
+
+![Homepage hero with animated live agent terminal](docs/screenshots/home-hero.png)
+
+</td>
+</tr>
+<tr>
+<td>
+
+### Interactive Architecture Diagram
+
+![Interactive architecture diagram showing all 8 agents](docs/screenshots/home-arch.png)
+
+</td>
+<td>
+
+### Agent Team Cards
+
+![Agent team cards showing all 8 roles and their models](docs/screenshots/home-team.png)
+
+</td>
+</tr>
+<tr>
+<td colspan="2">
+
+### Live Engineering Dashboard
+
+![Live engineering dashboard showing real-time agent messages and kanban](docs/screenshots/dashboard.png)
+
+</td>
+</tr>
+</table>
+
+> **Three URLs ship with the system:**
+> - `/` — Product homepage (this UI)
+> - `/dashboard` — Live engineering feed, kanban, CI, agent heartbeats
+> - `/pitch` — Investor pitch deck
 
 ---
 
@@ -203,12 +249,19 @@ Human (CLI / Dashboard / API)
 cp .env.example .env   # then fill in your keys
 ```
 
-Minimum required:
+Minimum required — **pick one AI provider:**
+
 ```env
+# Option A — Anthropic API key
 ANTHROPIC_API_KEY=sk-ant-...
-GITHUB_TOKEN=ghp_...         # classic PAT with repo scope
+
+# Option B — GitHub Copilot (no Anthropic key needed!)
+# Leave ANTHROPIC_API_KEY unset; agents auto-detect your Copilot subscription.
+GITHUB_TOKEN=ghp_...         # classic PAT with repo + workflow scopes
 GITHUB_USERNAME=your-username
 ```
+
+> **GitHub Copilot users:** set only `GITHUB_TOKEN` and `GITHUB_USERNAME`. The agents automatically route through `api.githubcopilot.com` using the same Claude models at no extra cost.
 
 ### 2. Start the team
 

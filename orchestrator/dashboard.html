@@ -3058,14 +3058,52 @@ loadPendingQuestions();
 
 // Periodic polling
 setInterval(loadMetrics,         15000);
-setInterval(loadAgentStatus,     20000);
+setInterval(loadAgentStatus,     10000);
 setInterval(loadCIResults,       20000);
-setInterval(loadTasks,           15000);
+setInterval(loadTasks,            5000);
 setInterval(loadWiki,            30000);
 setInterval(loadToolStats,       20000);
 setInterval(loadPendingQuestions, 10000);
 // Refresh status tab elapsed times even when no new messages arrive
 setInterval(() => { if (activeTab === 'status') renderStatusTab(); }, 15000);
+
+// ── Reliable polling fallback (works through Cloudflare / any HTTP proxy) ──
+// Polls /messages/since every 3 s so the feed stays live even when SSE is
+// buffered or dropped.  addMessage() deduplicates by id, so this is safe.
+let _pollSince = Date.now() - 60000;  // pick up last 60 s on first run
+
+async function _pollNewMessages() {
+  try {
+    const res = await fetch(`/messages/since?ts=${_pollSince}`);
+    if (!res.ok) return;
+    const msgs = await res.json();
+    _pollSince = Date.now();
+    if (!msgs.length) return;
+
+    // Ensure thread metadata exists before inserting messages
+    const unknownIds = [...new Set(msgs.map(m => m.thread_id))].filter(id => !threads[id]);
+    if (unknownIds.length) {
+      const tRes = await fetch('/threads');
+      if (tRes.ok) {
+        const tList = await tRes.json();
+        let changed = false;
+        for (const t of tList) {
+          if (!threads[t.id]) {
+            threads[t.id] = { id: t.id, title: t.title || t.id.substring(0,8), count: 0,
+              status: t.status, github_repo: t.github_repo || '',
+              last_active_role: t.last_active_role || '', last_active_at: t.last_active_at || '' };
+            changed = true;
+          }
+        }
+        document.getElementById('stat-threads').textContent = tList.length;
+        if (changed) renderThreadList();
+      }
+    }
+    msgs.forEach(m => addMessage(m, true));
+  } catch(e) {}
+}
+
+setInterval(_pollNewMessages, 3000);
 
 // Cmd/Ctrl+Enter submits the waiting-banner reply textarea
 document.getElementById('wb-reply').addEventListener('keydown', e => {

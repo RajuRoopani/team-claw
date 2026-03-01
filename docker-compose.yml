@@ -101,7 +101,8 @@ services:
       - workspace:/workspace
     environment:
       ROLE: product_owner
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
       REDIS_URL: redis://redis:6379
       MODEL: ${PO_MODEL:-claude-opus-4-6}
       ORCHESTRATOR_URL: http://orchestrator:8080
@@ -113,12 +114,12 @@ services:
       - workspace:/workspace
     environment:
       ROLE: engineering_manager
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
       REDIS_URL: redis://redis:6379
       MODEL: ${EM_MODEL:-claude-opus-4-6}
       SANDBOX_URL: http://sandbox:8081
       ORCHESTRATOR_URL: http://orchestrator:8080
-      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
       GITHUB_USERNAME: ${GITHUB_USERNAME:-RajuRoopani}
 
   architect:
@@ -128,7 +129,8 @@ services:
       - workspace:/workspace
     environment:
       ROLE: architect
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
       REDIS_URL: redis://redis:6379
       MODEL: ${ARCH_MODEL:-claude-sonnet-4-6}
       ORCHESTRATOR_URL: http://orchestrator:8080
@@ -140,7 +142,8 @@ services:
       - workspace:/workspace
     environment:
       ROLE: ux_engineer
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
       REDIS_URL: redis://redis:6379
       MODEL: ${UX_MODEL:-claude-sonnet-4-6}
       ORCHESTRATOR_URL: http://orchestrator:8080
@@ -154,12 +157,12 @@ services:
       ROLE: senior_dev_1
       INSTANCE_ID: "1"
       MENTEE_ROLE: junior_dev_1
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
       REDIS_URL: redis://redis:6379
       MODEL: ${SR_MODEL:-claude-sonnet-4-6}
       SANDBOX_URL: http://sandbox:8081
       ORCHESTRATOR_URL: http://orchestrator:8080
-      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
       GITHUB_USERNAME: ${GITHUB_USERNAME:-RajuRoopani}
 
   senior-dev-2:
@@ -171,12 +174,12 @@ services:
       ROLE: senior_dev_2
       INSTANCE_ID: "2"
       MENTEE_ROLE: junior_dev_2
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
       REDIS_URL: redis://redis:6379
       MODEL: ${SR_MODEL:-claude-sonnet-4-6}
       SANDBOX_URL: http://sandbox:8081
       ORCHESTRATOR_URL: http://orchestrator:8080
-      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
       GITHUB_USERNAME: ${GITHUB_USERNAME:-RajuRoopani}
 
   junior-dev-1:
@@ -188,12 +191,12 @@ services:
       ROLE: junior_dev_1
       INSTANCE_ID: "1"
       MENTOR_ROLE: senior_dev_1
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
       REDIS_URL: redis://redis:6379
       MODEL: ${JR_MODEL:-claude-haiku-4-5-20251001}
       SANDBOX_URL: http://sandbox:8081
       ORCHESTRATOR_URL: http://orchestrator:8080
-      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
       GITHUB_USERNAME: ${GITHUB_USERNAME:-RajuRoopani}
 
   junior-dev-2:
@@ -205,10 +208,10 @@ services:
       ROLE: junior_dev_2
       INSTANCE_ID: "2"
       MENTOR_ROLE: senior_dev_2
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
       REDIS_URL: redis://redis:6379
       MODEL: ${JR_MODEL:-claude-haiku-4-5-20251001}
       SANDBOX_URL: http://sandbox:8081
       ORCHESTRATOR_URL: http://orchestrator:8080
-      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
       GITHUB_USERNAME: ${GITHUB_USERNAME:-RajuRoopani}

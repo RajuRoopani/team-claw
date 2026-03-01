@@ -46,9 +46,24 @@ class Agent:
 
         # Clients
         self.bus = MessageBus(self.redis_url, self.role)
-        self.claude = anthropic.AsyncAnthropic(
-            api_key=os.environ["ANTHROPIC_API_KEY"]
-        )
+        _api_key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
+        _github_token = os.environ.get("GITHUB_TOKEN", "").strip()
+        if not _api_key and _github_token:
+            logger.info("[%s] Using GitHub Copilot as AI backend.", self.role)
+            self.claude = anthropic.AsyncAnthropic(
+                api_key="github-copilot",
+                base_url="https://api.githubcopilot.com",
+                default_headers={
+                    "Authorization": f"Bearer {_github_token}",
+                    "Copilot-Integration-Id": "vscode-chat",
+                },
+            )
+        elif _api_key:
+            self.claude = anthropic.AsyncAnthropic(api_key=_api_key)
+        else:
+            raise RuntimeError(
+                "Either ANTHROPIC_API_KEY or GITHUB_TOKEN must be set in the environment."
+            )
 
     # ─────────────────────────────────────────
     # Startup helpers

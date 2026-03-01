@@ -445,6 +445,37 @@ async def get_thread_messages(thread_id: str) -> list[MessageOut]:
     ]
 
 
+@app.get("/messages/since", response_model=list[MessageOut])
+async def messages_since(ts: float = 0) -> list[MessageOut]:
+    """Return all messages created after the given Unix epoch millisecond timestamp.
+    Used by the dashboard as a reliable polling fallback alongside SSE."""
+    dt = datetime.utcfromtimestamp(ts / 1000).replace(tzinfo=timezone.utc) if ts else datetime(2000, 1, 1, tzinfo=timezone.utc)
+    async with state.db.acquire() as conn:
+        rows = await conn.fetch(
+            """
+            SELECT id, thread_id, from_role, to_role, type, content, priority, created_at
+            FROM messages
+            WHERE created_at > $1
+            ORDER BY created_at ASC
+            LIMIT 500
+            """,
+            dt,
+        )
+    return [
+        MessageOut(
+            id=str(r["id"]),
+            thread_id=str(r["thread_id"]),
+            from_role=r["from_role"],
+            to_role=r["to_role"],
+            type=r["type"],
+            content=r["content"],
+            priority=r["priority"],
+            created_at=r["created_at"].isoformat(),
+        )
+        for r in rows
+    ]
+
+
 @app.get("/threads/{thread_id}/stream")
 async def stream_thread(thread_id: str):
     """Server-Sent Events stream of new messages for a thread."""
@@ -461,9 +492,15 @@ async def stream_thread(thread_id: str):
                         decoded = _decode(fields)
                         if decoded.get("thread_id") == thread_id:
                             yield f"data: {json.dumps(decoded)}\n\n"
+            else:
+                yield ": ping\n\n"
             await asyncio.sleep(0)
 
-    return StreamingResponse(event_gen(), media_type="text/event-stream")
+    return StreamingResponse(
+        event_gen(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 # ─────────────────────────────────────────────
@@ -1310,6 +1347,8 @@ async def stream_all():
                             last_activity_id = redis_id
                         decoded = _decode(fields)
                         yield f"data: {json.dumps(decoded)}\n\n"
+            else:
+                yield ": ping\n\n"
             await asyncio.sleep(0)
 
     return StreamingResponse(
@@ -1317,6 +1356,16 @@ async def stream_all():
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+@app.get("/", response_class=HTMLResponse)
+@app.get("/home", response_class=HTMLResponse)
+async def homepage():
+    """Serve the Team Claw homepage."""
+    f = pathlib.Path(__file__).parent / "home.html"
+    if f.exists():
+        return FileResponse(str(f), media_type="text/html")
+    return HTMLResponse("<h1>Homepage not found</h1>", status_code=404)
 
 
 @app.get("/dashboard", response_class=HTMLResponse)

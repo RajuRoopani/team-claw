@@ -1,0 +1,2040 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Team Claw — Your Autonomous AI Engineering Team</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,400&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════════════════════════
+   TOKENS
+═══════════════════════════════════════════════════════════════ */
+:root {
+  --bg:      #07070e;
+  --surf:    #0d0d1a;
+  --surf2:   #12121f;
+  --surf3:   #181828;
+  --border:  #1c1c32;
+  --border2: #252540;
+  --accent:  #6366f1;
+  --accent2: #818cf8;
+  --cyan:    #06b6d4;
+  --green:   #10b981;
+  --amber:   #f59e0b;
+  --red:     #ef4444;
+  --pink:    #ec4899;
+  --purple:  #8b5cf6;
+  --text:    #94a3b8;
+  --text2:   #cbd5e1;
+  --bright:  #f1f5f9;
+  --muted:   #334155;
+
+  --c-po:    #d2a8ff;
+  --c-em:    #ffa657;
+  --c-arch:  #79c0ff;
+  --c-ux:    #f0abfc;
+  --c-sr1:   #56d364;
+  --c-sr2:   #3fb950;
+  --c-jr1:   #ffa198;
+  --c-jr2:   #ff7b72;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   RESET & BASE
+═══════════════════════════════════════════════════════════════ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--text2);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+  overflow-x: hidden;
+}
+a { color: inherit; text-decoration: none; }
+img, svg { display: block; }
+
+/* ═══════════════════════════════════════════════════════════════
+   SCROLLBAR
+═══════════════════════════════════════════════════════════════ */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+
+/* ═══════════════════════════════════════════════════════════════
+   NOISE TEXTURE
+═══════════════════════════════════════════════════════════════ */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 128px 128px;
+  pointer-events: none;
+  z-index: 0;
+  opacity: .4;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   NAV
+═══════════════════════════════════════════════════════════════ */
+nav {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 2.5rem;
+  height: 60px;
+  background: rgba(7,7,14,.8);
+  backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--border);
+  transition: background .3s;
+}
+.nav-logo {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  font-weight: 800;
+  font-size: 1.1rem;
+  color: var(--bright);
+  letter-spacing: -.02em;
+}
+.nav-logo .claw { font-size: 1.3rem; }
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+}
+.nav-links a {
+  font-size: .875rem;
+  color: var(--text);
+  font-weight: 500;
+  transition: color .2s;
+}
+.nav-links a:hover { color: var(--bright); }
+.nav-cta {
+  display: flex;
+  gap: .75rem;
+  align-items: center;
+}
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: .45rem;
+  padding: .5rem 1.1rem;
+  border-radius: 8px;
+  font-size: .875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all .2s;
+  border: none;
+}
+.btn-ghost {
+  background: transparent;
+  color: var(--text2);
+  border: 1px solid var(--border2);
+}
+.btn-ghost:hover {
+  border-color: var(--accent);
+  color: var(--accent2);
+  background: rgba(99,102,241,.08);
+}
+.btn-primary {
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 0 0 20px rgba(99,102,241,.35);
+}
+.btn-primary:hover {
+  background: #4f52d8;
+  box-shadow: 0 0 28px rgba(99,102,241,.5);
+  transform: translateY(-1px);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   HERO
+═══════════════════════════════════════════════════════════════ */
+#hero {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  padding: 8rem 2.5rem 5rem;
+  overflow: hidden;
+}
+.hero-glow {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  pointer-events: none;
+}
+.hero-glow-1 {
+  width: 600px; height: 600px;
+  background: radial-gradient(circle, rgba(99,102,241,.18) 0%, transparent 70%);
+  top: -100px; left: -150px;
+}
+.hero-glow-2 {
+  width: 500px; height: 500px;
+  background: radial-gradient(circle, rgba(6,182,212,.1) 0%, transparent 70%);
+  top: 50px; right: -100px;
+}
+.hero-glow-3 {
+  width: 400px; height: 400px;
+  background: radial-gradient(circle, rgba(139,92,246,.08) 0%, transparent 70%);
+  bottom: 0; left: 40%;
+}
+.hero-inner {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4rem;
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+  align-items: center;
+}
+.hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: .5rem;
+  background: rgba(99,102,241,.12);
+  border: 1px solid rgba(99,102,241,.3);
+  border-radius: 999px;
+  padding: .35rem 1rem;
+  font-size: .78rem;
+  font-weight: 600;
+  color: var(--accent2);
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  margin-bottom: 1.5rem;
+}
+.live-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 8px var(--green);
+  animation: blink 2s ease-in-out infinite;
+}
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.25} }
+.hero-title {
+  font-size: clamp(2.6rem, 5vw, 4rem);
+  font-weight: 900;
+  color: var(--bright);
+  letter-spacing: -.04em;
+  line-height: 1.05;
+  margin-bottom: 1.25rem;
+}
+.hero-title .grad {
+  background: linear-gradient(135deg, #818cf8 0%, #06b6d4 55%, #10b981 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.hero-sub {
+  font-size: 1.1rem;
+  color: var(--text);
+  line-height: 1.7;
+  max-width: 520px;
+  margin-bottom: 2.5rem;
+}
+.hero-sub strong { color: var(--text2); font-weight: 600; }
+.hero-actions {
+  display: flex;
+  gap: .75rem;
+  flex-wrap: wrap;
+}
+.hero-meta {
+  display: flex;
+  gap: 2rem;
+  margin-top: 2.5rem;
+}
+.hero-stat-n {
+  font-size: 1.6rem;
+  font-weight: 900;
+  color: var(--bright);
+  letter-spacing: -.03em;
+}
+.hero-stat-l {
+  font-size: .72rem;
+  color: var(--text);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
+
+/* ── Terminal ── */
+.terminal {
+  background: #0a0a14;
+  border: 1px solid var(--border2);
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 24px 80px rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,.04);
+}
+.term-bar {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  padding: .75rem 1rem;
+  background: var(--surf2);
+  border-bottom: 1px solid var(--border);
+}
+.term-dots { display: flex; gap: .4rem; }
+.term-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+}
+.td-r { background: #ff5f57; }
+.td-y { background: #ffbd2e; }
+.td-g { background: #28ca41; }
+.term-title {
+  font-size: .72rem;
+  color: var(--text);
+  font-family: 'JetBrains Mono', monospace;
+  margin: 0 auto;
+}
+.term-body {
+  padding: 1.2rem 1.4rem;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: .78rem;
+  line-height: 1.9;
+  min-height: 340px;
+}
+.term-line { display: flex; gap: .6rem; align-items: flex-start; opacity: 0; animation: fadeUp .3s forwards; }
+.term-line.visible { opacity: 1; }
+@keyframes fadeUp { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:none} }
+.term-ts { color: #334155; flex-shrink: 0; }
+.term-role { font-weight: 600; flex-shrink: 0; }
+.term-msg { color: var(--text2); }
+.term-cursor {
+  display: inline-block;
+  width: 8px; height: 14px;
+  background: var(--accent);
+  animation: cursor 1s step-end infinite;
+  vertical-align: middle;
+  margin-left: 2px;
+}
+@keyframes cursor { 50%{opacity:0} }
+
+/* ═══════════════════════════════════════════════════════════════
+   SECTIONS SHARED
+═══════════════════════════════════════════════════════════════ */
+section { position: relative; z-index: 1; }
+.section-wrap {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 6rem 2.5rem;
+}
+.eyebrow {
+  font-size: .72rem;
+  font-weight: 700;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--accent2);
+  margin-bottom: .75rem;
+}
+.section-title {
+  font-size: clamp(1.8rem, 3.5vw, 2.8rem);
+  font-weight: 900;
+  color: var(--bright);
+  letter-spacing: -.03em;
+  line-height: 1.1;
+  margin-bottom: 1rem;
+}
+.section-sub {
+  font-size: 1.05rem;
+  color: var(--text);
+  max-width: 600px;
+  line-height: 1.65;
+  margin-bottom: 3.5rem;
+}
+.reveal {
+  opacity: 0;
+  transform: translateY(30px);
+  transition: opacity .6s ease, transform .6s ease;
+}
+.reveal.visible {
+  opacity: 1;
+  transform: none;
+}
+.reveal-delay-1 { transition-delay: .1s; }
+.reveal-delay-2 { transition-delay: .2s; }
+.reveal-delay-3 { transition-delay: .3s; }
+.reveal-delay-4 { transition-delay: .4s; }
+.reveal-delay-5 { transition-delay: .5s; }
+.reveal-delay-6 { transition-delay: .6s; }
+
+/* ═══════════════════════════════════════════════════════════════
+   HOW IT WORKS
+═══════════════════════════════════════════════════════════════ */
+#how { background: var(--surf); }
+.how-divider { height: 1px; background: linear-gradient(90deg, transparent, var(--border2), transparent); }
+
+.steps-track {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0;
+  position: relative;
+}
+.steps-track::before {
+  content: '';
+  position: absolute;
+  top: 40px;
+  left: calc(50% / 3);
+  right: calc(50% / 3);
+  height: 2px;
+  background: linear-gradient(90deg, var(--accent), var(--cyan), var(--green));
+  z-index: 0;
+}
+.step-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 0 2rem 2rem;
+  position: relative;
+  z-index: 1;
+}
+.step-num {
+  width: 80px; height: 80px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  margin-bottom: 1.5rem;
+  border: 2px solid var(--border2);
+  background: var(--surf2);
+  position: relative;
+  transition: all .3s;
+}
+.step-card:nth-child(1) .step-num { border-color: rgba(99,102,241,.5); box-shadow: 0 0 20px rgba(99,102,241,.15); }
+.step-card:nth-child(2) .step-num { border-color: rgba(6,182,212,.5); box-shadow: 0 0 20px rgba(6,182,212,.15); }
+.step-card:nth-child(3) .step-num { border-color: rgba(16,185,129,.5); box-shadow: 0 0 20px rgba(16,185,129,.15); }
+.step-num-label {
+  position: absolute;
+  top: -8px; right: -8px;
+  background: var(--accent);
+  color: #fff;
+  font-size: .65rem;
+  font-weight: 800;
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.step-card:nth-child(2) .step-num-label { background: var(--cyan); }
+.step-card:nth-child(3) .step-num-label { background: var(--green); }
+.step-title {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--bright);
+  margin-bottom: .6rem;
+  letter-spacing: -.02em;
+}
+.step-desc {
+  font-size: .9rem;
+  color: var(--text);
+  line-height: 1.65;
+}
+
+/* ── Example Task ── */
+.task-example {
+  margin-top: 4rem;
+  background: var(--surf2);
+  border: 1px solid var(--border2);
+  border-radius: 16px;
+  padding: 2rem 2.5rem;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 2.5rem;
+  align-items: center;
+}
+.task-input-box {
+  background: var(--surf3);
+  border: 1px solid rgba(99,102,241,.35);
+  border-radius: 10px;
+  padding: 1rem 1.4rem;
+  font-size: .95rem;
+  color: var(--bright);
+  font-style: italic;
+  max-width: 380px;
+}
+.task-input-label {
+  font-size: .68rem;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--accent2);
+  margin-bottom: .5rem;
+}
+.task-arrow-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: .25rem;
+}
+.task-arrow {
+  font-size: 1.5rem;
+  color: var(--accent);
+  animation: arrowPulse 1.5s ease-in-out infinite;
+}
+@keyframes arrowPulse { 0%,100%{opacity:.4;transform:translateX(0)} 50%{opacity:1;transform:translateX(4px)} }
+.task-arrow-label { font-size: .65rem; color: var(--text); white-space: nowrap; }
+.task-output-box {
+  background: var(--surf3);
+  border: 1px solid rgba(16,185,129,.35);
+  border-radius: 10px;
+  padding: 1rem 1.4rem;
+  max-width: 340px;
+}
+.task-output-label {
+  font-size: .68rem;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--green);
+  margin-bottom: .5rem;
+}
+.task-output-item {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  font-size: .85rem;
+  color: var(--text2);
+  margin-bottom: .3rem;
+}
+.task-output-item .ok { color: var(--green); }
+
+/* ═══════════════════════════════════════════════════════════════
+   ARCHITECTURE DIAGRAM
+═══════════════════════════════════════════════════════════════ */
+#arch { background: var(--bg); }
+
+.arch-diagram {
+  position: relative;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+/* top: human + orchestrator */
+.arch-top {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin-bottom: 1.2rem;
+}
+/* Rows */
+.arch-row {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  position: relative;
+  margin-bottom: .5rem;
+}
+/* Connector lines */
+.arch-vline {
+  width: 2px;
+  height: 32px;
+  background: linear-gradient(to bottom, var(--border2), var(--accent));
+  margin: 0 auto;
+  position: relative;
+}
+.arch-vline::after {
+  content: '';
+  position: absolute;
+  bottom: -5px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 6px solid var(--accent);
+}
+.arch-hlines {
+  display: flex;
+  justify-content: center;
+  position: relative;
+  height: 32px;
+  margin-bottom: .5rem;
+}
+.arch-hlines svg {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.flow-path {
+  fill: none;
+  stroke-width: 1.5;
+  stroke-dasharray: 6 4;
+  animation: flowDash 2s linear infinite;
+}
+@keyframes flowDash {
+  to { stroke-dashoffset: -20; }
+}
+
+/* Agent node */
+.anode {
+  background: var(--surf);
+  border: 1px solid var(--border2);
+  border-radius: 12px;
+  padding: .85rem 1.1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: .2rem;
+  cursor: pointer;
+  transition: all .25s;
+  position: relative;
+  min-width: 130px;
+  user-select: none;
+}
+.anode::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  border-radius: 12px 12px 0 0;
+  opacity: .8;
+}
+.anode:hover {
+  border-color: var(--border2);
+  transform: translateY(-3px);
+  box-shadow: 0 8px 30px rgba(0,0,0,.4);
+}
+.anode.active {
+  border-color: currentColor;
+  box-shadow: 0 0 0 2px currentColor, 0 8px 30px rgba(0,0,0,.4);
+  transform: translateY(-3px);
+}
+.anode-emoji { font-size: 1.5rem; margin-bottom: .1rem; }
+.anode-name {
+  font-size: .78rem;
+  font-weight: 700;
+  color: var(--bright);
+  white-space: nowrap;
+}
+.anode-model {
+  font-size: .6rem;
+  font-family: 'JetBrains Mono', monospace;
+  padding: .1rem .4rem;
+  border-radius: 4px;
+  background: rgba(255,255,255,.06);
+  color: var(--text);
+}
+
+/* Agent colors */
+.anode-human    { --nc: #58a6ff; color: var(--nc); }
+.anode-human::before { background: var(--nc); }
+.anode-orch     { --nc: #8b949e; color: var(--nc); }
+.anode-orch::before { background: var(--nc); }
+.anode-po       { --nc: var(--c-po); color: var(--nc); }
+.anode-po::before { background: var(--c-po); }
+.anode-em       { --nc: var(--c-em); color: var(--nc); }
+.anode-em::before { background: var(--c-em); }
+.anode-arch     { --nc: var(--c-arch); color: var(--nc); }
+.anode-arch::before { background: var(--c-arch); }
+.anode-ux       { --nc: var(--c-ux); color: var(--nc); }
+.anode-ux::before { background: var(--c-ux); }
+.anode-sr1      { --nc: var(--c-sr1); color: var(--nc); }
+.anode-sr1::before { background: var(--c-sr1); }
+.anode-sr2      { --nc: var(--c-sr2); color: var(--nc); }
+.anode-sr2::before { background: var(--c-sr2); }
+.anode-jr1      { --nc: var(--c-jr1); color: var(--nc); }
+.anode-jr1::before { background: var(--c-jr1); }
+.anode-jr2      { --nc: var(--c-jr2); color: var(--nc); }
+.anode-jr2::before { background: var(--c-jr2); }
+.anode-github   { --nc: #e6edf3; color: var(--nc); }
+.anode-github::before { background: linear-gradient(90deg, #6366f1, #06b6d4); }
+
+/* Agent detail panel */
+.agent-panel {
+  background: var(--surf2);
+  border: 1px solid var(--border2);
+  border-radius: 16px;
+  padding: 1.5rem 1.75rem;
+  margin-top: 2rem;
+  display: none;
+  animation: panelIn .25s ease;
+}
+@keyframes panelIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:none} }
+.agent-panel.visible { display: block; }
+.panel-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.2rem;
+}
+.panel-emoji { font-size: 2.2rem; }
+.panel-role {
+  font-size: .7rem;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  margin-bottom: .25rem;
+}
+.panel-name {
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: var(--bright);
+  letter-spacing: -.02em;
+}
+.panel-model-badge {
+  display: inline-block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: .68rem;
+  padding: .2rem .6rem;
+  border-radius: 6px;
+  background: rgba(99,102,241,.15);
+  color: var(--accent2);
+  border: 1px solid rgba(99,102,241,.25);
+}
+.panel-body {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+}
+.panel-section-title {
+  font-size: .7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  color: var(--text);
+  margin-bottom: .6rem;
+}
+.panel-bullets { list-style: none; }
+.panel-bullets li {
+  font-size: .85rem;
+  color: var(--text2);
+  line-height: 1.55;
+  margin-bottom: .35rem;
+  display: flex;
+  gap: .5rem;
+}
+.panel-bullets li::before { content: '→'; color: var(--text); flex-shrink: 0; }
+.panel-talks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .4rem;
+}
+.panel-talks-tag {
+  font-size: .72rem;
+  padding: .2rem .55rem;
+  border-radius: 6px;
+  background: var(--surf3);
+  border: 1px solid var(--border2);
+  color: var(--text2);
+}
+.arch-hint {
+  text-align: center;
+  font-size: .78rem;
+  color: var(--text);
+  margin-top: 1.5rem;
+  opacity: .7;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   AGENT CARDS
+═══════════════════════════════════════════════════════════════ */
+#team { background: var(--surf); }
+.team-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+}
+.team-card {
+  background: var(--surf2);
+  border: 1px solid var(--border2);
+  border-radius: 14px;
+  padding: 1.4rem;
+  position: relative;
+  overflow: hidden;
+  transition: transform .25s, box-shadow .25s, border-color .25s;
+}
+.team-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  border-radius: 14px 14px 0 0;
+}
+.team-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 40px rgba(0,0,0,.4);
+}
+.tc-emoji { font-size: 2rem; margin-bottom: .6rem; }
+.tc-role {
+  font-size: .65rem;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  margin-bottom: .25rem;
+}
+.tc-name {
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--bright);
+  margin-bottom: .6rem;
+  letter-spacing: -.02em;
+}
+.tc-model {
+  display: inline-block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: .62rem;
+  padding: .15rem .5rem;
+  border-radius: 5px;
+  background: rgba(255,255,255,.06);
+  color: var(--text);
+  margin-bottom: .8rem;
+}
+.tc-responsibilities {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: .3rem;
+}
+.tc-responsibilities li {
+  font-size: .78rem;
+  color: var(--text);
+  line-height: 1.45;
+  display: flex;
+  gap: .4rem;
+  align-items: flex-start;
+}
+.tc-responsibilities li::before {
+  content: '·';
+  font-size: 1.2em;
+  line-height: 1.1;
+  flex-shrink: 0;
+}
+/* card accent colors */
+.tc-po::before { background: var(--c-po); }
+.tc-po { color: var(--c-po); }
+.tc-po:hover { border-color: rgba(210,168,255,.3); }
+.tc-em::before { background: var(--c-em); }
+.tc-em { color: var(--c-em); }
+.tc-em:hover { border-color: rgba(255,166,87,.3); }
+.tc-arch::before { background: var(--c-arch); }
+.tc-arch { color: var(--c-arch); }
+.tc-arch:hover { border-color: rgba(121,192,255,.3); }
+.tc-ux::before { background: var(--c-ux); }
+.tc-ux { color: var(--c-ux); }
+.tc-ux:hover { border-color: rgba(240,171,252,.3); }
+.tc-sr1::before { background: var(--c-sr1); }
+.tc-sr1 { color: var(--c-sr1); }
+.tc-sr1:hover { border-color: rgba(86,211,100,.3); }
+.tc-sr2::before { background: var(--c-sr2); }
+.tc-sr2 { color: var(--c-sr2); }
+.tc-sr2:hover { border-color: rgba(63,185,80,.3); }
+.tc-jr1::before { background: var(--c-jr1); }
+.tc-jr1 { color: var(--c-jr1); }
+.tc-jr1:hover { border-color: rgba(255,161,152,.3); }
+.tc-jr2::before { background: var(--c-jr2); }
+.tc-jr2 { color: var(--c-jr2); }
+.tc-jr2:hover { border-color: rgba(255,123,114,.3); }
+
+/* ═══════════════════════════════════════════════════════════════
+   FEATURES BENTO
+═══════════════════════════════════════════════════════════════ */
+#features { background: var(--bg); }
+.bento {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: auto auto;
+  gap: 1rem;
+}
+.bento-card {
+  background: var(--surf);
+  border: 1px solid var(--border2);
+  border-radius: 16px;
+  padding: 1.75rem;
+  transition: border-color .25s, transform .25s;
+  position: relative;
+  overflow: hidden;
+}
+.bento-card:hover {
+  border-color: rgba(99,102,241,.35);
+  transform: translateY(-2px);
+}
+.bento-icon {
+  font-size: 2rem;
+  margin-bottom: 1rem;
+}
+.bento-title {
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--bright);
+  margin-bottom: .5rem;
+  letter-spacing: -.01em;
+}
+.bento-desc {
+  font-size: .875rem;
+  color: var(--text);
+  line-height: 1.65;
+}
+.bento-card.wide {
+  grid-column: span 2;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  align-items: center;
+}
+.bento-card.wide .bento-content { display: flex; flex-direction: column; }
+.bento-code {
+  background: #080810;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1rem 1.2rem;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: .75rem;
+  line-height: 1.8;
+  color: #a5b4fc;
+}
+.bento-code .k { color: #c084fc; }
+.bento-code .s { color: #6ee7b7; }
+.bento-code .c { color: #334155; }
+.bento-code .n { color: #fbbf24; }
+.bento-tag {
+  display: inline-block;
+  padding: .15rem .5rem;
+  border-radius: 5px;
+  font-size: .68rem;
+  font-weight: 600;
+  margin-right: .3rem;
+  margin-bottom: .3rem;
+}
+.bt-ind { background: rgba(99,102,241,.15); color: var(--accent2); }
+.bt-grn { background: rgba(16,185,129,.15); color: var(--green); }
+.bt-cyn { background: rgba(6,182,212,.15); color: var(--cyan); }
+.bt-amb { background: rgba(245,158,11,.15); color: var(--amber); }
+.bt-pur { background: rgba(139,92,246,.15); color: var(--purple); }
+/* glow overlay on featured card */
+.bento-card.featured::after {
+  content: '';
+  position: absolute;
+  top: -60px; right: -60px;
+  width: 180px; height: 180px;
+  background: radial-gradient(circle, rgba(99,102,241,.12) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   STATS
+═══════════════════════════════════════════════════════════════ */
+#stats {
+  background: linear-gradient(135deg, rgba(99,102,241,.1) 0%, rgba(6,182,212,.05) 50%, rgba(16,185,129,.08) 100%);
+  border-top: 1px solid var(--border2);
+  border-bottom: 1px solid var(--border2);
+}
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0;
+}
+.stat-item {
+  padding: 3rem 2rem;
+  text-align: center;
+  border-right: 1px solid var(--border2);
+}
+.stat-item:last-child { border-right: none; }
+.stat-n {
+  font-size: clamp(2.4rem, 4vw, 3.5rem);
+  font-weight: 900;
+  color: var(--bright);
+  letter-spacing: -.04em;
+  line-height: 1;
+  margin-bottom: .4rem;
+}
+.stat-n em {
+  color: var(--accent2);
+  font-style: normal;
+  font-size: .6em;
+}
+.stat-l {
+  font-size: .75rem;
+  color: var(--text);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  line-height: 1.4;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   TECH STACK
+═══════════════════════════════════════════════════════════════ */
+#stack { background: var(--surf); }
+.stack-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .75rem;
+  margin-top: 2rem;
+}
+.stack-pill {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  background: var(--surf2);
+  border: 1px solid var(--border2);
+  border-radius: 999px;
+  padding: .5rem 1.1rem;
+  font-size: .85rem;
+  color: var(--text2);
+  transition: all .2s;
+}
+.stack-pill:hover {
+  border-color: rgba(99,102,241,.4);
+  color: var(--bright);
+  background: rgba(99,102,241,.07);
+}
+.stack-pill .icon { font-size: 1.1rem; }
+
+/* ═══════════════════════════════════════════════════════════════
+   QUICK START
+═══════════════════════════════════════════════════════════════ */
+#quickstart { background: var(--bg); }
+.quickstart-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+  align-items: start;
+}
+.qs-step {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+.qs-num {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(99,102,241,.15);
+  border: 1px solid rgba(99,102,241,.3);
+  color: var(--accent2);
+  font-size: .8rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: .1rem;
+}
+.qs-body {}
+.qs-title {
+  font-size: .95rem;
+  font-weight: 700;
+  color: var(--bright);
+  margin-bottom: .35rem;
+}
+.qs-desc {
+  font-size: .85rem;
+  color: var(--text);
+  line-height: 1.6;
+  margin-bottom: .5rem;
+}
+.code-inline {
+  display: block;
+  background: var(--surf2);
+  border: 1px solid var(--border2);
+  border-radius: 8px;
+  padding: .65rem 1rem;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: .78rem;
+  color: #a5b4fc;
+  white-space: pre;
+  overflow-x: auto;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   CTA
+═══════════════════════════════════════════════════════════════ */
+#cta {
+  background: radial-gradient(ellipse at center, rgba(99,102,241,.2) 0%, rgba(6,182,212,.06) 40%, transparent 70%), var(--surf);
+  border-top: 1px solid var(--border2);
+}
+.cta-inner {
+  text-align: center;
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 6rem 2.5rem;
+}
+.cta-title {
+  font-size: clamp(2rem, 4vw, 3rem);
+  font-weight: 900;
+  color: var(--bright);
+  letter-spacing: -.04em;
+  line-height: 1.08;
+  margin-bottom: 1.2rem;
+}
+.cta-sub {
+  font-size: 1.05rem;
+  color: var(--text);
+  line-height: 1.65;
+  margin-bottom: 2.5rem;
+}
+.cta-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.btn-lg {
+  padding: .75rem 1.75rem;
+  font-size: 1rem;
+  border-radius: 10px;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   FOOTER
+═══════════════════════════════════════════════════════════════ */
+footer {
+  background: var(--bg);
+  border-top: 1px solid var(--border);
+  padding: 2rem 2.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.footer-logo {
+  font-weight: 800;
+  font-size: .95rem;
+  color: var(--text2);
+  letter-spacing: -.02em;
+}
+.footer-links {
+  display: flex;
+  gap: 1.5rem;
+}
+.footer-links a {
+  font-size: .8rem;
+  color: var(--text);
+  transition: color .2s;
+}
+.footer-links a:hover { color: var(--text2); }
+.footer-copy {
+  font-size: .78rem;
+  color: var(--muted);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   RESPONSIVE
+═══════════════════════════════════════════════════════════════ */
+@media (max-width: 900px) {
+  .hero-inner { grid-template-columns: 1fr; gap: 2.5rem; }
+  .terminal { display: none; }
+  .hero-title { font-size: 2.4rem; }
+  .team-grid { grid-template-columns: repeat(2, 1fr); }
+  .bento { grid-template-columns: 1fr; }
+  .bento-card.wide { grid-column: span 1; grid-template-columns: 1fr; }
+  .stats-grid { grid-template-columns: repeat(2, 1fr); }
+  .stat-item:nth-child(2) { border-right: none; }
+  .steps-track { grid-template-columns: 1fr; gap: 2rem; }
+  .steps-track::before { display: none; }
+  .task-example { grid-template-columns: 1fr; text-align: center; }
+  .quickstart-grid { grid-template-columns: 1fr; }
+  .arch-top, .arch-row { flex-wrap: wrap; }
+  nav .nav-links { display: none; }
+}
+@media (max-width: 600px) {
+  nav { padding: 0 1.25rem; }
+  .section-wrap { padding: 4rem 1.25rem; }
+  .hero-inner { padding-top: 1rem; }
+  #hero { padding: 7rem 1.25rem 4rem; }
+  .team-grid { grid-template-columns: 1fr; }
+  .stats-grid { grid-template-columns: 1fr; }
+  .stat-item { border-right: none; border-bottom: 1px solid var(--border2); padding: 2rem 1.25rem; }
+  .stat-item:last-child { border-bottom: none; }
+  footer { flex-direction: column; gap: 1rem; text-align: center; }
+}
+</style>
+</head>
+<body>
+
+<!-- ════════════════════════════════════════════════════════════
+  NAV
+════════════════════════════════════════════════════════════ -->
+<nav>
+  <a class="nav-logo" href="/">
+    <span class="claw">🦀</span>
+    <span>Team<span style="color:var(--accent2)">Claw</span></span>
+  </a>
+  <div class="nav-links">
+    <a href="#how">How it works</a>
+    <a href="#arch">Architecture</a>
+    <a href="#team">Agents</a>
+    <a href="#features">Features</a>
+  </div>
+  <div class="nav-cta">
+    <a class="btn btn-ghost" href="/pitch">Pitch Deck</a>
+    <a class="btn btn-primary" href="/dashboard">Open Dashboard →</a>
+  </div>
+</nav>
+
+<!-- ════════════════════════════════════════════════════════════
+  HERO
+════════════════════════════════════════════════════════════ -->
+<section id="hero">
+  <div class="hero-glow hero-glow-1"></div>
+  <div class="hero-glow hero-glow-2"></div>
+  <div class="hero-glow hero-glow-3"></div>
+  <div class="hero-inner">
+    <div class="hero-left">
+      <div class="hero-badge reveal">
+        <span class="live-dot"></span>
+        Live &amp; open source
+      </div>
+      <h1 class="hero-title reveal reveal-delay-1">
+        Your entire<br>engineering team,<br>
+        <span class="grad">powered by AI</span>
+      </h1>
+      <p class="hero-sub reveal reveal-delay-2">
+        Submit a task in plain English. <strong>8 specialized AI agents</strong> — Product Owner, Engineering Manager, Architect, UX Engineer, and 4 developers — collaborate through the full SDLC and ship <strong>production code to GitHub</strong> in minutes.
+      </p>
+      <div class="hero-actions reveal reveal-delay-3">
+        <a class="btn btn-primary btn-lg" href="/dashboard">Open Dashboard →</a>
+        <a class="btn btn-ghost btn-lg" href="https://github.com/RajuRoopani/team-claw" target="_blank" rel="noopener">⎇ View on GitHub</a>
+      </div>
+      <div class="hero-meta reveal reveal-delay-4">
+        <div>
+          <div class="hero-stat-n">8</div>
+          <div class="hero-stat-l">AI agents</div>
+        </div>
+        <div>
+          <div class="hero-stat-n">&lt;3<span style="font-size:1rem;color:var(--text)">min</span></div>
+          <div class="hero-stat-l">task to GitHub</div>
+        </div>
+        <div>
+          <div class="hero-stat-n">100<span style="font-size:1rem;color:var(--text)">%</span></div>
+          <div class="hero-stat-l">test coverage</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Live terminal -->
+    <div class="reveal reveal-delay-2">
+      <div class="terminal">
+        <div class="term-bar">
+          <div class="term-dots">
+            <div class="term-dot td-r"></div>
+            <div class="term-dot td-y"></div>
+            <div class="term-dot td-g"></div>
+          </div>
+          <div class="term-title">team-claw — live agent feed</div>
+        </div>
+        <div class="term-body" id="termBody">
+          <div class="term-line" style="opacity:1">
+            <span class="term-ts">00:00</span>
+            <span class="term-role" style="color:#58a6ff">you</span>
+            <span class="term-msg">Build a REST API for a todo app with auth</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════
+  HOW IT WORKS
+════════════════════════════════════════════════════════════ -->
+<div class="how-divider"></div>
+<section id="how">
+  <div class="section-wrap">
+    <div class="eyebrow reveal">How it works</div>
+    <h2 class="section-title reveal reveal-delay-1">From idea to production<br>in three steps</h2>
+    <p class="section-sub reveal reveal-delay-2">No setup wizards, no boilerplate, no ticket grooming. Just describe what you want to build.</p>
+
+    <div class="steps-track">
+      <div class="step-card reveal">
+        <div class="step-num">
+          <span>✍️</span>
+          <span class="step-num-label">1</span>
+        </div>
+        <div class="step-title">Describe your task</div>
+        <div class="step-desc">Type a plain-English requirement through the dashboard or API. No special syntax — just say what you need built.</div>
+      </div>
+      <div class="step-card reveal reveal-delay-1">
+        <div class="step-num">
+          <span>🤝</span>
+          <span class="step-num-label">2</span>
+        </div>
+        <div class="step-title">Agents collaborate</div>
+        <div class="step-desc">Eight specialized AI agents debate the design, write code, review each other's work, and run tests — just like a real team.</div>
+      </div>
+      <div class="step-card reveal reveal-delay-2">
+        <div class="step-num">
+          <span>🚀</span>
+          <span class="step-num-label">3</span>
+        </div>
+        <div class="step-title">Code lands on GitHub</div>
+        <div class="step-desc">A clean repo with architecture docs, tested code, and a commit history appears on your GitHub — ready to ship.</div>
+      </div>
+    </div>
+
+    <div class="task-example reveal reveal-delay-3">
+      <div>
+        <div class="task-input-label">Your input</div>
+        <div class="task-input-box">"Build a REST API for a todo app with JWT auth and PostgreSQL"</div>
+      </div>
+      <div class="task-arrow-wrap">
+        <div class="task-arrow">→</div>
+        <div class="task-arrow-label">~2 minutes</div>
+        <div class="task-arrow-label">8 agents working</div>
+      </div>
+      <div>
+        <div class="task-output-label">Delivered to GitHub</div>
+        <div class="task-output-box">
+          <div class="task-output-item"><span class="ok">✓</span> Architecture document (ADR)</div>
+          <div class="task-output-item"><span class="ok">✓</span> FastAPI app with 5 endpoints</div>
+          <div class="task-output-item"><span class="ok">✓</span> JWT auth middleware</div>
+          <div class="task-output-item"><span class="ok">✓</span> 21/21 pytest tests passing</div>
+          <div class="task-output-item"><span class="ok">✓</span> README with setup guide</div>
+          <div class="task-output-item"><span class="ok">✓</span> Clean commit history</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════
+  ARCHITECTURE
+════════════════════════════════════════════════════════════ -->
+<section id="arch">
+  <div class="section-wrap">
+    <div class="eyebrow reveal">Architecture</div>
+    <h2 class="section-title reveal reveal-delay-1">8 agents, one mission</h2>
+    <p class="section-sub reveal reveal-delay-2">Each agent owns a distinct SDLC role, communicates via Redis Streams, and persists memory across tasks. Click any node to learn more.</p>
+
+    <div class="arch-diagram reveal reveal-delay-2">
+      <!-- Row: Human + Orchestrator -->
+      <div class="arch-top">
+        <div class="anode anode-human" data-agent="human">
+          <span class="anode-emoji">👤</span>
+          <span class="anode-name">You</span>
+          <span class="anode-model">http api</span>
+        </div>
+        <div style="color:var(--border2);font-size:1.4rem;align-self:center">→</div>
+        <div class="anode anode-orch" data-agent="orch">
+          <span class="anode-emoji">⚙️</span>
+          <span class="anode-name">Orchestrator</span>
+          <span class="anode-model">FastAPI</span>
+        </div>
+      </div>
+
+      <!-- Connector -->
+      <div class="arch-vline" style="background:linear-gradient(var(--border2),var(--c-po));"></div>
+
+      <!-- Product Owner -->
+      <div class="arch-row">
+        <div class="anode anode-po" data-agent="po">
+          <span class="anode-emoji">📋</span>
+          <span class="anode-name">Product Owner</span>
+          <span class="anode-model">claude-opus-4-6</span>
+        </div>
+      </div>
+
+      <div class="arch-vline" style="background:linear-gradient(var(--c-po),var(--c-em));"></div>
+
+      <!-- Engineering Manager -->
+      <div class="arch-row">
+        <div class="anode anode-em" data-agent="em">
+          <span class="anode-emoji">🧑‍💼</span>
+          <span class="anode-name">Engineering Manager</span>
+          <span class="anode-model">claude-opus-4-6</span>
+        </div>
+      </div>
+
+      <!-- SVG fan-out connector -->
+      <div style="position:relative;height:40px;max-width:700px;margin:0 auto;width:100%;">
+        <svg viewBox="0 0 700 40" preserveAspectRatio="none" style="width:100%;height:100%;overflow:visible;">
+          <path class="flow-path" d="M350,0 L175,40" stroke="rgba(121,192,255,.4)"/>
+          <path class="flow-path" d="M350,0 L525,40" stroke="rgba(240,171,252,.4)"/>
+          <circle cx="175" cy="40" r="3" fill="var(--c-arch)" opacity=".8"/>
+          <circle cx="525" cy="40" r="3" fill="var(--c-ux)" opacity=".8"/>
+        </svg>
+      </div>
+
+      <!-- Architect + UX -->
+      <div class="arch-row">
+        <div class="anode anode-arch" data-agent="arch" style="margin-right:4rem;">
+          <span class="anode-emoji">🏛️</span>
+          <span class="anode-name">Architect</span>
+          <span class="anode-model">claude-sonnet-4-6</span>
+        </div>
+        <div class="anode anode-ux" data-agent="ux" style="margin-left:4rem;">
+          <span class="anode-emoji">🎨</span>
+          <span class="anode-name">UX Engineer</span>
+          <span class="anode-model">claude-sonnet-4-6</span>
+        </div>
+      </div>
+
+      <!-- SVG fan-out to senior devs -->
+      <div style="position:relative;height:40px;max-width:700px;margin:0 auto;width:100%;">
+        <svg viewBox="0 0 700 40" preserveAspectRatio="none" style="width:100%;height:100%;overflow:visible;">
+          <path class="flow-path" d="M175,0 L175,40" stroke="rgba(86,211,100,.4)"/>
+          <path class="flow-path" d="M525,0 L525,40" stroke="rgba(63,185,80,.4)"/>
+          <circle cx="175" cy="40" r="3" fill="var(--c-sr1)" opacity=".8"/>
+          <circle cx="525" cy="40" r="3" fill="var(--c-sr2)" opacity=".8"/>
+        </svg>
+      </div>
+
+      <!-- Senior Devs -->
+      <div class="arch-row">
+        <div class="anode anode-sr1" data-agent="sr1" style="margin-right:4rem;">
+          <span class="anode-emoji">👩‍💻</span>
+          <span class="anode-name">Senior Dev 1</span>
+          <span class="anode-model">claude-sonnet-4-6</span>
+        </div>
+        <div class="anode anode-sr2" data-agent="sr2" style="margin-left:4rem;">
+          <span class="anode-emoji">🧑‍💻</span>
+          <span class="anode-name">Senior Dev 2</span>
+          <span class="anode-model">claude-sonnet-4-6</span>
+        </div>
+      </div>
+
+      <!-- Fan to junior devs -->
+      <div style="position:relative;height:40px;max-width:700px;margin:0 auto;width:100%;">
+        <svg viewBox="0 0 700 40" preserveAspectRatio="none" style="width:100%;height:100%;overflow:visible;">
+          <path class="flow-path" d="M175,0 L175,40" stroke="rgba(255,161,152,.4)"/>
+          <path class="flow-path" d="M525,0 L525,40" stroke="rgba(255,123,114,.4)"/>
+          <circle cx="175" cy="40" r="3" fill="var(--c-jr1)" opacity=".8"/>
+          <circle cx="525" cy="40" r="3" fill="var(--c-jr2)" opacity=".8"/>
+        </svg>
+      </div>
+
+      <!-- Junior Devs -->
+      <div class="arch-row">
+        <div class="anode anode-jr1" data-agent="jr1" style="margin-right:4rem;">
+          <span class="anode-emoji">👨‍💻</span>
+          <span class="anode-name">Junior Dev 1</span>
+          <span class="anode-model">claude-haiku-4-5</span>
+        </div>
+        <div class="anode anode-jr2" data-agent="jr2" style="margin-left:4rem;">
+          <span class="anode-emoji">💻</span>
+          <span class="anode-name">Junior Dev 2</span>
+          <span class="anode-model">claude-haiku-4-5</span>
+        </div>
+      </div>
+
+      <!-- Fan to GitHub -->
+      <div style="position:relative;height:40px;max-width:700px;margin:0 auto;width:100%;">
+        <svg viewBox="0 0 700 40" preserveAspectRatio="none" style="width:100%;height:100%;overflow:visible;">
+          <path class="flow-path" d="M175,0 L350,40" stroke="rgba(99,102,241,.5)"/>
+          <path class="flow-path" d="M525,0 L350,40" stroke="rgba(99,102,241,.5)"/>
+          <circle cx="350" cy="40" r="4" fill="var(--accent)" opacity="1"/>
+        </svg>
+      </div>
+
+      <!-- GitHub -->
+      <div class="arch-row">
+        <div class="anode anode-github" data-agent="github">
+          <span class="anode-emoji">⎇</span>
+          <span class="anode-name">GitHub Repository</span>
+          <span class="anode-model">production code</span>
+        </div>
+      </div>
+
+      <p class="arch-hint">Click any agent to learn about their role</p>
+
+      <!-- Detail panel -->
+      <div class="agent-panel" id="agentPanel">
+        <div class="panel-header">
+          <div class="panel-emoji" id="panelEmoji"></div>
+          <div>
+            <div class="panel-role" id="panelRole"></div>
+            <div class="panel-name" id="panelName"></div>
+            <div style="margin-top:.4rem">
+              <span class="panel-model-badge" id="panelModel"></span>
+            </div>
+          </div>
+        </div>
+        <div class="panel-body">
+          <div>
+            <div class="panel-section-title">Responsibilities</div>
+            <ul class="panel-bullets" id="panelBullets"></ul>
+          </div>
+          <div>
+            <div class="panel-section-title">Communicates with</div>
+            <div class="panel-talks" id="panelTalks"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════
+  STATS
+════════════════════════════════════════════════════════════ -->
+<section id="stats">
+  <div class="stats-grid" style="max-width:1200px;margin:0 auto;">
+    <div class="stat-item reveal">
+      <div class="stat-n" data-target="8">0</div>
+      <div class="stat-l">Specialized AI agents<br>covering every SDLC role</div>
+    </div>
+    <div class="stat-item reveal reveal-delay-1">
+      <div class="stat-n">&lt;3<em>min</em></div>
+      <div class="stat-l">Average time from<br>task to GitHub push</div>
+    </div>
+    <div class="stat-item reveal reveal-delay-2">
+      <div class="stat-n" data-target="100">0<em>%</em></div>
+      <div class="stat-l">Test coverage on<br>all generated code</div>
+    </div>
+    <div class="stat-item reveal reveal-delay-3">
+      <div class="stat-n" data-target="0">0<em>$</em></div>
+      <div class="stat-l">Infra cost — runs on your<br>machine with Docker</div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════
+  AGENT TEAM CARDS
+════════════════════════════════════════════════════════════ -->
+<section id="team">
+  <div class="section-wrap">
+    <div class="eyebrow reveal">The Team</div>
+    <h2 class="section-title reveal reveal-delay-1">Meet your AI engineering team</h2>
+    <p class="section-sub reveal reveal-delay-2">Each agent has a distinct role, persistent memory, and specialized system prompt — they're not just chat, they're collaborators.</p>
+
+    <div class="team-grid">
+      <div class="team-card tc-po reveal">
+        <div class="tc-emoji">📋</div>
+        <div class="tc-role">Product Owner</div>
+        <div class="tc-name">The Visionary</div>
+        <div class="tc-model">claude-opus-4-6</div>
+        <ul class="tc-responsibilities">
+          <li>Translates requirements into structured user stories</li>
+          <li>Defines acceptance criteria and priority</li>
+          <li>Manages sprint backlog and scope</li>
+          <li>Reviews deliverables against requirements</li>
+        </ul>
+      </div>
+      <div class="team-card tc-em reveal reveal-delay-1">
+        <div class="tc-emoji">🧑‍💼</div>
+        <div class="tc-role">Engineering Manager</div>
+        <div class="tc-name">The Coordinator</div>
+        <div class="tc-model">claude-opus-4-6</div>
+        <ul class="tc-responsibilities">
+          <li>Breaks epics into technical tasks</li>
+          <li>Assigns work to the right developers</li>
+          <li>Resolves blockers and dependencies</li>
+          <li>Tracks progress and coordinates releases</li>
+        </ul>
+      </div>
+      <div class="team-card tc-arch reveal reveal-delay-2">
+        <div class="tc-emoji">🏛️</div>
+        <div class="tc-role">Architect</div>
+        <div class="tc-name">The Designer</div>
+        <div class="tc-model">claude-sonnet-4-6</div>
+        <ul class="tc-responsibilities">
+          <li>Selects tech stack and patterns</li>
+          <li>Writes architecture decision records</li>
+          <li>Designs APIs, schemas, and interfaces</li>
+          <li>Enforces standards and best practices</li>
+        </ul>
+      </div>
+      <div class="team-card tc-ux reveal reveal-delay-3">
+        <div class="tc-emoji">🎨</div>
+        <div class="tc-role">UX Engineer</div>
+        <div class="tc-name">The Creator</div>
+        <div class="tc-model">claude-sonnet-4-6</div>
+        <ul class="tc-responsibilities">
+          <li>Creates wireframes and UX flows</li>
+          <li>Writes CSS and frontend components</li>
+          <li>Ensures accessibility and usability</li>
+          <li>Validates design against user stories</li>
+        </ul>
+      </div>
+      <div class="team-card tc-sr1 reveal reveal-delay-1">
+        <div class="tc-emoji">👩‍💻</div>
+        <div class="tc-role">Senior Developer 1</div>
+        <div class="tc-name">The Builder</div>
+        <div class="tc-model">claude-sonnet-4-6</div>
+        <ul class="tc-responsibilities">
+          <li>Implements core features and APIs</li>
+          <li>Performs code reviews</li>
+          <li>Mentors and delegates to Junior Dev 1</li>
+          <li>Pushes final code to GitHub</li>
+        </ul>
+      </div>
+      <div class="team-card tc-sr2 reveal reveal-delay-2">
+        <div class="tc-emoji">🧑‍💻</div>
+        <div class="tc-role">Senior Developer 2</div>
+        <div class="tc-name">The Builder</div>
+        <div class="tc-model">claude-sonnet-4-6</div>
+        <ul class="tc-responsibilities">
+          <li>Implements parallel feature tracks</li>
+          <li>Integrates components and modules</li>
+          <li>Mentors and delegates to Junior Dev 2</li>
+          <li>Handles database and infrastructure code</li>
+        </ul>
+      </div>
+      <div class="team-card tc-jr1 reveal reveal-delay-3">
+        <div class="tc-emoji">👨‍💻</div>
+        <div class="tc-role">Junior Developer 1</div>
+        <div class="tc-name">The Tester</div>
+        <div class="tc-model">claude-haiku-4-5</div>
+        <ul class="tc-responsibilities">
+          <li>Writes comprehensive test suites</li>
+          <li>Implements simpler features</li>
+          <li>Runs tests in the sandbox environment</li>
+          <li>Reports results to Senior Dev 1</li>
+        </ul>
+      </div>
+      <div class="team-card tc-jr2 reveal reveal-delay-4">
+        <div class="tc-emoji">💻</div>
+        <div class="tc-role">Junior Developer 2</div>
+        <div class="tc-name">The Tester</div>
+        <div class="tc-model">claude-haiku-4-5</div>
+        <ul class="tc-responsibilities">
+          <li>Writes unit and integration tests</li>
+          <li>Generates documentation</li>
+          <li>Runs CI in sandbox and reports results</li>
+          <li>Reports results to Senior Dev 2</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════
+  FEATURES BENTO
+════════════════════════════════════════════════════════════ -->
+<section id="features">
+  <div class="section-wrap">
+    <div class="eyebrow reveal">Features</div>
+    <h2 class="section-title reveal reveal-delay-1">Everything a real team does,<br>automated end to end</h2>
+
+    <div class="bento">
+      <div class="bento-card wide featured reveal">
+        <div class="bento-content">
+          <div class="bento-icon">⚡</div>
+          <div class="bento-title">Real-time agent collaboration</div>
+          <div class="bento-desc">Watch agents debate architecture, review each other's code, and resolve blockers live in the dashboard. Powered by Redis Streams — every message is persisted and auditable.</div>
+          <div style="margin-top:1rem">
+            <span class="bento-tag bt-ind">Redis Streams</span>
+            <span class="bento-tag bt-cyn">Live SSE Feed</span>
+            <span class="bento-tag bt-grn">Persistent Audit Log</span>
+          </div>
+        </div>
+        <div class="bento-code">
+<span class="c"># Agents communicate via Redis inboxes</span>
+<span class="k">await</span> redis.xadd(
+  <span class="s">"agent:senior_dev_1:inbox"</span>,
+  {<span class="s">"from"</span>: <span class="s">"eng_manager"</span>,
+   <span class="s">"task"</span>: <span class="s">"implement /auth/login"</span>,
+   <span class="s">"priority"</span>: <span class="s">"high"</span>}
+)
+<span class="c"># Agents reply, review, iterate...</span>
+        </div>
+      </div>
+
+      <div class="bento-card reveal reveal-delay-1">
+        <div class="bento-icon">🔒</div>
+        <div class="bento-title">Sandboxed code execution</div>
+        <div class="bento-desc">All code runs in an isolated Docker sandbox before being pushed. Tests must pass — no exceptions. The CI result is published back to the agent feed.</div>
+        <div style="margin-top:.8rem">
+          <span class="bento-tag bt-grn">Docker sandbox</span>
+          <span class="bento-tag bt-ind">Auto-CI</span>
+        </div>
+      </div>
+
+      <div class="bento-card reveal reveal-delay-2">
+        <div class="bento-icon">🧠</div>
+        <div class="bento-title">Persistent agent memory</div>
+        <div class="bento-desc">Each agent writes lessons learned to PostgreSQL. The next time you submit a task, agents build on prior experience — no repetition, continuous improvement.</div>
+        <div style="margin-top:.8rem">
+          <span class="bento-tag bt-pur">PostgreSQL</span>
+          <span class="bento-tag bt-amb">Cross-task learning</span>
+        </div>
+      </div>
+
+      <div class="bento-card reveal reveal-delay-1">
+        <div class="bento-icon">⎇</div>
+        <div class="bento-title">Automatic GitHub push</div>
+        <div class="bento-desc">Agents commit code to a new repo on your GitHub account with a real, readable commit history — architecture docs, implementation, tests, and README in separate commits.</div>
+      </div>
+
+      <div class="bento-card reveal reveal-delay-2">
+        <div class="bento-icon">🤖</div>
+        <div class="bento-title">Works with GitHub Copilot</div>
+        <div class="bento-desc">No Anthropic API key required. If you have a GitHub Copilot subscription, agents auto-detect it and use the Copilot backend — same Claude models, zero extra cost.</div>
+        <div style="margin-top:.8rem">
+          <span class="bento-tag bt-grn">GitHub Copilot</span>
+          <span class="bento-tag bt-ind">Anthropic API</span>
+        </div>
+      </div>
+
+      <div class="bento-card reveal reveal-delay-3">
+        <div class="bento-icon">📊</div>
+        <div class="bento-title">Live engineering dashboard</div>
+        <div class="bento-desc">Watch the full agent message feed, kanban board, CI results, token usage, and team wiki — all updating in real time at <code style="font-family:monospace;font-size:.85em;color:var(--cyan)">/dashboard</code>.</div>
+      </div>
+
+      <div class="bento-card reveal reveal-delay-2">
+        <div class="bento-icon">💬</div>
+        <div class="bento-title">Human-in-the-loop</div>
+        <div class="bento-desc">When agents are stuck or need a decision, they surface a question to you through the dashboard. You reply, they continue — keeping you in control without blocking progress.</div>
+      </div>
+
+      <div class="bento-card reveal reveal-delay-3">
+        <div class="bento-icon">🐳</div>
+        <div class="bento-title">One command deploy</div>
+        <div class="bento-desc">The entire team — 11 Docker containers including Redis, PostgreSQL, sandbox, and all 8 agents — starts with a single command. No cloud accounts needed.</div>
+        <div style="margin-top:.8rem">
+          <span class="bento-tag bt-cyn">docker compose up</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════
+  TECH STACK
+════════════════════════════════════════════════════════════ -->
+<section id="stack">
+  <div class="section-wrap" style="padding-top:4rem;padding-bottom:4rem;">
+    <div class="eyebrow reveal">Built with</div>
+    <h3 class="section-title reveal reveal-delay-1" style="font-size:1.8rem;">Open, production-grade technology</h3>
+    <div class="stack-pills reveal reveal-delay-2">
+      <div class="stack-pill"><span class="icon">🤖</span> Claude Opus 4.6 / Sonnet 4.6 / Haiku 4.5</div>
+      <div class="stack-pill"><span class="icon">🐍</span> Python 3.11 + asyncio</div>
+      <div class="stack-pill"><span class="icon">⚡</span> FastAPI + Uvicorn</div>
+      <div class="stack-pill"><span class="icon">📨</span> Redis 7 Streams</div>
+      <div class="stack-pill"><span class="icon">🗄️</span> PostgreSQL 16</div>
+      <div class="stack-pill"><span class="icon">🐳</span> Docker Compose</div>
+      <div class="stack-pill"><span class="icon">🔐</span> GitHub API + PAT</div>
+      <div class="stack-pill"><span class="icon">📡</span> Server-Sent Events</div>
+      <div class="stack-pill"><span class="icon">🧪</span> pytest + sandbox runner</div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════
+  QUICK START
+════════════════════════════════════════════════════════════ -->
+<section id="quickstart">
+  <div class="section-wrap">
+    <div class="eyebrow reveal">Quick Start</div>
+    <h2 class="section-title reveal reveal-delay-1">Up and running in minutes</h2>
+    <div class="quickstart-grid">
+      <div class="reveal reveal-delay-2">
+        <div class="qs-step">
+          <div class="qs-num">1</div>
+          <div class="qs-body">
+            <div class="qs-title">Clone the repo</div>
+            <code class="code-inline">git clone https://github.com/RajuRoopani/team-claw
+cd team-claw</code>
+          </div>
+        </div>
+        <div class="qs-step">
+          <div class="qs-num">2</div>
+          <div class="qs-body">
+            <div class="qs-title">Configure your .env</div>
+            <div class="qs-desc">Add your GitHub token and username. No Anthropic key needed if you have GitHub Copilot.</div>
+            <code class="code-inline">GITHUB_TOKEN=ghp_...
+GITHUB_USERNAME=your-username</code>
+          </div>
+        </div>
+        <div class="qs-step">
+          <div class="qs-num">3</div>
+          <div class="qs-body">
+            <div class="qs-title">Launch the team</div>
+            <code class="code-inline">docker compose up --build -d</code>
+          </div>
+        </div>
+        <div class="qs-step">
+          <div class="qs-num">4</div>
+          <div class="qs-body">
+            <div class="qs-title">Submit your first task</div>
+            <code class="code-inline">curl -X POST http://localhost:8080/task \
+  -H "Content-Type: application/json" \
+  -d '{"title":"Build a REST API for a blog"}'</code>
+          </div>
+        </div>
+      </div>
+      <div class="reveal reveal-delay-3">
+        <div style="background:var(--surf2);border:1px solid var(--border2);border-radius:16px;padding:2rem;">
+          <div style="font-size:.72rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--accent2);margin-bottom:1.2rem;">What happens next</div>
+          <div style="display:flex;flex-direction:column;gap:1rem;">
+            <div style="display:flex;gap:.75rem;align-items:flex-start;">
+              <span style="color:var(--c-po);font-size:1.1rem;flex-shrink:0">📋</span>
+              <div>
+                <div style="font-size:.85rem;font-weight:600;color:var(--bright);margin-bottom:.2rem">Product Owner</div>
+                <div style="font-size:.8rem;color:var(--text)">Breaks your task into user stories and acceptance criteria</div>
+              </div>
+            </div>
+            <div style="display:flex;gap:.75rem;align-items:flex-start;">
+              <span style="color:var(--c-em);font-size:1.1rem;flex-shrink:0">🧑‍💼</span>
+              <div>
+                <div style="font-size:.85rem;font-weight:600;color:var(--bright);margin-bottom:.2rem">Engineering Manager</div>
+                <div style="font-size:.8rem;color:var(--text)">Assigns subtasks to Senior Devs in parallel</div>
+              </div>
+            </div>
+            <div style="display:flex;gap:.75rem;align-items:flex-start;">
+              <span style="color:var(--c-arch);font-size:1.1rem;flex-shrink:0">🏛️</span>
+              <div>
+                <div style="font-size:.85rem;font-weight:600;color:var(--bright);margin-bottom:.2rem">Architect + UX</div>
+                <div style="font-size:.8rem;color:var(--text)">Design the system and write the spec concurrently</div>
+              </div>
+            </div>
+            <div style="display:flex;gap:.75rem;align-items:flex-start;">
+              <span style="color:var(--c-sr1);font-size:1.1rem;flex-shrink:0">👩‍💻</span>
+              <div>
+                <div style="font-size:.85rem;font-weight:600;color:var(--bright);margin-bottom:.2rem">Senior + Junior Devs</div>
+                <div style="font-size:.8rem;color:var(--text)">Write code, tests, README — CI must pass before push</div>
+              </div>
+            </div>
+            <div style="display:flex;gap:.75rem;align-items:flex-start;">
+              <span style="color:var(--accent2);font-size:1.1rem;flex-shrink:0">⎇</span>
+              <div>
+                <div style="font-size:.85rem;font-weight:600;color:var(--bright);margin-bottom:.2rem">GitHub</div>
+                <div style="font-size:.8rem;color:var(--text)">A new repo appears on your account with all the code</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════
+  CTA
+════════════════════════════════════════════════════════════ -->
+<section id="cta">
+  <div class="cta-inner">
+    <div class="eyebrow reveal" style="text-align:center">Get started</div>
+    <h2 class="cta-title reveal reveal-delay-1">
+      Stop writing boilerplate.<br>Start shipping products.
+    </h2>
+    <p class="cta-sub reveal reveal-delay-2">
+      Team Claw is open source, self-hosted, and runs entirely on your machine. Your code, your GitHub, your team.
+    </p>
+    <div class="cta-actions reveal reveal-delay-3">
+      <a class="btn btn-primary btn-lg" href="/dashboard">Open Dashboard →</a>
+      <a class="btn btn-ghost btn-lg" href="https://github.com/RajuRoopani/team-claw" target="_blank" rel="noopener">⎇ Star on GitHub</a>
+      <a class="btn btn-ghost btn-lg" href="/pitch">📊 View Pitch Deck</a>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════
+  FOOTER
+════════════════════════════════════════════════════════════ -->
+<footer>
+  <div class="footer-logo">🦀 TeamClaw</div>
+  <div class="footer-links">
+    <a href="/dashboard">Dashboard</a>
+    <a href="/pitch">Pitch Deck</a>
+    <a href="https://github.com/RajuRoopani/team-claw" target="_blank" rel="noopener">GitHub</a>
+  </div>
+  <div class="footer-copy">Open source · MIT license</div>
+</footer>
+
+<script>
+/* ═══════════════════════════════════════════
+   SCROLL REVEAL
+═══════════════════════════════════════════ */
+const ro = new IntersectionObserver(entries => {
+  entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
+}, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+document.querySelectorAll('.reveal').forEach(el => ro.observe(el));
+
+/* ═══════════════════════════════════════════
+   NAV SCROLL EFFECT
+═══════════════════════════════════════════ */
+window.addEventListener('scroll', () => {
+  document.querySelector('nav').style.background =
+    window.scrollY > 40 ? 'rgba(7,7,14,.95)' : 'rgba(7,7,14,.8)';
+}, { passive: true });
+
+/* ═══════════════════════════════════════════
+   TERMINAL ANIMATION
+═══════════════════════════════════════════ */
+const termLines = [
+  { delay: 800,  role: '📋 product_owner', color: '#d2a8ff', msg: 'Analysing requirements. Breaking into 4 user stories.' },
+  { delay: 1800, role: '🧑‍💼 eng_manager',  color: '#ffa657', msg: 'Assigning auth to sr1, CRUD to sr2. Arch in parallel.' },
+  { delay: 2800, role: '🏛️ architect',     color: '#79c0ff', msg: 'FastAPI + asyncpg + JWT. Writing ADR now.' },
+  { delay: 3800, role: '👩‍💻 senior_dev_1', color: '#56d364', msg: 'main.py written. Delegating tests to jr1.' },
+  { delay: 4600, role: '🧑‍💻 senior_dev_2', color: '#3fb950', msg: 'models.py + migrations done. Pushing schema.' },
+  { delay: 5400, role: '👨‍💻 junior_dev_1', color: '#ffa198', msg: 'test_auth.py: 14 cases written. Running CI...' },
+  { delay: 6200, role: '💻 junior_dev_2',  color: '#ff7b72', msg: 'test_crud.py: 7 cases written. Running CI...' },
+  { delay: 7000, role: '⚙️ sandbox',       color: '#8b949e', msg: '✅ 21/21 tests passed in 4.2s' },
+  { delay: 7800, role: '👩‍💻 senior_dev_1', color: '#56d364', msg: '🚀 Pushed to github.com/user/todo-rest-api' },
+];
+
+const termBody = document.getElementById('termBody');
+let termStarted = false;
+
+function startTerminal() {
+  if (termStarted) return;
+  termStarted = true;
+  termLines.forEach(({ delay, role, color, msg }, i) => {
+    setTimeout(() => {
+      const mins = String(Math.floor(delay / 60000)).padStart(2,'0');
+      const secs = String(Math.floor((delay % 60000) / 1000)).padStart(2,'0');
+      const line = document.createElement('div');
+      line.className = 'term-line';
+      line.innerHTML = `
+        <span class="term-ts">${mins}:${secs}</span>
+        <span class="term-role" style="color:${color}">${role}</span>
+        <span class="term-msg">${msg}</span>
+      `;
+      termBody.appendChild(line);
+      requestAnimationFrame(() => line.style.opacity = '1');
+      termBody.scrollTop = termBody.scrollHeight;
+
+      if (i === termLines.length - 1) {
+        const cursor = document.createElement('span');
+        cursor.className = 'term-cursor';
+        termBody.appendChild(cursor);
+      }
+    }, delay);
+  });
+}
+
+// Start terminal when hero is visible
+new IntersectionObserver(entries => {
+  if (entries[0].isIntersecting) startTerminal();
+}, { threshold: 0.3 }).observe(document.getElementById('hero'));
+
+/* ═══════════════════════════════════════════
+   ARCHITECTURE PANEL
+═══════════════════════════════════════════ */
+const agentData = {
+  human: {
+    emoji: '👤', role: 'User', name: 'You',
+    model: 'HTTP / REST API',
+    bullets: ['Submit tasks via POST /task', 'Monitor progress via dashboard', 'Reply to agent questions', 'Receive the GitHub repo link'],
+    talks: ['Orchestrator'],
+  },
+  orch: {
+    emoji: '⚙️', role: 'Infrastructure', name: 'Orchestrator',
+    model: 'FastAPI + PostgreSQL',
+    bullets: ['Accepts tasks from humans via REST API', 'Routes messages between agents via Redis Streams', 'Persists all messages and memories to PostgreSQL', 'Serves the live dashboard and event stream'],
+    talks: ['All agents', 'Redis', 'PostgreSQL', 'Sandbox'],
+  },
+  po: {
+    emoji: '📋', role: 'Product Owner', name: 'The Visionary',
+    model: 'claude-opus-4-6',
+    bullets: ['Interprets plain-English requirements', 'Writes structured user stories with acceptance criteria', 'Prioritises and refines the backlog', 'Reviews final deliverables against requirements'],
+    talks: ['Engineering Manager', 'Architect', 'UX Engineer'],
+  },
+  em: {
+    emoji: '🧑‍💼', role: 'Engineering Manager', name: 'The Coordinator',
+    model: 'claude-opus-4-6',
+    bullets: ['Decomposes stories into technical tasks', 'Assigns tasks to the right senior developer', 'Tracks progress and unblocks dependencies', 'Coordinates parallel workstreams across the team'],
+    talks: ['Product Owner', 'Architect', 'Senior Dev 1', 'Senior Dev 2'],
+  },
+  arch: {
+    emoji: '🏛️', role: 'Architect', name: 'The Designer',
+    model: 'claude-sonnet-4-6',
+    bullets: ['Selects appropriate tech stack and patterns', 'Writes architecture decision records (ADRs)', 'Designs API contracts and data schemas', 'Reviews implementations for standards compliance'],
+    talks: ['Engineering Manager', 'UX Engineer', 'Senior Dev 1', 'Senior Dev 2'],
+  },
+  ux: {
+    emoji: '🎨', role: 'UX Engineer', name: 'The Creator',
+    model: 'claude-sonnet-4-6',
+    bullets: ['Designs user flows and wireframes', 'Writes HTML/CSS for frontend components', 'Ensures accessibility and responsive design', 'Validates UI against product requirements'],
+    talks: ['Engineering Manager', 'Architect', 'Senior Dev 1'],
+  },
+  sr1: {
+    emoji: '👩‍💻', role: 'Senior Developer 1', name: 'The Builder',
+    model: 'claude-sonnet-4-6',
+    bullets: ['Implements core backend features and APIs', 'Reviews code quality and architecture compliance', 'Delegates tests and docs to Junior Dev 1', 'Commits and pushes final code to GitHub'],
+    talks: ['Engineering Manager', 'Architect', 'Junior Dev 1', 'GitHub'],
+  },
+  sr2: {
+    emoji: '🧑‍💻', role: 'Senior Developer 2', name: 'The Builder',
+    model: 'claude-sonnet-4-6',
+    bullets: ['Implements parallel feature tracks', 'Handles database models, migrations, and infrastructure', 'Delegates test writing to Junior Dev 2', 'Coordinates integration with Senior Dev 1'],
+    talks: ['Engineering Manager', 'Junior Dev 2', 'GitHub'],
+  },
+  jr1: {
+    emoji: '👨‍💻', role: 'Junior Developer 1', name: 'The Tester',
+    model: 'claude-haiku-4-5',
+    bullets: ['Writes unit, integration, and E2E test suites', 'Runs tests in the sandboxed environment', 'Reports CI pass/fail results to Senior Dev 1', 'Implements simpler features under guidance'],
+    talks: ['Senior Dev 1', 'Sandbox'],
+  },
+  jr2: {
+    emoji: '💻', role: 'Junior Developer 2', name: 'The Tester',
+    model: 'claude-haiku-4-5',
+    bullets: ['Writes unit and integration tests for Sr Dev 2\'s code', 'Generates README and inline documentation', 'Runs CI in sandbox and reports results', 'Implements simple utility functions'],
+    talks: ['Senior Dev 2', 'Sandbox'],
+  },
+  github: {
+    emoji: '⎇', role: 'Destination', name: 'GitHub Repository',
+    model: 'git push origin main',
+    bullets: ['New repo created per task (named from description)', 'Commits include architecture docs, code, tests, README', 'Clean readable commit history from the dev team', 'Fully functional and CI-passing on arrival'],
+    talks: ['Senior Dev 1', 'Senior Dev 2'],
+  },
+};
+
+let activeAgent = null;
+
+document.querySelectorAll('.anode').forEach(node => {
+  node.addEventListener('click', () => {
+    const key = node.dataset.agent;
+    const data = agentData[key];
+    if (!data) return;
+
+    document.querySelectorAll('.anode').forEach(n => n.classList.remove('active'));
+
+    if (activeAgent === key) {
+      activeAgent = null;
+      document.getElementById('agentPanel').classList.remove('visible');
+      return;
+    }
+    activeAgent = key;
+    node.classList.add('active');
+
+    document.getElementById('panelEmoji').textContent = data.emoji;
+    document.getElementById('panelRole').textContent = data.role;
+    document.getElementById('panelName').textContent = data.name;
+    document.getElementById('panelModel').textContent = data.model;
+
+    const bullets = document.getElementById('panelBullets');
+    bullets.innerHTML = data.bullets.map(b => `<li>${b}</li>`).join('');
+
+    const talks = document.getElementById('panelTalks');
+    talks.innerHTML = data.talks.map(t => `<span class="panel-talks-tag">${t}</span>`).join('');
+
+    const panel = document.getElementById('agentPanel');
+    panel.classList.remove('visible');
+    requestAnimationFrame(() => panel.classList.add('visible'));
+    panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  });
+});
+
+/* ═══════════════════════════════════════════
+   STATS COUNTER
+═══════════════════════════════════════════ */
+function animateCount(el, target, suffix = '') {
+  const start = performance.now();
+  const duration = 1400;
+  function tick(now) {
+    const t = Math.min((now - start) / duration, 1);
+    const ease = 1 - Math.pow(1 - t, 3);
+    el.firstChild.textContent = Math.round(ease * target);
+    if (t < 1) requestAnimationFrame(tick);
+    else el.firstChild.textContent = target;
+  }
+  requestAnimationFrame(tick);
+}
+
+new IntersectionObserver(entries => {
+  if (!entries[0].isIntersecting) return;
+  document.querySelectorAll('.stat-n[data-target]').forEach(el => {
+    animateCount(el, parseInt(el.dataset.target));
+  });
+}, { threshold: 0.5 }).observe(document.getElementById('stats'));
+</script>
+</body>
+</html>
