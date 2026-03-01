@@ -1,54 +1,183 @@
 # Team Claw
 
-An autonomous AI software development team running in Docker. Eight Claude agents — each playing a real SDLC role — receive requirements, design, implement, test, review, and ship working code to GitHub without human intervention.
+> **An autonomous AI software development team.** Submit a requirement. Watch eight Claude agents design, build, test, and ship working code to GitHub — without touching a keyboard.
 
-Built across 18 phases, from a minimal 2-agent loop to a full team with a dedicated UX Engineer, CI, human-in-the-loop escalation, live dashboard, tool telemetry, and persistent agent memory that evolves with every task. Latest: Phase 19 — agent auto-recovery (exponential backoff, exhaustion rescue), thread close guard, GitHub push reminders, and Architect git tools. Runs on macOS, Linux, and Windows (Docker Desktop).
+---
 
-![Team Claw Dashboard](docs/dashboard.png)
+<div align="center">
+
+**[Live Pitch Deck](https://rhjrjl9w-8080.usw2.devtunnels.ms/pitch)** &nbsp;|&nbsp; **[Live Dashboard](https://rhjrjl9w-8080.usw2.devtunnels.ms/dashboard)** &nbsp;|&nbsp; **[GitHub](https://github.com/RajuRoopani/team-claw)**
+
+`8 agents` &nbsp;·&nbsp; `12 containers` &nbsp;·&nbsp; `25 tools` &nbsp;·&nbsp; `38 API endpoints` &nbsp;·&nbsp; `19 build phases` &nbsp;·&nbsp; `~5,000 LOC`
+
+</div>
+
+---
+
+## What It Does
+
+You type one sentence. The team does the rest.
+
+```
+python3 cli.py submit \
+  "Build a social media REST API" \
+  "Users, posts, likes, follows, feed. FastAPI + tests. GitHub Repo: social-api"
+```
+
+Fifteen minutes later, a GitHub repo exists with production-ready code and a passing test suite — written, reviewed, and pushed entirely by AI agents talking to each other.
+
+No scaffolding. No templates. No human in the loop (unless an agent asks).
+
+---
+
+## What's Been Shipped
+
+Real apps, written autonomously, tests passing:
+
+| App | Stack | Tests |
+|-----|-------|-------|
+| Facebook clone | Node.js + Express + SQLite | 61 / 61 ✅ |
+| Twitter clone | FastAPI + PostgreSQL | 48 / 48 ✅ |
+| Instagram clone | FastAPI + SQLite | 55 / 55 ✅ |
+| Notes app | FastAPI + REST | 42 / 42 ✅ |
+
+**206+ tests, all passing. All pushed to GitHub. Zero human code written.**
 
 ---
 
 ## The Team
 
-| Container | Role | Model | Responsibilities |
-|-----------|------|-------|-----------------|
-| `product-owner` | Product Owner | claude-opus-4-6 | Refines requirements, defines acceptance criteria, signs off on delivery |
-| `engineering-manager` | Engineering Manager | claude-opus-4-6 | Decomposes tasks, assigns work, tracks progress, unblocks team, triggers git push |
-| `architect` | Architect | claude-sonnet-4-6 | Makes architecture/design decisions before implementation begins |
-| `ux-engineer` | UX Engineer | claude-sonnet-4-6 | Produces wireframes, user flows, and component specs before UI implementation begins |
-| `senior-dev-1` | Senior Dev 1 | claude-sonnet-4-6 | Implements features, reviews code, mentors Junior Dev 1 |
-| `senior-dev-2` | Senior Dev 2 | claude-sonnet-4-6 | Implements features, reviews code, mentors Junior Dev 2 |
-| `junior-dev-1` | Junior Dev 1 | claude-haiku-4-5 | Well-defined tasks, writes tests, asks Sr Dev 1 when blocked |
-| `junior-dev-2` | Junior Dev 2 | claude-haiku-4-5 | Well-defined tasks, writes tests, asks Sr Dev 2 when blocked |
+Eight Claude instances, each playing a real engineering role:
+
+| Agent | Model | What They Do |
+|-------|-------|-------------|
+| **Product Owner** | claude-opus-4-6 | Turns your requirement into a precise spec. Owns acceptance criteria. Signs off on delivery. |
+| **Engineering Manager** | claude-opus-4-6 | Decomposes the spec into tasks. Assigns work. Unblocks the team. Enforces git push. |
+| **Architect** | claude-sonnet-4-6 | Makes every design decision before a line of code is written. Writes ADRs. |
+| **UX Engineer** | claude-sonnet-4-6 | Produces wireframes, user flows, and component specs. Devs read this as their UI spec. |
+| **Senior Dev 1** | claude-sonnet-4-6 | Implements features. Reviews Junior Dev 1's work. Branches, commits, pushes. |
+| **Senior Dev 2** | claude-sonnet-4-6 | Implements features. Reviews Junior Dev 2's work. Branches, commits, pushes. |
+| **Junior Dev 1** | claude-haiku-4-5 | Handles well-scoped tasks. Escalates to Sr Dev 1 when blocked (max 3 round trips). |
+| **Junior Dev 2** | claude-haiku-4-5 | Handles well-scoped tasks. Escalates to Sr Dev 2 when blocked (max 3 round trips). |
+
+Each agent has its own Docker container, its own inbox (Redis Streams), and its own persistent memory bank (Postgres). They communicate by passing structured JSON messages — never through a shared file or a direct function call.
+
+---
+
+## How a Task Flows
+
+```
+You
+ │  python3 cli.py submit "Build X" "Description..."
+ ▼
+Orchestrator (:8080)
+ │  Creates thread → routes to Product Owner
+ ▼
+Product Owner
+ │  Refines requirements → acceptance criteria → hands off to EM
+ ▼
+Engineering Manager
+ │  Decomposes into tasks → assigns in parallel:
+ ├──▶ Architect          Design decisions, ADRs, tech constraints
+ ├──▶ UX Engineer        Wireframes + component specs → /workspace/designs/
+ ├──▶ Senior Dev 1       Feature branch → implement → test → commit → push
+ ├──▶ Senior Dev 2       Feature branch → implement → test → commit → push
+ │    ├──▶ Junior Dev 1  Scoped sub-tasks under Sr Dev 1's mentorship
+ │    └──▶ Junior Dev 2  Scoped sub-tasks under Sr Dev 2's mentorship
+ ▼
+Engineering Manager
+ │  Receives task_complete from all agents → git merge → git push main
+ ▼
+Sandbox (:8081)
+ │  pytest runs in isolated container (no network, 512 MB RAM cap)
+ ▼
+CI passes → thread auto-completes → GitHub repo has working, tested code
+```
+
+If an agent gets blocked, they call `ask_human` — the thread pauses, you see a notification in the dashboard, and the team resumes the moment you reply.
+
+---
+
+## Agents That Learn
+
+Every agent accumulates knowledge across tasks. After each job, they call `write_memory` to store what they learned — patterns, mistakes, decisions. At the start of the next task, they recall it. Memories live in Postgres and survive container restarts.
+
+| Agent | What They Remember |
+|-------|--------------------|
+| Product Owner | `requirement:pattern:*` — recurring scope traps, AC templates that worked |
+| Engineering Manager | `delegation:pattern:*` — which decompositions hit blockers, team calibration |
+| Architect | `pattern:arch:*`, `decision:*` — ADR muscle memory, what to avoid repeating |
+| UX Engineer | `pattern:ux:*`, `component:*` — reusable UI patterns, layout constraints |
+| Senior Dev | `pattern:code:*`, `lesson:debug:*` — debugging playbook, library choices |
+| Junior Dev | `learned:*`, `mistake:*`, `mentor:advice:*` — growing from every task |
+
+The longer the system runs, the more capable it becomes — without touching a prompt or redeploying.
+
+```bash
+curl http://localhost:8080/memory/senior_dev_1       # what Sr Dev 1 has learned
+curl http://localhost:8080/memory/engineering_manager # EM's delegation patterns
+```
+
+---
+
+## Any Role Can Be Added
+
+The team is a plugin architecture. Adding a new specialist is two files and 8 lines of docker-compose:
+
+```
+agents/security_engineer/
+├── system_prompt.md    ← Identity, responsibilities, workflow, output format
+└── config.py           ← Which tools, which roles they can reach
+```
+
+```yaml
+# docker-compose.yml — 8 lines
+security-engineer:
+  <<: *agent-base
+  volumes:
+    - ./agents/security_engineer:/agent
+    - workspace:/workspace
+  environment:
+    ROLE: security_engineer
+```
+
+The new agent immediately inherits: Redis message bus, Postgres persistence, tool dispatcher, agentic loop with exponential backoff, max_tokens resilience, heartbeat, budget tracking, tool telemetry, memory system, and all 19 phases of production hardening.
+
+**The UX Engineer was added this way — 160 lines total, shipped in one day.**
+
+Next candidates: Security Engineer, QA Engineer, DevOps/SRE, Data Engineer, Tech Writer.
 
 ---
 
 ## Architecture
 
 ```
-Human (CLI / Dashboard)
-        │
-        ▼
-Orchestrator API (:8080)           FastAPI — task router, audit logger, SSE broadcaster
-        │
-        ├──→ Redis Streams          agent:{role}:inbox per agent + team:audit
-        │
-        ├── product_owner           Refines requirements → Engineering Manager
-        ├── engineering_manager     Breaks down tasks → assigns to devs + architect + UX
-        ├── architect               Reviews design → reports back to EM
-        ├── ux_engineer             Wireframes + component specs → /workspace/designs/
-        ├── senior_dev_1/2          Implements, commits, pushes → task_complete to EM
-        └── junior_dev_1/2          Implements with mentor support → task_complete to EM
-                │
-                ▼
-          /workspace                Shared Docker volume — all code written here
-                │
-                ▼
-          sandbox (:8081)           Isolated test runner (no network, 512 MB RAM cap)
-                │
-                ▼
-           PostgreSQL               Messages, threads, tasks, artifacts, CI results, tool telemetry
+Human (CLI / Dashboard / API)
+          │
+          ▼
+  Orchestrator (:8080)              FastAPI — 38 endpoints, SSE broadcaster, audit logger
+          │                         Webhooks, HITL, CI gate, standup, tool telemetry
+          │
+     ┌────┴────┐
+     │         │
+  Redis      Postgres               Redis: Streams (durable inbox per agent) + Pub/Sub (real-time)
+  Streams    (state)                Postgres: messages, threads, tasks, CI results, memory, wiki
+     │
+     ├── product_owner
+     ├── engineering_manager
+     ├── architect
+     ├── ux_engineer
+     ├── senior_dev_1/2
+     └── junior_dev_1/2
+               │
+               ▼
+         /workspace                 Shared Docker volume — all code written here
+               │
+               ▼
+         Sandbox (:8081)            Isolated test runner — no network, 512 MB RAM cap
 ```
+
+**12 Docker containers. One `docker compose up`.**
 
 ---
 
@@ -58,36 +187,27 @@ Orchestrator API (:8080)           FastAPI — task router, audit logger, SSE br
 
 | | macOS / Linux | Windows |
 |--|---------------|---------|
-| **Container runtime** | Docker Desktop or `docker` + `docker-compose` CLI | [Docker Desktop for Windows](https://www.docker.com/products/docker-desktop/) (WSL 2 backend recommended) |
+| **Container runtime** | Docker Desktop or docker + docker-compose CLI | [Docker Desktop for Windows](https://www.docker.com/products/docker-desktop/) (WSL 2 backend) |
 | **Python** (CLI only) | Python 3.9+ | Python 3.9+ from [python.org](https://www.python.org/downloads/) |
 | **Git** | Any | [Git for Windows](https://git-scm.com/download/win) |
-| **API keys** | Anthropic API key + GitHub token | same |
+| **API keys** | Anthropic key + GitHub classic PAT | same |
 
-> **Windows users — clone with LF line endings** (the repo ships a `.gitattributes` that handles this automatically, but if you have `core.autocrlf=true` set globally, override it for this clone):
+> **Windows:** Clone with LF line endings (`.gitattributes` handles this automatically):
 > ```powershell
 > git clone -c core.autocrlf=false https://github.com/RajuRoopani/team-claw.git
 > ```
 
----
-
 ### 1. Configure
 
-**macOS / Linux**
 ```bash
-cp .env.example .env
+cp .env.example .env   # then fill in your keys
 ```
 
-**Windows (PowerShell)**
-```powershell
-Copy-Item .env.example .env
-```
-
-Edit `.env` and fill in your keys:
-
+Minimum required:
 ```env
 ANTHROPIC_API_KEY=sk-ant-...
-GITHUB_TOKEN=ghp_...
-GITHUB_USERNAME=your-github-username
+GITHUB_TOKEN=ghp_...         # classic PAT with repo scope
+GITHUB_USERNAME=your-username
 ```
 
 ### 2. Start the team
@@ -96,337 +216,176 @@ GITHUB_USERNAME=your-github-username
 docker compose up --build
 ```
 
-All 11 containers start: Redis, Postgres, Sandbox, Orchestrator, and 8 agent containers. Wait ~30 seconds for the Postgres healthcheck to pass before submitting tasks.
+Wait ~30 seconds for Postgres healthcheck. Then open `http://localhost:8080`.
 
-### 3. Install the CLI
+### 3. Install CLI
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 4. Submit a task
+### 4. Ship something
 
-**macOS / Linux**
 ```bash
 python3 cli.py submit \
   "Build a REST API for a todo app" \
-  "Create a FastAPI service with CRUD endpoints for todos. Include pytest tests. GitHub Repo: build-a-todo-app"
+  "FastAPI, CRUD endpoints, pytest tests. GitHub Repo: my-todo-api"
 ```
 
-**Windows (PowerShell / CMD)**
-```powershell
-python cli.py submit "Build a REST API for a todo app" "Create a FastAPI service with CRUD endpoints for todos. Include pytest tests. GitHub Repo: build-a-todo-app"
-```
+### 5. Watch it happen
 
-### 5. Watch the team work
-
-**macOS / Linux**
 ```bash
 python3 cli.py watch <thread_id>
-```
-
-**Windows**
-```powershell
-python cli.py watch <thread_id>
-```
-
-Or open the live dashboard at `http://localhost:8080`.
-
----
-
-## CLI Reference
-
-```
-# macOS / Linux
-python3 cli.py <command> [options]
-
-# Windows
-python cli.py <command> [options]
-```
-
-| Command | Description |
-|---------|-------------|
-| `submit "<title>" "<description>" [--priority high\|normal\|low]` | Submit a new task to the team |
-| `watch <thread_id>` | Stream live messages for a thread (SSE) |
-| `threads` | List all threads with status |
-| `messages <thread_id>` | Print full message history for a thread |
-| `standup [--hours N]` | Show what the team worked on in the last N hours (default: 24) |
-| `budget <thread_id>` | Show token usage and budget bar for a thread |
-| `tools [--agent role] [--thread id] [--limit N]` | Show tool execution history with stats |
-| `questions [--thread <id>]` | List unanswered human questions (HITL) |
-| `reply <thread_id> "<message>" [--to <agent_role>]` | Reply to a pending human question |
-
-### Examples
-
-```bash
-# Submit a task
-python3 cli.py submit "Build a Slack clone" "FastAPI with users, DMs, and group channels. GitHub Repo: my-slack-clone"
-
-# Watch a thread live
-python3 cli.py watch 550e8400-e29b-41d4-a716-446655440000
-
-# See what the team built today
-python3 cli.py standup --hours 8
-
-# Check if agents have questions for you
-python3 cli.py questions
-
-# Reply to an agent's question
-python3 cli.py reply 550e8400-e29b-41d4-a716-446655440000 "Use PostgreSQL, not SQLite" --to senior_dev_1
-
-# Check token usage
-python3 cli.py budget 550e8400-e29b-41d4-a716-446655440000
+# or open http://localhost:8080/dashboard
 ```
 
 ---
 
 ## Dashboard
 
-Open `http://localhost:8080` for the live web dashboard:
+`http://localhost:8080` — live web UI, no refresh needed.
 
-- **Thread sidebar** — all threads with live status (active / waiting / complete)
-- **Live activity indicator** — each thread card shows which agent last worked on it and how long ago (`⬤ engineering_manager · 3s ago`); dot pulses green when activity happened < 20 seconds ago; thread border turns green while an agent is actively processing
-- **Thinking indicator** — a fading `⟳ role is thinking…` row appears at the bottom of the selected thread's feed between messages; disappears when the next real message arrives or after 12 seconds
-- **Message feed** — real-time SSE stream of every inter-agent message
-- **Context-aware chat bar** — submits a new task when no thread is selected; steers the active thread when one is selected (injects a human reply into the team's inbox)
-- **Pending Questions panel** — shows unanswered `ask_human` questions; reply inline
-- **CI results panel** — pass/fail per task with test counts
-- **Kanban task board** — tasks per thread with status
-- **Tool Activity panel** — last 8 tool calls with duration + top tools by call count
-- **Budget bar** — token usage bar (green → amber → red) below the feed header
-- **Agent heartbeat dots** — green/amber/gray per agent (30s heartbeat)
-- **Standup modal** — one-click standup report
-- **⚡ Status tab** — right panel tab showing the current thread's waiting state, which agents have unresolved delegations, and any pending human question (see below)
+| Feature | What it shows |
+|---------|---------------|
+| **Thread sidebar** | All threads with live status — active / waiting / complete / closed |
+| **Live activity** | Which agent is working right now, how long ago, pulsing dot |
+| **Thinking indicator** | `⟳ role is thinking…` appears between messages, fades when the next message arrives |
+| **Message feed** | Full inter-agent conversation in real time (SSE) |
+| **⚡ Status tab** | Who the team is waiting on, any pending human questions |
+| **Pending questions** | `ask_human` questions from agents, reply inline |
+| **CI panel** | Pass/fail + test counts per task |
+| **Kanban board** | Task status per thread |
+| **Tool Activity** | Last 8 tool calls with duration, top tools by call count |
+| **Budget bar** | Token usage (green → amber → red) |
+| **Agent heartbeats** | Online / stale / offline dot per agent (30s heartbeat) |
+| **Standup modal** | One-click standup report for the last 24h |
+| **7 themes** | Void, Ocean, Dracula, Nord, Cyberpunk, Forest, Solar |
+| **Chat bar** | Submit new task (no thread selected) or steer active thread (thread selected) |
+
+---
+
+## CLI Reference
+
+```bash
+python3 cli.py submit "<title>" "<description>" [--priority high|normal|low]
+python3 cli.py watch <thread_id>          # live SSE stream
+python3 cli.py threads                    # list all threads
+python3 cli.py messages <thread_id>       # full message history
+python3 cli.py standup [--hours N]        # what the team did in last N hours
+python3 cli.py budget <thread_id>         # token usage bar
+python3 cli.py tools [--agent role] [--thread id] [--limit N]
+python3 cli.py questions                  # pending ask_human questions
+python3 cli.py reply <thread_id> "<answer>" [--to <role>]
+```
+
+---
+
+## Production Features
+
+19 phases of engineering baked in. Not bolted on.
+
+| Feature | Detail |
+|---------|--------|
+| **Message durability** | Redis Streams with XAUTOCLAIM — no message lost on container restart |
+| **Exponential backoff** | Rate-limit: 5/10/20s · Server error: 2/4/8s · Connection error: 3/6/12s |
+| **Loop detection** | Circuit-breaks if same tool + same inputs repeats 3× |
+| **max_tokens resilience** | Truncated responses trigger a continuation nudge instead of silent exit |
+| **Exhaustion rescue** | If the loop ends without a natural stop, EM is notified automatically |
+| **CI quality gate** | `status=done` blocked if the last pytest run failed (`?force=true` overrides) |
+| **Thread close guard** | `POST /close` returns 409 if tasks are still incomplete |
+| **Per-task git isolation** | Each project writes to `/workspace/{project}/` — zero cross-task contamination |
+| **File ownership protocol** | EM assigns explicit file ownership — no agent overwrites another's work |
+| **Budget tracking** | Token budget per thread; warnings at 80%, hard stop at 100% |
+| **Idle detection** | Configurable alert when a thread goes quiet for N minutes |
+| **Webhooks** | `ci.pass`, `ci.fail`, `thread.complete`, `thread.waiting`, `budget.warning` |
 
 ---
 
 ## Tools Available to Agents
 
-| Tool | Description | Who has it |
-|------|-------------|------------|
-| `send_message` | Route a message to another agent via Redis | All |
-| `read_file` | Read a file from /workspace | All |
-| `write_file` | Write/overwrite a file in /workspace | All except PO |
-| `edit_file` | Search-and-replace within a file | EM, Arch, UX, Sr, Jr |
-| `list_files` | List files under a path in /workspace | All |
-| `execute_code` | Run code in the sandbox (pytest, python, etc.) | EM, Sr, Jr |
-| `search_code` | Grep for a pattern across /workspace | EM, Arch, UX, Sr, Jr |
-| `find_files` | Glob pattern match across /workspace | EM, Arch, UX, Sr, Jr |
-| `git_status` | Show git status of /workspace | EM, Sr, Jr |
-| `git_commit` | Commit staged changes in /workspace | EM, Sr, Jr |
-| `git_push` | Push a branch to GitHub | EM, Sr, Jr |
-| `git_merge` | Merge a branch into another | EM |
-| `git_diff` | Show unstaged/staged/commit-range diff | EM, Arch, Sr, Jr |
-| `create_task` | Create a Kanban task (tracked in Postgres) | All |
-| `update_task_status` | Update task status (todo/in_progress/done) | All |
-| `wiki_write` | Write to the team wiki | EM, Arch, PO |
-| `wiki_read` | Read from the team wiki | All |
-| `write_memory` | Persist a key-value fact to agent memory (survives restarts) | All |
-| `read_memory` | Recall a specific memory by key | All |
-| `list_memories` | List all persisted memory keys for this agent | All |
-| `check_budget` | Check token budget for current thread | All |
-| `ask_human` | Pause thread and submit a question to the human | All |
+25 tools. Each agent gets exactly the tools their role warrants.
 
----
-
-## How a Task Works
-
-```
-1. Human submits task via CLI or Dashboard
-        ↓
-2. Orchestrator creates thread → routes to Product Owner
-        ↓
-3. Product Owner refines requirements → sends to Engineering Manager
-        ↓
-4. Engineering Manager decomposes into tasks → assigns to Architect + UX Engineer + Devs
-        ↓
-5. Architect reviews design decisions → reports back to EM
-   UX Engineer produces wireframes + component specs → /workspace/designs/ → reports back to EM
-        ↓
-6. Senior/Junior Devs implement (using design doc as spec) → write tests → execute_code to verify
-        ↓
-7. Each Dev: git_status → git_commit → git_push → task_complete to EM
-        ↓
-8. EM receives all task_complete → git_merge feature branches → git_push main
-        ↓
-9. EM marks tasks done → CI runs in sandbox (pytest)
-        ↓
-10. CI passes → _auto_complete_thread() fires → thread status: complete
-        ↓
-11. Dashboard shows ✅ complete; GitHub repo has working code
-```
-
-If an agent is blocked or requirements are ambiguous, they call `ask_human` → thread enters `waiting` status → human replies via CLI or dashboard → thread resumes.
-
----
-
-## Thread Lifecycle
-
-```
-submitted → active → (waiting) → active → complete
-                         ↑
-                  ask_human called;
-                  human reply resumes
-```
-
-Threads can also be manually closed via the dashboard (🔒 button) or `POST /threads/{id}/close`.
+| Tool | Who has it |
+|------|-----------|
+| `send_message` | All |
+| `read_file`, `write_file`, `edit_file`, `list_files` | All (write/edit: not PO) |
+| `search_code`, `find_files` | EM, Arch, UX, Sr, Jr |
+| `execute_code` | Sr, Jr (not EM — prevents loop misuse) |
+| `git_status`, `git_commit`, `git_push`, `git_diff` | EM, Arch, Sr, Jr |
+| `git_checkout_branch`, `git_merge` | EM, Arch |
+| `create_task`, `update_task_status` | All |
+| `wiki_write`, `wiki_read` | EM, Arch, PO (write); All (read) |
+| `write_memory`, `read_memory`, `list_memories` | All |
+| `check_budget` | All |
+| `ask_human` | All |
 
 ---
 
 ## API Reference
 
-### Tasks
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `POST` | `/task` | Submit a new task |
-| `GET` | `/threads` | List all threads |
-| `GET` | `/threads/{id}` | Get thread details |
-| `GET` | `/threads/{id}/messages` | Get all messages in a thread |
-| `GET` | `/threads/{id}/budget` | Get token usage for a thread |
-| `GET` | `/threads/{id}/summary` | Get AI-generated thread summary |
-| `POST` | `/threads/{id}/close` | Close a thread |
-
-### Human-in-the-Loop
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `POST` | `/threads/{id}/human-reply` | Send a reply to an agent (resumes waiting thread) |
-| `POST` | `/threads/{id}/ask-human` | (Agent-facing) Submit a question to the human |
-| `GET` | `/pending-questions` | List all unanswered human questions |
-| `GET` | `/threads/{id}/pending-questions` | List unanswered questions for a thread |
-
-### Kanban
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `POST` | `/tasks` | Create a task |
-| `PATCH` | `/tasks/{id}` | Update task status |
-| `GET` | `/tasks` | List tasks (filter: `?thread_id=`) |
-
-### CI
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/ci-results` | List CI results (filter: `?thread_id=&task_id=`) |
-| `GET` | `/ci-results/trend` | Trend data for CI pass/fail over time |
-
-### Telemetry
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `POST` | `/tool-executions` | Record a tool call (agent-facing) |
-| `GET` | `/tool-history` | Query tool call history (filter: agent, tool, thread) |
-| `GET` | `/tool-history/stats` | Aggregate stats + p95 latency per tool |
-| `POST` | `/heartbeat/{role}` | Agent heartbeat (every 30s) |
-| `GET` | `/agents` | Agent online/stale/offline status |
-
-### Reports
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/standup` | Standup report (`?hours=24`) |
-| `POST` | `/standup/publish` | Write standup to team wiki |
-| `GET` | `/events` | SSE stream of all real-time events |
+```
+POST   /task                          Submit a task
+GET    /threads                       List threads
+GET    /threads/{id}/messages         Message history
+GET    /threads/{id}/budget           Token usage
+GET    /threads/{id}/summary          AI-generated summary
+POST   /threads/{id}/close            Close thread (409 if tasks pending)
+POST   /threads/{id}/human-reply      Answer an agent's question
+GET    /pending-questions             All unanswered ask_human calls
+POST   /tasks  ·  PATCH /tasks/{id}  Kanban
+GET    /ci-results  ·  /ci-results/trend
+GET    /tool-history  ·  /tool-history/stats   (p95 latency per tool)
+GET    /agents                        Heartbeat status per agent
+GET    /standup                       Standup report
+GET    /events                        SSE stream
+GET    /memory/{role}                 Agent memory bank
+GET    /pitch                         Pitch deck
+```
 
 ---
 
-## Database Schema
+## Phase History
 
-| Table | Purpose |
-|-------|---------|
-| `threads` | Task threads with status, title, GitHub repo |
-| `messages` | All inter-agent messages (full content + metadata) |
-| `tasks` | Kanban tasks (todo / in_progress / done) |
-| `artifacts` | Files written by agents (path + content) |
-| `ci_results` | Sandbox test run results per task |
-| `wiki` | Team wiki (key-value, updated by agents) |
-| `agent_heartbeats` | Last ping per agent role |
-| `tool_executions` | Every tool call: agent, tool, duration_ms, success |
-| `human_questions` | HITL questions from agents, with answers |
-
----
-
-## Project Structure
-
-```
-team-claw/
-├── docker-compose.yml
-├── .env.example
-├── cli.py                              # Human CLI (submit, watch, standup, etc.)
-│
-├── orchestrator/
-│   ├── Dockerfile
-│   ├── requirements.txt
-│   ├── main.py                         # FastAPI app — all endpoints, SSE, webhooks
-│   └── dashboard.html                  # Live web dashboard (served at /)
-│
-├── agents/
-│   ├── base/                           # Shared runtime for all agents
-│   │   ├── Dockerfile
-│   │   ├── requirements.txt
-│   │   ├── agent.py                    # Core agentic loop (Claude API + tool dispatch)
-│   │   ├── message_bus.py              # Redis Streams wrapper
-│   │   ├── models.py                   # Message dataclass + MessageType enum
-│   │   ├── entrypoint.py              # Container entrypoint (reads role from env)
-│   │   └── tools/
-│   │       └── __init__.py             # All tool schemas + executors + dispatcher
-│   │
-│   ├── product_owner/
-│   │   ├── system_prompt.md
-│   │   └── config.py                   # Allowed tools + reachable roles
-│   ├── engineering_manager/
-│   │   ├── system_prompt.md
-│   │   └── config.py
-│   ├── architect/
-│   │   ├── system_prompt.md
-│   │   └── config.py
-│   ├── ux_engineer/
-│   │   ├── system_prompt.md
-│   │   └── config.py
-│   ├── senior_dev/
-│   │   ├── system_prompt.md
-│   │   └── config.py
-│   └── junior_dev/
-│       ├── system_prompt.md
-│       └── config.py
-│
-├── sandbox/
-│   ├── Dockerfile
-│   ├── requirements.txt
-│   └── main.py                         # Code execution API (:8081)
-│
-└── shared/
-    ├── db/
-    │   └── schema.sql                  # Postgres schema (auto-loaded at startup)
-    └── workspace/
-        └── .gitkeep                    # Code written by agents lives here
-```
+| Phase | What shipped |
+|-------|-------------|
+| 1 | Foundation: Redis + Postgres + base Dockerfile, 2-agent loop (EM ↔ Sr Dev) |
+| 2 | Full 7-agent team, sandbox, Junior Devs |
+| 3 | Context summarization, git tools, live dashboard |
+| 4 | Shared `/workspace` volume, wiki, agent memory, artifact tracking |
+| 5 | Heartbeats, Kanban, auto-CI (pytest in sandbox) |
+| 6 | CI quality gate, webhooks, thread auto-completion |
+| 7 | `search_code`, `find_files`, `check_budget`; standup report; budget bar |
+| 8 | `edit_file`, tool telemetry, thread close, idle alerts |
+| 9 | Human-in-the-loop: `ask_human`, pending questions panel, `git_diff`, context-aware chat bar |
+| 10 | GitHub integration: auto-repo creation, branch strategy, ⎇ dashboard link |
+| 11 | UX Engineer agent; `max_tokens` resilience; agent memory reflection after every task |
+| 12 | Live activity signals: pulsing dot, `⟳ thinking…`, ephemeral activity stream |
+| 13 | ⚡ Status tab: thread status, Waiting On section, Human Input Needed |
+| 14 | Bug fixes: stable thread titles, `execute_code` silent-loop fix |
+| 15 | 7 dashboard themes with localStorage persistence |
+| 16 | Loop detection circuit-breaker; file ownership protocol; status noise reduction |
+| 17 | Per-task isolated git repos — zero cross-task contamination |
+| 18 | Message durability: XAUTOCLAIM on startup, pending-queue drain before blocking read |
+| 19 | Resilience: exponential backoff, exhaustion rescue, thread close guard, push reminders, Architect git tools |
 
 ---
 
 ## Configuration
 
-Copy `.env.example` to `.env` and set these variables:
-
 ```env
 # Required
 ANTHROPIC_API_KEY=sk-ant-...
-
-# GitHub (for agents to push code)
-GITHUB_TOKEN=ghp_...
-GITHUB_USERNAME=your-github-username
-
-# Database
+GITHUB_TOKEN=ghp_...            # classic PAT — fine-grained tokens return 403
+GITHUB_USERNAME=your-username
 DB_USER=teamclaw
 DB_PASSWORD=teamclaw
 
 # Optional
-WEBHOOK_URL=                    # POST notifications on ci.pass/ci.fail/thread.complete
-THREAD_BUDGET_TOKENS=0          # Token budget per thread (0 = unlimited)
-IDLE_THREAD_MINUTES=0           # Alert on threads idle > N minutes (0 = disabled)
+WEBHOOK_URL=                    # POST on ci.pass / ci.fail / thread.complete
+THREAD_BUDGET_TOKENS=0          # 0 = unlimited
+IDLE_THREAD_MINUTES=0           # 0 = disabled
 
-# Model overrides (defaults shown)
+# Model overrides
 PO_MODEL=claude-opus-4-6
 EM_MODEL=claude-opus-4-6
 ARCH_MODEL=claude-sonnet-4-6
@@ -437,237 +396,50 @@ JR_MODEL=claude-haiku-4-5-20251001
 
 ---
 
-## Webhooks
-
-Set `WEBHOOK_URL` in `.env` to receive POST notifications:
-
-| Event | Payload |
-|-------|---------|
-| `ci.pass` | `{thread_id, task_id, passed, total}` |
-| `ci.fail` | `{thread_id, task_id, passed, total, output}` |
-| `thread.complete` | `{thread_id}` |
-| `thread.waiting` | `{thread_id, question}` |
-| `thread.resumed` | `{thread_id, target_role}` |
-| `thread.closed` | `{thread_id}` |
-| `budget.warning` | `{thread_id, used, limit}` |
-| `budget.exceeded` | `{thread_id, used, limit}` |
-
----
-
-## Agent Learning & Memory
-
-Every agent accumulates knowledge across tasks. At the end of each task, agents call `write_memory` to save what they learned. At the start of the next task, they call `list_memories` to recall it. Memories are stored in Postgres and injected into each agent's system prompt at container startup — so knowledge persists across restarts.
-
-Each role has a structured key schema so memories stay queryable and meaningful:
-
-| Role | Key pattern | What accumulates |
-|------|-------------|-----------------|
-| Product Owner | `requirement:pattern:*`, `scope:pitfall:*`, `ac:template:*` | Better user stories, recurring scope traps, reusable AC patterns |
-| Engineering Manager | `delegation:pattern:*`, `team:performance:*`, `workflow:lesson:*` | Smarter task decomposition, team calibration, process improvements |
-| Architect | `pattern:arch:*`, `decision:*`, `mistake:*` | Reusable design decisions, ADR muscle memory, rework avoidance |
-| UX Engineer | `pattern:ux:*`, `component:*`, `constraint:*` | Reusable component specs, design patterns, tech constraints that shaped layout |
-| Senior Dev | `pattern:code:*`, `lesson:debug:*`, `tech:choice:*` | Code patterns, debugging playbook, library decisions |
-| Junior Dev | `learned:*`, `mistake:*`, `mentor:advice:*` | Lessons from mentor, mistakes not to repeat, new techniques |
-
-You can inspect any agent's memory bank via the API:
-
-```bash
-curl http://localhost:8080/memory/senior_dev_1
-curl http://localhost:8080/memory/ux_engineer/pattern:ux:empty-state
-```
-
----
-
-## Agentic Loop Resilience
-
-If the Claude API returns `stop_reason: max_tokens` (response truncated mid-generation), the agent loop no longer silently dies. Instead:
-
-- **If tool calls are present** in the partial response — they are executed and the loop continues normally.
-- **If no tool calls were made** — the loop injects a continuation nudge telling the agent to use tools rather than writing long text responses, then makes another API call.
-
-This prevents agents from consuming their inbox message and producing nothing when a task generates a large initial response.
-
----
-
-## Live Activity Signals
-
-The dashboard shows real-time agent activity even between messages, so you always know whether a task is running or hung.
-
-**How it works:**
-
-1. `POST /metrics` fires on every Claude API call inside the agentic loop (already existed for token tracking). It now also writes an ephemeral `agent_working` event to a separate Redis stream `team:activity` (never persisted to Postgres) and updates an in-memory `thread_last_activity` map.
-2. `GET /stream/all` reads from both `team:audit` (messages) and `team:activity` (working signals) in a single `xread` call — both streams flow through the same SSE connection.
-3. The dashboard filters `agent_working` events out of the message feed and uses them only for the sidebar and thinking indicator.
-
-**What you see:**
-
-| Signal | Where | Meaning |
-|--------|-------|---------|
-| Pulsing green dot + `role · Xs ago` | Thread card | An agent made a Claude API call in the last 20 seconds |
-| Green left border on thread card | Thread sidebar | Agent is actively processing right now |
-| `⟳ role is thinking…` | Bottom of feed | Same signal — visible in the feed view; fades after 12s |
-| Dot turns gray, time grows | Thread card | Agent finished or is waiting — no recent API calls |
-
-No changes to `agent.py` were needed — the existing metrics hook was sufficient.
-
----
-
-## Status Tab
-
-The **⚡ Status** tab in the right panel gives you a real-time answer to "what is the team waiting on right now?" without scrolling through the message feed.
-
-**Thread Status section:**
-- A pill badge (`Active` / `Waiting for you` / `Complete` / `Closed`) with an animated dot for active threads
-- The last agent to make a Claude API call and how long ago (live-updated via `agent_working` SSE events and every 15 seconds for elapsed-time ticking)
-
-**Human Input Needed section** (shown only when thread is paused):
-- The agent's question and optional context, with a "↓ Reply in feed" button that switches back to the Work tab and focuses the reply textarea
-
-**Waiting On section:**
-- Computed by scanning all messages for the current thread:
-  - `task_assignment` is pending until `task_complete` arrives from that agent
-  - `question` is pending until `answer` arrives from that agent
-- Each pending item shows: agent name (in their role color), type badge (`task` or `question`), who assigned them, elapsed time, and a one-line preview of what was delegated
-
-**What it looks like in practice:**
-
-```
-⚡ Status
-
-Thread Status
-● Active
-  engineering_manager · ⚡ active now
-
-Waiting On
-🎯 senior_dev_1   [task]   3m ago
-   assigned by engineering_manager
-   Implement the REST API endpoints...
-
-❓ architect       [question]   8m ago
-   assigned by engineering_manager
-   Should we use PostgreSQL or SQLite...
-```
-
----
-
-## What's Been Built (Phase History)
-
-| Phase | What was added |
-|-------|----------------|
-| 1 | Foundation: Redis + Postgres + base Dockerfile, 2-agent loop (EM ↔ Sr Dev) |
-| 2 | Full 7-agent team, all roles, code execution sandbox, Junior Devs |
-| 3 | Context summarization, git tools (`git_status`, `git_commit`, `git_push`, `git_merge`), live dashboard |
-| 4 | Shared `/workspace` volume, wiki tools, agent memory, artifact tracking |
-| 5 | Agent heartbeats, Kanban task board, auto-CI (pytest in sandbox) |
-| 6 | CI quality gate (blocks `done` if CI failed), webhooks, thread auto-completion |
-| 7 | `search_code`, `find_files`, `check_budget` tools; standup report; budget bar in dashboard |
-| 8 | `edit_file` tool, tool telemetry (duration + success per call), thread close endpoint, idle thread alerts |
-| 9 | Human-in-the-loop: `ask_human` tool, `human_questions` table, pending questions panel, `git_diff` tool, context-aware chat bar (new task vs. steer mode), `questions`/`reply` CLI commands |
-| 10 | GitHub integration: `git_push`/`git_checkout_branch`/`git_merge` tools, auto-repo creation, branch strategy, ⎇ link in dashboard |
-| 11 | UX Engineer agent; `max_tokens` resilience fix in the agentic loop; agent memory evolution (all agents reflect and write memories after every task) |
-| 12 | Live activity signals: thread cards show last-active agent + pulsing dot; `⟳ thinking…` indicator in feed; `team:activity` ephemeral Redis stream; no agent changes needed |
-| 13 | ⚡ Status tab: right panel tab with thread status pill, "Waiting On" section (unresolved `task_assignment`/`question` messages diffed against `task_complete`/`answer`), and Human Input Needed section |
-| 14 | Bug fixes: thread sidebar title no longer overwritten by mid-task steering messages; `execute_code` tool no longer loops silently when called without `code` or `file_path` |
-| 15 | Dashboard theme selector: 7 selectable themes (Void, Ocean, Dracula, Nord, Cyberpunk, Forest, Solar) with CSS custom-property swapping, color dot + swatch preview, localStorage persistence |
-| 16 | Agent reliability: **loop detection** in `_agentic_loop` (circuit-breaks when same tool+inputs repeats 3×); **file ownership protocol** in EM + dev prompts (explicit per-file assignments prevent overwrite conflicts); **status noise reduction** (devs only message on blockers/questions/completion); `execute_code` removed from EM tools; `write_file` now returns actionable error when `content` param is missing |
-| 17 | **Per-task isolated git repos**: `git_commit`, `git_status`, `git_push` all support a `subdirectory` param — agents write to `/workspace/{project}/` and push only that folder as a clean isolated repo. No more slack_app/uber_app files bleeding into unrelated repos. Enables true parallel agent work with zero cross-task contamination. |
-| 18 | **Message durability fix**: `receive()` in `MessageBus` now drains the pending queue (`"0"`) before blocking on new messages (`">"`). `setup()` calls `XAUTOCLAIM(min_idle_time=0)` on startup to reclaim orphaned pending messages from any previous (dead) consumer. Agents that restart mid-task now pick up exactly where they left off — no message is ever silently abandoned. |
-| 19 | **Resilience + GitHub push enforcement**: (1) Thread close guard — `POST /threads/{id}/close` returns 409 if any tasks are still incomplete (`?force=true` overrides). (2) Agent auto-recovery — exponential backoff on API errors (rate-limit/server/connection), persistent tool-error streak detection with recovery hint injection, final-stretch warnings at the last 3 iterations, and exhaustion rescue (HTTP POST to EM inbox) when the loop ends without a natural `end_turn`. (3) Push reminders — orchestrator fires a Redis inbox message to the task assignee on every `status=done` PATCH when the thread has a GitHub repo. Architect now has full git tools (`git_commit`, `git_push`, `git_checkout_branch`). |
-
----
-
 ## Tips
 
-**Including a GitHub repo in your task** ensures agents push code when done:
-```
-"... GitHub Repo: build-a-todo-app"
-```
-
-**Thread titles are permanent** — the sidebar title is set when the task is submitted and never overwritten, even when you send steering messages mid-task.
-
-**If agents stall**, flush stale inbox messages from completed threads:
-
-macOS / Linux:
+**UI tasks get a design doc first** — the UX Engineer writes wireframes to `/workspace/designs/` before devs write code:
 ```bash
+python3 cli.py submit "Build a task dashboard" "... GitHub Repo: my-dashboard"
+# → /workspace/designs/task-dashboard-ux.md exists before implementation begins
+```
+
+**Steer a running task** — select the thread in the dashboard and type, or:
+```bash
+python3 cli.py reply <thread_id> "Switch from SQLite to PostgreSQL"
+```
+
+**Flush stale inboxes** between tasks if agents seem stuck:
+```bash
+# macOS / Linux
 for role in engineering_manager architect ux_engineer senior_dev_1 senior_dev_2 junior_dev_1 junior_dev_2 product_owner; do
   docker exec team-claw-redis-1 redis-cli XTRIM "agent:${role}:inbox" MAXLEN 0
 done
-```
 
-Windows (PowerShell):
-```powershell
+# Windows (PowerShell)
 foreach ($role in @("engineering_manager","architect","ux_engineer","senior_dev_1","senior_dev_2","junior_dev_1","junior_dev_2","product_owner")) {
   docker exec team-claw-redis-1 redis-cli XTRIM "agent:${role}:inbox" MAXLEN 0
 }
 ```
 
-Then send a human message to the active thread asking the EM to re-engage.
-
-**Steering a running task** — select the thread in the dashboard and type in the chat bar, or:
+**Check what agents have learned:**
 ```bash
-python3 cli.py reply <thread_id> "Switch from SQLite to PostgreSQL"   # macOS/Linux
-python  cli.py reply <thread_id> "Switch from SQLite to PostgreSQL"   # Windows
-```
-
-**Checking for questions** — agents call `ask_human` when genuinely blocked:
-```bash
-python3 cli.py questions
-python3 cli.py reply <thread_id> "Your answer here"
-```
-
-**Watching costs** — each agent reports token usage; budget bars turn amber at 80%, red at 100%.
-
-**UI tasks get a design doc first** — for any user-facing feature, the UX Engineer writes a wireframe + component spec to `/workspace/designs/` before devs write a line of code:
-```bash
-python3 cli.py submit "Build a dashboard" "... GitHub Repo: my-dashboard"
-# UX engineer writes /workspace/designs/dashboard-ux.md
-# Devs read it as their spec
-```
-
-**Inspect what agents have learned** — memories accumulate across tasks and persist in Postgres:
-```bash
-curl http://localhost:8080/memory/engineering_manager   # all EM memories
-curl http://localhost:8080/memory/senior_dev_1          # all Sr Dev 1 memories
+curl http://localhost:8080/memory/senior_dev_1
+curl http://localhost:8080/memory/architect
 ```
 
 ---
 
 ## Windows Troubleshooting
 
-**`python3` not found**
-Windows ships Python as `python`, not `python3`. Either use `python cli.py ...` or create an alias:
-```powershell
-Set-Alias python3 python
-```
-
-**Docker daemon not running**
-Start Docker Desktop from the Start Menu. Wait for the whale icon in the system tray to show "Docker Desktop is running" before running `docker compose up`.
-
-**WSL 2 backend warning / Hyper-V errors**
-Open Docker Desktop → Settings → General → enable "Use the WSL 2 based engine". Requires Windows 10 version 2004+ or Windows 11.
-
-**Line endings corrupted (`git status` shows every file as modified)**
-The repo ships a `.gitattributes` that enforces LF. If you cloned before this file existed, renormalize:
-```powershell
-git rm --cached -r .
-git reset --hard
-```
-
-**Port 8080 already in use**
-Another service is on 8080. Either stop it or override the port:
-```powershell
-$env:ORCHESTRATOR_PORT=9090; docker compose up
-```
-Then open `http://localhost:9090`.
-
-**Containers exit immediately after start**
-Check logs: `docker compose logs orchestrator`. Most common cause is a missing or invalid `.env` file — make sure `ANTHROPIC_API_KEY` is set.
-
-**`docker exec` commands differ slightly on Windows**
-In PowerShell, use double quotes and escape if needed:
-```powershell
-docker exec team-claw-redis-1 redis-cli XTRIM "agent:engineering_manager:inbox" MAXLEN 0
-```
+| Problem | Fix |
+|---------|-----|
+| `python3: command not found` | Use `python cli.py ...` or `Set-Alias python3 python` |
+| Docker daemon not running | Start Docker Desktop, wait for the whale icon |
+| Every file shows modified | Renormalize: `git rm --cached -r . && git reset --hard` |
+| Port 8080 in use | `$env:ORCHESTRATOR_PORT=9090; docker compose up` |
+| Containers exit immediately | Check `docker compose logs orchestrator` — usually missing `.env` |
+| WSL 2 / Hyper-V errors | Docker Desktop → Settings → General → enable WSL 2 engine |
 
 ---
 
