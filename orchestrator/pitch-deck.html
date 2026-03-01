@@ -5,802 +5,803 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Team Claw — Pitch Deck</title>
 <style>
-  :root {
-    --bg:       #0a0a0f;
-    --surface:  #111118;
-    --border:   #1e1e2e;
-    --accent:   #6366f1;
-    --accent2:  #8b5cf6;
-    --accent3:  #06b6d4;
-    --green:    #10b981;
-    --amber:    #f59e0b;
-    --red:      #ef4444;
-    --text:     #e2e8f0;
-    --muted:    #64748b;
-    --bright:   #f8fafc;
-  }
+:root {
+  --bg:      #07070e;
+  --surf:    #0f0f1a;
+  --surf2:   #161626;
+  --border:  #1e1e35;
+  --accent:  #6366f1;
+  --purple:  #8b5cf6;
+  --cyan:    #06b6d4;
+  --green:   #10b981;
+  --amber:   #f59e0b;
+  --red:     #ef4444;
+  --pink:    #ec4899;
+  --text:    #cbd5e1;
+  --muted:   #475569;
+  --bright:  #f1f5f9;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100vw;height:100vh;overflow:hidden;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif}
 
-  * { margin: 0; padding: 0; box-sizing: border-box; }
+/* ── deck ── */
+.deck{width:100%;height:100vh;position:relative}
+.slide{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:3.5rem 5rem 4rem;opacity:0;pointer-events:none;transition:opacity .4s ease,transform .4s ease;transform:translateX(70px)}
+.slide.active{opacity:1;pointer-events:all;transform:translateX(0)}
+.slide.exit{opacity:0;transform:translateX(-70px)}
 
-  body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-    overflow: hidden;
-    height: 100vh;
-    width: 100vw;
-  }
+/* ── chrome ── */
+#progress{position:fixed;top:0;left:0;height:3px;background:linear-gradient(90deg,var(--accent),var(--cyan));transition:width .4s ease;z-index:999}
+#counter{position:fixed;bottom:1.4rem;right:1.8rem;font-size:.72rem;color:var(--muted);letter-spacing:.1em;z-index:999}
+#dots{position:fixed;bottom:1.4rem;left:50%;transform:translateX(-50%);display:flex;gap:.45rem;z-index:999}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--border);cursor:pointer;transition:background .2s,transform .2s}
+.dot.active{background:var(--accent);transform:scale(1.5)}
+.nav{position:fixed;top:50%;transform:translateY(-50%);background:rgba(255,255,255,.04);border:1px solid var(--border);color:var(--muted);width:40px;height:40px;border-radius:50%;cursor:pointer;font-size:1rem;display:flex;align-items:center;justify-content:center;transition:all .2s;z-index:999}
+.nav:hover{background:rgba(99,102,241,.18);color:var(--accent);border-color:var(--accent)}
+#prev{left:1rem}#next{right:1rem}
 
-  /* ── Deck container ── */
-  .deck {
-    width: 100%;
-    height: 100vh;
-    position: relative;
-  }
+/* ── type ── */
+.eyebrow{font-size:.7rem;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--accent);margin-bottom:.6rem}
+.h1{font-size:clamp(2.4rem,5.5vw,4.2rem);font-weight:900;line-height:1.05;color:var(--bright);letter-spacing:-.03em}
+.grad{background:linear-gradient(135deg,var(--accent) 30%,var(--cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.h2{font-size:clamp(1.5rem,3vw,2.2rem);font-weight:800;color:var(--bright);letter-spacing:-.02em;line-height:1.15}
+.sub{font-size:clamp(.85rem,1.5vw,1.05rem);color:var(--muted);line-height:1.65;max-width:700px}
+.center{text-align:center}
 
-  .slide {
-    position: absolute;
-    inset: 0;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    padding: 4rem 6rem;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity .45s cubic-bezier(.4,0,.2,1), transform .45s cubic-bezier(.4,0,.2,1);
-    transform: translateX(60px);
-  }
-  .slide.active {
-    opacity: 1;
-    pointer-events: all;
-    transform: translateX(0);
-  }
-  .slide.exit {
-    opacity: 0;
-    transform: translateX(-60px);
-  }
+/* ── cards ── */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:1.1rem;width:100%;max-width:1040px}
+.g3{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;width:100%;max-width:1050px}
+.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:.9rem;width:100%;max-width:1100px}
+.card{background:var(--surf);border:1px solid var(--border);border-radius:12px;padding:1.25rem 1.4rem;position:relative;overflow:hidden}
+.card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+.card.ind::before{background:linear-gradient(90deg,var(--accent),transparent)}
+.card.grn::before{background:linear-gradient(90deg,var(--green),transparent)}
+.card.cyn::before{background:linear-gradient(90deg,var(--cyan),transparent)}
+.card.amb::before{background:linear-gradient(90deg,var(--amber),transparent)}
+.card.pur::before{background:linear-gradient(90deg,var(--purple),transparent)}
+.card.pnk::before{background:linear-gradient(90deg,var(--pink),transparent)}
+.card.red::before{background:linear-gradient(90deg,var(--red),transparent)}
+.ct{font-size:.7rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:.3rem}
+.cv{font-size:1.9rem;font-weight:900;color:var(--bright)}
+.cb{font-size:.82rem;color:var(--text);line-height:1.55;margin-top:.4rem}
+.cs{font-size:.75rem;color:var(--muted);margin-top:.2rem}
+.ci{font-size:1.6rem;margin-bottom:.4rem}
 
-  /* ── Progress bar ── */
-  #progress-bar {
-    position: fixed;
-    top: 0; left: 0;
-    height: 3px;
-    background: linear-gradient(90deg, var(--accent), var(--accent3));
-    transition: width .4s ease;
-    z-index: 100;
-  }
+/* ── arch diagram ── */
+.arch{width:100%;max-width:1060px;display:flex;flex-direction:column;gap:0}
+.arch-row{display:flex;align-items:stretch;gap:0}
+.arch-row+.arch-row{margin-top:.5rem}
+.anode{
+  background:var(--surf);border:1px solid var(--border);border-radius:10px;
+  padding:.65rem .9rem;font-size:.78rem;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:.2rem;text-align:center;
+  position:relative;min-width:0;flex:1
+}
+.anode .alabel{font-size:.62rem;text-transform:uppercase;letter-spacing:.09em;color:var(--muted)}
+.anode .aname{font-size:.82rem;font-weight:700;color:var(--bright)}
+.anode .atag{font-size:.62rem;padding:.1rem .45rem;border-radius:4px;margin-top:.1rem}
+.aconn{display:flex;align-items:center;justify-content:center;font-size:.75rem;color:var(--muted);padding:0 .3rem;flex-shrink:0}
+.aconn.vert{flex-direction:column;writing-mode:vertical-rl;padding:.2rem 0;font-size:.6rem;letter-spacing:.05em}
+.asep{width:1px;background:var(--border);margin:0 .3rem;align-self:stretch}
+.arch-label{font-size:.62rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);padding:.15rem .6rem;border-radius:4px;border:1px solid var(--border);background:var(--bg);white-space:nowrap}
 
-  /* ── Slide counter ── */
-  #counter {
-    position: fixed;
-    bottom: 1.5rem;
-    right: 2rem;
-    font-size: .75rem;
-    color: var(--muted);
-    letter-spacing: .08em;
-    z-index: 100;
-  }
+/* ── agent value table ── */
+.av-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:.8rem;width:100%;max-width:1100px}
+.av-card{background:var(--surf);border:1px solid var(--border);border-radius:12px;padding:1.1rem 1.2rem;overflow:hidden;position:relative}
+.av-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+.av-role{font-size:.68rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;margin-bottom:.25rem}
+.av-name{font-size:.95rem;font-weight:800;color:var(--bright);margin-bottom:.4rem}
+.av-model{display:inline-block;font-size:.62rem;padding:.1rem .4rem;border-radius:4px;margin-bottom:.5rem}
+.av-line{font-size:.75rem;color:var(--text);line-height:1.5;margin-bottom:.15rem;display:flex;gap:.4rem}
+.av-line::before{content:'→';color:var(--muted);flex-shrink:0}
+.av-mem{margin-top:.6rem;padding-top:.55rem;border-top:1px solid var(--border);font-size:.68rem;color:var(--muted)}
+.av-mem strong{color:var(--accent);font-size:.65rem}
 
-  /* ── Nav dots ── */
-  #dots {
-    position: fixed;
-    bottom: 1.5rem;
-    left: 50%;
-    transform: translateX(-50%);
-    display: flex;
-    gap: .5rem;
-    z-index: 100;
-  }
-  .dot {
-    width: 6px; height: 6px;
-    border-radius: 50%;
-    background: var(--border);
-    cursor: pointer;
-    transition: background .2s, transform .2s;
-  }
-  .dot.active { background: var(--accent); transform: scale(1.4); }
+/* ── memory learning ── */
+.mem-flow{display:flex;align-items:center;gap:0;width:100%;max-width:960px;justify-content:center}
+.mem-node{
+  background:var(--surf);border:1px solid var(--border);border-radius:12px;
+  padding:1rem 1.2rem;text-align:center;flex:1;min-width:130px
+}
+.mem-node .mn-icon{font-size:1.6rem;margin-bottom:.4rem}
+.mem-node .mn-title{font-size:.82rem;font-weight:700;color:var(--bright);margin-bottom:.25rem}
+.mem-node .mn-sub{font-size:.72rem;color:var(--muted);line-height:1.4}
+.mem-arrow{font-size:1.2rem;color:var(--accent);padding:0 .5rem;flex-shrink:0}
+.mem-keys{display:grid;grid-template-columns:repeat(3,1fr);gap:.8rem;width:100%;max-width:1000px;margin-top:1.2rem}
+.mk{background:var(--surf);border:1px solid var(--border);border-radius:10px;padding:.9rem 1rem}
+.mk-role{font-size:.62rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;margin-bottom:.2rem}
+.mk-key{font-family:'SF Mono',monospace;font-size:.68rem;color:var(--accent);margin-bottom:.15rem}
+.mk-val{font-size:.72rem;color:var(--muted);line-height:1.45;font-style:italic}
 
-  /* ── Nav arrows ── */
-  .nav-btn {
-    position: fixed;
-    top: 50%;
-    transform: translateY(-50%);
-    background: rgba(255,255,255,.04);
-    border: 1px solid var(--border);
-    color: var(--muted);
-    width: 42px; height: 42px;
-    border-radius: 50%;
-    cursor: pointer;
-    font-size: 1.1rem;
-    display: flex; align-items: center; justify-content: center;
-    transition: all .2s;
-    z-index: 100;
-  }
-  .nav-btn:hover { background: rgba(99,102,241,.15); color: var(--accent); border-color: var(--accent); }
-  #nav-prev { left: 1.2rem; }
-  #nav-next { right: 1.2rem; }
+/* ── stat numbers ── */
+.stats{display:flex;gap:3rem;justify-content:center;margin-top:1.2rem}
+.stat .sn{font-size:3rem;font-weight:900;color:var(--bright);letter-spacing:-.04em;line-height:1}
+.stat .sn em{font-size:1.4rem;color:var(--accent);font-style:normal}
+.stat .sl{font-size:.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:.12em;margin-top:.2rem}
 
-  /* ── Typography ── */
-  .eyebrow {
-    font-size: .75rem;
-    font-weight: 600;
-    letter-spacing: .15em;
-    text-transform: uppercase;
-    color: var(--accent);
-    margin-bottom: .75rem;
-  }
-  .headline {
-    font-size: clamp(2.2rem, 5vw, 4rem);
-    font-weight: 800;
-    line-height: 1.1;
-    color: var(--bright);
-    letter-spacing: -.02em;
-  }
-  .headline .grad {
-    background: linear-gradient(135deg, var(--accent), var(--accent3));
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-  }
-  .subhead {
-    font-size: clamp(1rem, 2vw, 1.35rem);
-    color: var(--muted);
-    line-height: 1.6;
-    margin-top: 1rem;
-    max-width: 720px;
-  }
-  .section-title {
-    font-size: 1.8rem;
-    font-weight: 700;
-    color: var(--bright);
-    letter-spacing: -.01em;
-  }
+/* ── phase timeline ── */
+.phases{width:100%;max-width:1000px;display:grid;grid-template-columns:repeat(2,1fr);gap:.4rem .8rem}
+.ph{display:flex;gap:.7rem;align-items:flex-start}
+.ph-num{font-size:.72rem;font-weight:900;color:var(--accent);width:2.2rem;flex-shrink:0;padding-top:.05rem}
+.ph-body{font-size:.75rem;color:var(--muted);line-height:1.45}
+.ph-body strong{color:var(--text)}
 
-  /* ── Cards & grid ── */
-  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; width: 100%; max-width: 1000px; }
-  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; width: 100%; max-width: 1050px; }
-  .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; width: 100%; max-width: 1100px; }
+/* ── ms slide ── */
+.ms-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem;width:100%;max-width:1000px}
+.ms-card{background:var(--surf);border:1px solid var(--border);border-radius:12px;padding:1.3rem 1.4rem;display:flex;gap:1rem}
+.ms-icon{font-size:2rem;flex-shrink:0;margin-top:.1rem}
+.ms-title{font-size:.95rem;font-weight:700;color:var(--bright);margin-bottom:.3rem}
+.ms-body{font-size:.8rem;color:var(--muted);line-height:1.55}
 
-  .card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 1.4rem 1.6rem;
-    position: relative;
-    overflow: hidden;
-  }
-  .card::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 0; right: 0;
-    height: 2px;
-    background: linear-gradient(90deg, var(--accent), transparent);
-  }
-  .card.green::before  { background: linear-gradient(90deg, var(--green),  transparent); }
-  .card.amber::before  { background: linear-gradient(90deg, var(--amber),  transparent); }
-  .card.cyan::before   { background: linear-gradient(90deg, var(--accent3),transparent); }
-  .card.purple::before { background: linear-gradient(90deg, var(--accent2),transparent); }
+/* ── ask ── */
+.ask-list{max-width:700px;width:100%;display:flex;flex-direction:column;gap:.9rem;margin-top:1rem}
+.ask{background:var(--surf);border:1px solid var(--border);border-radius:12px;padding:1.2rem 1.4rem;display:flex;gap:1rem;align-items:flex-start}
+.ask-n{font-size:2rem;font-weight:900;color:var(--accent);opacity:.4;line-height:1;flex-shrink:0;width:1.8rem;text-align:center}
+.ask-t{font-size:.95rem;font-weight:700;color:var(--bright);margin-bottom:.25rem}
+.ask-b{font-size:.82rem;color:var(--muted);line-height:1.5}
 
-  .card-icon { font-size: 1.8rem; margin-bottom: .6rem; }
-  .card-title { font-size: .85rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .1em; margin-bottom: .4rem; }
-  .card-value { font-size: 2rem; font-weight: 800; color: var(--bright); }
-  .card-sub   { font-size: .8rem; color: var(--muted); margin-top: .25rem; }
-  .card-body  { font-size: .88rem; color: var(--text); line-height: 1.55; margin-top: .5rem; }
+/* ── misc ── */
+.pill{display:inline-flex;align-items:center;gap:.4rem;background:var(--surf);border:1px solid var(--border);border-radius:999px;padding:.4rem 1rem;font-size:.78rem}
+.live-dot{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 6px var(--green);animation:blink 2s infinite;flex-shrink:0}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+.pulse-ring{width:40px;height:40px;border-radius:50%;border:2px solid var(--accent);animation:ring 2s infinite;opacity:.3;position:absolute}
+@keyframes ring{0%{transform:scale(1);opacity:.3}100%{transform:scale(1.6);opacity:0}}
+.mt{margin-top:1.2rem}
+.mt2{margin-top:1.8rem}
+.wide{max-width:1100px;width:100%}
+.tag{display:inline-block;padding:.12rem .5rem;border-radius:4px;font-size:.68rem;font-weight:600}
+.t-ind{background:rgba(99,102,241,.15);color:var(--accent)}
+.t-grn{background:rgba(16,185,129,.15);color:var(--green)}
+.t-cyn{background:rgba(6,182,212,.15);color:var(--cyan)}
+.t-amb{background:rgba(245,158,11,.15);color:var(--amber)}
+.t-pur{background:rgba(139,92,246,.15);color:var(--purple)}
+.t-pnk{background:rgba(236,72,153,.15);color:var(--pink)}
+.t-red{background:rgba(239,68,68,.15);color:var(--red)}
+code{font-family:'SF Mono','Cascadia Code',monospace;font-size:.82em;color:var(--cyan)}
+.code-box{background:#090912;border:1px solid var(--border);border-radius:10px;padding:1.1rem 1.4rem;font-family:'SF Mono',monospace;font-size:.78rem;line-height:1.8;color:#a5b4fc;max-width:700px;width:100%}
+.code-box .k{color:#c084fc}.code-box .s{color:#6ee7b7}.code-box .c{color:#334155}
 
-  /* ── Agent pills ── */
-  .agent-row { display: flex; flex-wrap: wrap; gap: .6rem; justify-content: center; margin-top: .5rem; }
-  .agent-pill {
-    display: flex; align-items: center; gap: .5rem;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 999px;
-    padding: .45rem 1rem;
-    font-size: .82rem;
-  }
-  .agent-pill .dot-online {
-    width: 7px; height: 7px; border-radius: 50%;
-    background: var(--green);
-    box-shadow: 0 0 6px var(--green);
-    animation: pulse 2s infinite;
-  }
-  @keyframes pulse {
-    0%,100% { opacity: 1; }
-    50% { opacity: .4; }
-  }
-  .agent-pill .model-badge {
-    font-size: .68rem; color: var(--accent);
-    background: rgba(99,102,241,.12);
-    border-radius: 4px;
-    padding: .1rem .4rem;
-  }
-
-  /* ── Flow diagram ── */
-  .flow {
-    display: flex;
-    align-items: center;
-    gap: 0;
-    max-width: 980px;
-    width: 100%;
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    margin-top: 1rem;
-  }
-  .flow-step {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: .4rem;
-    flex: 1;
-    min-width: 90px;
-  }
-  .flow-step .icon-wrap {
-    width: 48px; height: 48px;
-    border-radius: 12px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 1.3rem;
-    border: 1px solid var(--border);
-    background: var(--surface);
-    position: relative;
-  }
-  .flow-step .label { font-size: .72rem; color: var(--muted); text-align: center; line-height: 1.3; }
-  .flow-arrow { color: var(--accent); font-size: 1.1rem; flex-shrink: 0; padding: 0 .1rem; margin-bottom: 1.5rem; }
-
-  /* ── Stat row ── */
-  .stat-row { display: flex; gap: 2.5rem; justify-content: center; margin-top: 1.5rem; }
-  .stat { text-align: center; }
-  .stat-num { font-size: 2.8rem; font-weight: 900; color: var(--bright); letter-spacing: -.03em; }
-  .stat-num span { font-size: 1.4rem; color: var(--accent); }
-  .stat-label { font-size: .75rem; color: var(--muted); text-transform: uppercase; letter-spacing: .1em; margin-top: .2rem; }
-
-  /* ── Table ── */
-  .ptable { width: 100%; border-collapse: collapse; font-size: .85rem; }
-  .ptable th { color: var(--muted); font-weight: 600; letter-spacing: .05em; text-transform: uppercase; font-size: .72rem; padding: .5rem .8rem; text-align: left; border-bottom: 1px solid var(--border); }
-  .ptable td { padding: .55rem .8rem; border-bottom: 1px solid rgba(255,255,255,.04); color: var(--text); }
-  .ptable tr:last-child td { border-bottom: none; }
-  .ptable td .tag {
-    display: inline-block;
-    padding: .15rem .55rem;
-    border-radius: 4px;
-    font-size: .72rem;
-    font-weight: 600;
-  }
-  .tag-blue   { background: rgba(99,102,241,.15);  color: var(--accent); }
-  .tag-purple { background: rgba(139,92,246,.15);  color: var(--accent2); }
-  .tag-cyan   { background: rgba(6,182,212,.15);   color: var(--accent3); }
-  .tag-green  { background: rgba(16,185,129,.15);  color: var(--green); }
-  .tag-amber  { background: rgba(245,158,11,.15);  color: var(--amber); }
-
-  /* ── Code block ── */
-  .code-block {
-    background: #0d0d14;
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 1.2rem 1.5rem;
-    font-family: 'SF Mono', 'Cascadia Code', monospace;
-    font-size: .82rem;
-    line-height: 1.7;
-    color: #a5b4fc;
-    max-width: 700px;
-    width: 100%;
-  }
-  .code-block .cmd { color: #c084fc; }
-  .code-block .str { color: #6ee7b7; }
-  .code-block .cmt { color: #475569; }
-
-  /* ── Quote ── */
-  .big-quote {
-    font-size: clamp(1.2rem, 2.5vw, 1.9rem);
-    font-weight: 700;
-    color: var(--bright);
-    line-height: 1.4;
-    text-align: center;
-    max-width: 820px;
-    position: relative;
-    padding: 0 2rem;
-  }
-  .big-quote::before {
-    content: '\201C';
-    position: absolute;
-    left: -.2rem;
-    top: -.5rem;
-    font-size: 5rem;
-    color: var(--accent);
-    opacity: .3;
-    line-height: 1;
-  }
-
-  /* ── Timeline ── */
-  .timeline { max-width: 900px; width: 100%; }
-  .tl-row {
-    display: grid;
-    grid-template-columns: 90px 1fr;
-    gap: 0 1.2rem;
-    margin-bottom: .1rem;
-    position: relative;
-  }
-  .tl-phase {
-    text-align: right;
-    padding: .45rem .6rem .45rem 0;
-    font-size: .78rem;
-    font-weight: 700;
-    color: var(--accent);
-    border-right: 2px solid var(--border);
-    position: relative;
-  }
-  .tl-phase::after {
-    content: '';
-    position: absolute;
-    right: -5px; top: 50%;
-    transform: translateY(-50%);
-    width: 8px; height: 8px;
-    border-radius: 50%;
-    background: var(--accent);
-  }
-  .tl-content {
-    padding: .4rem .4rem .4rem .8rem;
-    font-size: .8rem;
-    color: var(--muted);
-    display: flex;
-    align-items: center;
-  }
-  .tl-content strong { color: var(--text); margin-right: .4rem; }
-
-  /* ── Microsoft slide ── */
-  .msft-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.2rem; max-width: 980px; width: 100%; }
-  .msft-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 1.4rem 1.6rem;
-    display: flex;
-    gap: 1rem;
-    align-items: flex-start;
-  }
-  .msft-card .ms-icon { font-size: 2rem; flex-shrink: 0; margin-top: .1rem; }
-  .msft-card .ms-title { font-size: .95rem; font-weight: 700; color: var(--bright); margin-bottom: .3rem; }
-  .msft-card .ms-body { font-size: .82rem; color: var(--muted); line-height: 1.55; }
-
-  /* ── Ask slide ── */
-  .ask-list { max-width: 700px; width: 100%; display: flex; flex-direction: column; gap: 1rem; margin-top: 1rem; }
-  .ask-item {
-    display: flex;
-    gap: 1.2rem;
-    align-items: flex-start;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 1.3rem 1.5rem;
-  }
-  .ask-num {
-    font-size: 2rem;
-    font-weight: 900;
-    color: var(--accent);
-    opacity: .5;
-    line-height: 1;
-    flex-shrink: 0;
-    width: 2rem;
-    text-align: center;
-  }
-  .ask-title { font-size: 1rem; font-weight: 700; color: var(--bright); margin-bottom: .3rem; }
-  .ask-body  { font-size: .85rem; color: var(--muted); line-height: 1.55; }
-
-  /* ── Title slide bg ── */
-  #slide-1 { background: radial-gradient(ellipse at 30% 50%, rgba(99,102,241,.12) 0%, transparent 60%), radial-gradient(ellipse at 70% 50%, rgba(6,182,212,.07) 0%, transparent 60%), var(--bg); }
-  #slide-1 .tagline { font-size: clamp(.95rem, 1.8vw, 1.25rem); color: var(--muted); margin-top: 1.25rem; max-width: 680px; text-align: center; line-height: 1.6; }
-  #slide-1 .url-pill {
-    margin-top: 2rem;
-    display: flex; align-items: center; gap: .6rem;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 999px;
-    padding: .5rem 1.2rem;
-    font-size: .82rem;
-    font-family: monospace;
-    color: var(--accent3);
-  }
-  #slide-1 .url-pill .live-dot {
-    width: 8px; height: 8px; border-radius: 50%;
-    background: var(--green);
-    box-shadow: 0 0 6px var(--green);
-    animation: pulse 2s infinite;
-    flex-shrink: 0;
-  }
-
-  .wide { max-width: 1100px; width: 100%; }
-  .center { text-align: center; }
-  .mt { margin-top: 1.5rem; }
-
-  /* closing slide */
-  #slide-10 { background: radial-gradient(ellipse at center, rgba(99,102,241,.15) 0%, transparent 65%), var(--bg); }
-  #slide-10 .closer { font-size: clamp(1.4rem, 2.8vw, 2.2rem); font-weight: 800; color: var(--bright); line-height: 1.4; text-align: center; max-width: 820px; }
-  #slide-10 .closer em { font-style: normal; background: linear-gradient(135deg, var(--accent), var(--accent3)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
-  #slide-10 .links { display: flex; gap: 1rem; margin-top: 2rem; flex-wrap: wrap; justify-content: center; }
-  #slide-10 .link-pill {
-    background: var(--surface); border: 1px solid var(--border); border-radius: 999px;
-    padding: .55rem 1.3rem; font-size: .83rem; color: var(--text); display: flex; align-items: center; gap: .5rem;
-    text-decoration: none;
-  }
-  #slide-10 .link-pill:hover { border-color: var(--accent); color: var(--accent); }
+/* ── slide-specific bg ── */
+#s1{background:radial-gradient(ellipse at 25% 60%,rgba(99,102,241,.14) 0%,transparent 55%),radial-gradient(ellipse at 75% 40%,rgba(6,182,212,.08) 0%,transparent 55%),var(--bg)}
+#s10{background:radial-gradient(ellipse at center,rgba(99,102,241,.17) 0%,transparent 60%),var(--bg)}
 </style>
 </head>
 <body>
 
-<div id="progress-bar"></div>
-<button class="nav-btn" id="nav-prev">&#8592;</button>
-<button class="nav-btn" id="nav-next">&#8594;</button>
+<div id="progress"></div>
+<button class="nav" id="prev">&#8592;</button>
+<button class="nav" id="next">&#8594;</button>
 <div id="dots"></div>
 <div id="counter"></div>
 
 <div class="deck">
 
-  <!-- ─────────────────────────────────── SLIDE 1 · Title -->
-  <div class="slide active" id="slide-1">
-    <div class="eyebrow">Autonomous AI Engineering</div>
-    <h1 class="headline center">Team <span class="grad">Claw</span></h1>
-    <p class="tagline center">
-      Eight specialized AI agents — Product Owner, Engineering Manager, Architect,
-      UX Engineer, two Senior Devs, two Junior Devs — that receive a requirement,
-      design, implement, test, review, and ship production code to GitHub.
-      <strong>Autonomously.</strong>
-    </p>
-    <div class="url-pill">
-      <span class="live-dot"></span>
-      Live demo &nbsp;·&nbsp; https://rhjrjl9w-8080.usw2.devtunnels.ms
+<!-- ══════════════════════════════════════════ S1 · TITLE -->
+<div class="slide active" id="s1">
+  <div class="eyebrow">Autonomous AI Software Engineering</div>
+  <h1 class="h1 center">Team <span class="grad">Claw</span></h1>
+  <p class="sub center mt" style="max-width:660px">
+    Eight specialized AI agents — each owning a distinct SDLC role —
+    that receive a plain-English requirement and deliver
+    <strong style="color:var(--bright)">production code on GitHub</strong>,
+    complete with architecture docs, UX specs, CI-passing tests, and a clean commit history.
+    <strong style="color:var(--bright)">No human writes a line of code.</strong>
+  </p>
+  <div style="display:flex;gap:.8rem;margin-top:2rem;flex-wrap:wrap;justify-content:center">
+    <div class="pill"><span class="live-dot"></span>Live demo &nbsp;·&nbsp; <code>https://rhjrjl9w-8080.usw2.devtunnels.ms/dashboard</code></div>
+    <div class="pill">⎇ <code>github.com/RajuRoopani/team-claw</code></div>
+    <div class="pill">🐳 <code>docker compose up --build</code></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════ S2 · PROBLEM -->
+<div class="slide" id="s2">
+  <div class="eyebrow">The Problem</div>
+  <h2 class="h2 center">AI accelerates typing.<br>The bottleneck was never typing.</h2>
+  <div class="g3 mt" style="max-width:920px">
+    <div class="card amb">
+      <div class="ci">⏱️</div>
+      <div class="ct">Where time actually goes</div>
+      <div class="cv" style="font-size:2.8rem">70<span style="font-size:1.4rem;color:var(--amber)">%</span></div>
+      <div class="cb">of engineering effort is coordination — translating requirements into tasks, assigning work, architecture debates, code review, integration, re-work cycles. <strong style="color:var(--bright)">AI doesn't touch any of it.</strong></div>
+    </div>
+    <div class="card ind">
+      <div class="ci">🤖</div>
+      <div class="ct">What Copilot does</div>
+      <div class="cv" style="font-size:1.5rem;margin-top:.3rem">2× faster<br>typing</div>
+      <div class="cb">GitHub Copilot is brilliant autocomplete. But it helps one developer, one file, one moment. The coordination tax — PM → design → architecture → delegation → review — remains 100% human.</div>
+    </div>
+    <div class="card cyn">
+      <div class="ci">🧩</div>
+      <div class="ct">The missing layer</div>
+      <div class="cv" style="font-size:1.5rem;margin-top:.3rem">The Team<br>Layer</div>
+      <div class="cb">No existing tool handles requirements refinement, architecture decisions, UX specs, task decomposition, parallel development, code review, and CI enforcement — <strong style="color:var(--bright)">as a coordinated team.</strong></div>
+    </div>
+  </div>
+  <div style="margin-top:1.6rem;background:var(--surf);border:1px solid var(--border);border-radius:12px;padding:1rem 1.8rem;max-width:820px;text-align:center">
+    <span style="font-size:.95rem;color:var(--bright);font-weight:700">The talent pyramid doesn't scale.</span>
+    <span style="font-size:.88rem;color:var(--muted)"> You can't hire enough senior engineers. Junior engineers need constant supervision. Coordination overhead grows faster than headcount. </span>
+    <span style="font-size:.88rem;color:var(--bright);font-weight:600">Team Claw inverts the pyramid.</span>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════ S3 · SYSTEM ARCHITECTURE -->
+<div class="slide" id="s3">
+  <div class="eyebrow">System Architecture</div>
+  <h2 class="h2 center">12 services. Every layer production-grade.</h2>
+
+  <div class="arch mt" style="max-width:1060px">
+
+    <!-- Row 0: Human entry -->
+    <div class="arch-row" style="justify-content:center;margin-bottom:.4rem">
+      <div class="anode" style="max-width:280px;border-color:rgba(99,102,241,.4);background:rgba(99,102,241,.07)">
+        <div class="alabel">Entry Point</div>
+        <div class="aname">👤 Human (CLI / Dashboard)</div>
+        <div><span class="tag t-ind">submit task</span> <span class="tag t-cyn">steer live</span> <span class="tag t-grn">answer questions</span></div>
+      </div>
+    </div>
+    <div style="display:flex;justify-content:center;color:var(--muted);font-size:.75rem;margin-bottom:.4rem">↓ HTTP / SSE</div>
+
+    <!-- Row 1: Orchestrator -->
+    <div class="arch-row" style="justify-content:center;margin-bottom:.4rem">
+      <div class="anode" style="max-width:820px;flex:none;width:100%;border-color:rgba(6,182,212,.3);background:rgba(6,182,212,.05)">
+        <div class="alabel">Orchestrator — FastAPI :8080</div>
+        <div class="aname">🎛️ Task Router · SSE Broadcaster · Audit Logger · CI Trigger · GitHub Repo Creator</div>
+        <div style="display:flex;gap:.4rem;margin-top:.3rem;flex-wrap:wrap;justify-content:center">
+          <span class="tag t-cyn">38 endpoints</span>
+          <span class="tag t-ind">SSE live stream</span>
+          <span class="tag t-grn">auto-CI on task done</span>
+          <span class="tag t-amb">webhook fire-and-forget</span>
+          <span class="tag t-pur">HITL pause/resume</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 2: Three pillars -->
+    <div class="arch-row" style="gap:.5rem;margin-bottom:.4rem">
+      <div class="anode" style="border-color:rgba(245,158,11,.3);background:rgba(245,158,11,.05)">
+        <div class="alabel">Message Bus</div>
+        <div class="aname">⚡ Redis Streams</div>
+        <div class="cb" style="font-size:.7rem;color:var(--muted);margin-top:.2rem">Per-agent persistent inboxes<br>XAUTOCLAIM on restart<br>team:audit + team:activity</div>
+      </div>
+      <div class="aconn">↔</div>
+      <div class="anode" style="border-color:rgba(139,92,246,.3);background:rgba(139,92,246,.05)">
+        <div class="alabel">State Store</div>
+        <div class="aname">🐘 PostgreSQL 16</div>
+        <div class="cb" style="font-size:.7rem;color:var(--muted);margin-top:.2rem">9 tables · 25+ indexes<br>Messages, tasks, CI results<br>Tool telemetry, agent memory</div>
+      </div>
+      <div class="aconn">↔</div>
+      <div class="anode" style="border-color:rgba(239,68,68,.3);background:rgba(239,68,68,.05)">
+        <div class="alabel">Code Execution</div>
+        <div class="aname">🔒 Sandbox :8081</div>
+        <div class="cb" style="font-size:.7rem;color:var(--muted);margin-top:.2rem">No network · 512 MB RAM cap<br>Read-only workspace mount<br>pytest + arbitrary code</div>
+      </div>
+    </div>
+
+    <!-- Row 3: Agents -->
+    <div class="arch-row" style="gap:.35rem">
+      <div class="anode" style="border-color:rgba(99,102,241,.25)">
+        <div style="font-size:.9rem">📋</div>
+        <div class="aname" style="font-size:.72rem">Product Owner</div>
+        <div style="font-size:.58rem;color:var(--muted)">Opus 4</div>
+      </div>
+      <div class="anode" style="border-color:rgba(99,102,241,.25)">
+        <div style="font-size:.9rem">📊</div>
+        <div class="aname" style="font-size:.72rem">Eng Manager</div>
+        <div style="font-size:.58rem;color:var(--muted)">Opus 4</div>
+      </div>
+      <div class="anode" style="border-color:rgba(6,182,212,.25)">
+        <div style="font-size:.9rem">🏛️</div>
+        <div class="aname" style="font-size:.72rem">Architect</div>
+        <div style="font-size:.58rem;color:var(--muted)">Sonnet 4</div>
+      </div>
+      <div class="anode" style="border-color:rgba(236,72,153,.25)">
+        <div style="font-size:.9rem">🎨</div>
+        <div class="aname" style="font-size:.72rem">UX Engineer</div>
+        <div style="font-size:.58rem;color:var(--muted)">Sonnet 4</div>
+      </div>
+      <div class="anode" style="border-color:rgba(16,185,129,.25)">
+        <div style="font-size:.9rem">💻</div>
+        <div class="aname" style="font-size:.72rem">Sr Dev 1</div>
+        <div style="font-size:.58rem;color:var(--muted)">Sonnet 4</div>
+      </div>
+      <div class="anode" style="border-color:rgba(16,185,129,.25)">
+        <div style="font-size:.9rem">💻</div>
+        <div class="aname" style="font-size:.72rem">Sr Dev 2</div>
+        <div style="font-size:.58rem;color:var(--muted)">Sonnet 4</div>
+      </div>
+      <div class="anode" style="border-color:rgba(245,158,11,.25)">
+        <div style="font-size:.9rem">⚙️</div>
+        <div class="aname" style="font-size:.72rem">Jr Dev 1</div>
+        <div style="font-size:.58rem;color:var(--muted)">Haiku 4</div>
+      </div>
+      <div class="anode" style="border-color:rgba(245,158,11,.25)">
+        <div style="font-size:.9rem">⚙️</div>
+        <div class="aname" style="font-size:.72rem">Jr Dev 2</div>
+        <div style="font-size:.58rem;color:var(--muted)">Haiku 4</div>
+      </div>
+    </div>
+
+    <!-- Row 4: Outputs -->
+    <div style="display:flex;justify-content:center;color:var(--muted);font-size:.75rem;margin-top:.4rem;margin-bottom:.3rem">↓ all agents push to</div>
+    <div class="arch-row" style="gap:.5rem;justify-content:center">
+      <div class="anode" style="max-width:220px;border-color:rgba(16,185,129,.3);background:rgba(16,185,129,.05)">
+        <div style="font-size:.9rem">📁</div>
+        <div class="aname" style="font-size:.75rem">/workspace volume</div>
+        <div style="font-size:.62rem;color:var(--muted)">Shared Docker volume</div>
+      </div>
+      <div class="aconn">→</div>
+      <div class="anode" style="max-width:220px;border-color:rgba(16,185,129,.3);background:rgba(16,185,129,.05)">
+        <div style="font-size:.9rem">⎇</div>
+        <div class="aname" style="font-size:.75rem">GitHub Repo</div>
+        <div style="font-size:.62rem;color:var(--muted)">Auto-created + pushed</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════ S4 · AGENT VALUE MAP -->
+<div class="slide" id="s4">
+  <div class="eyebrow">Agent Value Map</div>
+  <h2 class="h2 center">Every role exists for a reason.</h2>
+  <div class="av-grid mt">
+
+    <div class="av-card" style="--c:var(--accent)"><div class="av-card::before"></div>
+      <div class="av-role" style="color:var(--accent)">Orchestration</div>
+      <div class="av-name">📋 Product Owner</div>
+      <span class="av-model" style="background:rgba(99,102,241,.12);color:var(--accent)">claude-opus-4-6</span>
+      <div class="av-line">Rewrites vague requests into crisp acceptance criteria</div>
+      <div class="av-line">Prevents scope creep before it reaches devs</div>
+      <div class="av-line">Signs off on final delivery — nothing ships without PO approval</div>
+      <div class="av-mem"><strong>Learns:</strong> requirement patterns that cause dev confusion · scope pitfalls that repeat · reusable AC templates per feature type</div>
+    </div>
+
+    <div class="av-card">
+      <div class="av-role" style="color:var(--purple)">Coordination</div>
+      <div class="av-name">📊 Engineering Manager</div>
+      <span class="av-model" style="background:rgba(139,92,246,.12);color:var(--purple)">claude-opus-4-6</span>
+      <div class="av-line">Decomposes epics into parallel workstreams</div>
+      <div class="av-line">Assigns Architect + UX in parallel before any code starts</div>
+      <div class="av-line">Tracks task status, unblocks, triggers CI gate, merges branches</div>
+      <div class="av-mem"><strong>Learns:</strong> delegation patterns that cause rework · which agent combos deliver fastest · when to escalate vs. push forward</div>
+    </div>
+
+    <div class="av-card">
+      <div class="av-role" style="color:var(--cyan)">Design</div>
+      <div class="av-name">🏛️ Architect</div>
+      <span class="av-model" style="background:rgba(6,182,212,.12);color:var(--cyan)">claude-sonnet-4-6</span>
+      <div class="av-line">Writes ADRs before devs touch a file</div>
+      <div class="av-line">Defines API contracts, DB schema, component boundaries</div>
+      <div class="av-line">Reviews code for N+1 queries, coupling, missing validation</div>
+      <div class="av-mem"><strong>Learns:</strong> patterns that work for project type · tech choices with rationale · design decisions that caused dev rework</div>
+    </div>
+
+    <div class="av-card">
+      <div class="av-role" style="color:var(--pink)">UX</div>
+      <div class="av-name">🎨 UX Engineer</div>
+      <span class="av-model" style="background:rgba(236,72,153,.12);color:var(--pink)">claude-sonnet-4-6</span>
+      <div class="av-line">ASCII wireframes + component specs before devs code UI</div>
+      <div class="av-line">Specifies hover/error/loading states explicitly</div>
+      <div class="av-line">Reviews built UI vs. design — catches mismatches</div>
+      <div class="av-mem"><strong>Learns:</strong> UX patterns per UI type · reusable component specs · design terms that confuse devs (e.g. select vs. tab strip)</div>
+    </div>
+
+    <div class="av-card">
+      <div class="av-role" style="color:var(--green)">Implementation</div>
+      <div class="av-name">💻 Senior Dev 1 &amp; 2</div>
+      <span class="av-model" style="background:rgba(16,185,129,.12);color:var(--green)">claude-sonnet-4-6</span>
+      <div class="av-line">Implements features against architecture contracts</div>
+      <div class="av-line">Reviews Junior Dev PRs — enforces patterns, catches antipatterns</div>
+      <div class="av-line">Mentors: answers Jr questions (max 3 rounds before EM escalation)</div>
+      <div class="av-mem"><strong>Learns:</strong> clean code patterns per framework · bug classes found in review · library choices with rationale</div>
+    </div>
+
+    <div class="av-card">
+      <div class="av-role" style="color:var(--amber)">Execution</div>
+      <div class="av-name">⚙️ Junior Dev 1 &amp; 2</div>
+      <span class="av-model" style="background:rgba(245,158,11,.12);color:var(--amber)">claude-haiku-4-5</span>
+      <div class="av-line">Implements well-scoped tasks against Sr Dev's patterns</div>
+      <div class="av-line">Writes unit + integration tests for every feature</div>
+      <div class="av-line">Escalates blockers to mentor Sr Dev — never guesses</div>
+      <div class="av-mem"><strong>Learns:</strong> test patterns that pass review · common mistakes to avoid · mentor feedback as standing rules</div>
+    </div>
+
+    <div class="av-card" style="grid-column:span 2;background:rgba(99,102,241,.04);border-color:rgba(99,102,241,.2)">
+      <div class="av-role" style="color:var(--accent)">Cost Architecture</div>
+      <div class="av-name" style="font-size:.9rem">💡 Model tiers match cognitive load — exactly like a real team</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.6rem;margin-top:.6rem">
+        <div style="text-align:center;padding:.6rem;background:var(--surf);border-radius:8px;border:1px solid var(--border)">
+          <div style="font-size:.7rem;color:var(--muted);margin-bottom:.2rem">Coordination — Opus 4</div>
+          <div style="font-size:.8rem;color:var(--bright)">PO + EM</div>
+          <div style="font-size:.7rem;color:var(--muted)">Strategic thinking, trade-offs</div>
+        </div>
+        <div style="text-align:center;padding:.6rem;background:var(--surf);border-radius:8px;border:1px solid var(--border)">
+          <div style="font-size:.7rem;color:var(--muted);margin-bottom:.2rem">Design + Impl — Sonnet 4</div>
+          <div style="font-size:.8rem;color:var(--bright)">Arch + UX + Sr Devs</div>
+          <div style="font-size:.7rem;color:var(--muted)">Deep technical work</div>
+        </div>
+        <div style="text-align:center;padding:.6rem;background:var(--surf);border-radius:8px;border:1px solid var(--border)">
+          <div style="font-size:.7rem;color:var(--muted);margin-bottom:.2rem">Execution — Haiku 4</div>
+          <div style="font-size:.8rem;color:var(--bright)">Jr Devs</div>
+          <div style="font-size:.7rem;color:var(--muted)">Well-defined tasks, tests</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════ S5 · LEARNING ENGINE -->
+<div class="slide" id="s5">
+  <div class="eyebrow">The Learning Engine</div>
+  <h2 class="h2 center">Agents don't just execute. They evolve.</h2>
+
+  <div class="mem-flow mt">
+    <div class="mem-node" style="border-color:rgba(99,102,241,.3);background:rgba(99,102,241,.07)">
+      <div class="mn-icon">📥</div>
+      <div class="mn-title">Task Arrives</div>
+      <div class="mn-sub">Agent calls <code>list_memories</code> — recalls every pattern, lesson, and mistake from past tasks before writing a single line</div>
+    </div>
+    <div class="mem-arrow">→</div>
+    <div class="mem-node" style="border-color:rgba(6,182,212,.3);background:rgba(6,182,212,.07)">
+      <div class="mn-icon">🧠</div>
+      <div class="mn-title">Apply Memory</div>
+      <div class="mn-sub">Recalled context shapes every decision — architecture choices, code patterns, UX components, requirement scope guards</div>
+    </div>
+    <div class="mem-arrow">→</div>
+    <div class="mem-node" style="border-color:rgba(16,185,129,.3);background:rgba(16,185,129,.07)">
+      <div class="mn-icon">✅</div>
+      <div class="mn-title">Task Complete</div>
+      <div class="mn-sub">Before sending <code>task_complete</code>, agent calls <code>write_memory</code> — saves 1–2 high-value insights with context and rationale</div>
+    </div>
+    <div class="mem-arrow">→</div>
+    <div class="mem-node" style="border-color:rgba(245,158,11,.3);background:rgba(245,158,11,.07)">
+      <div class="mn-icon">📈</div>
+      <div class="mn-title">Compound Growth</div>
+      <div class="mn-sub">Memory persists in PostgreSQL across restarts, versions, and tasks. Agents on task 50 are meaningfully smarter than on task 1.</div>
     </div>
   </div>
 
-  <!-- ─────────────────────────────────── SLIDE 2 · The Problem -->
-  <div class="slide" id="slide-2">
-    <div class="eyebrow">The Problem</div>
-    <h2 class="section-title center">AI accelerates typing.<br>The bottleneck was never typing.</h2>
-    <div class="grid-3 mt" style="max-width:900px">
-      <div class="card amber">
-        <div class="card-icon">⏱️</div>
-        <div class="card-title">70% of engineering time</div>
-        <div class="card-body">Goes to coordination — translating requirements into tasks, assigning work, unblocking, reviewing, integrating, and shipping. AI doesn't touch this today.</div>
-      </div>
-      <div class="card">
-        <div class="card-icon">🤖</div>
-        <div class="card-title">Copilot is autocomplete</div>
-        <div class="card-body">GitHub Copilot is the best code-completion tool ever built. But it helps one developer type faster. The coordination tax remains untouched.</div>
-      </div>
-      <div class="card cyan">
-        <div class="card-icon">📐</div>
-        <div class="card-title">The missing layer</div>
-        <div class="card-body">No AI system today handles task decomposition, architecture decisions, code review, CI enforcement, and end-to-end GitHub delivery — as a team.</div>
-      </div>
+  <div class="mem-keys">
+    <div class="mk">
+      <div class="mk-role" style="color:var(--cyan)">🏛️ Architect learns</div>
+      <div class="mk-key">pattern:arch:vanilla-js-dashboard</div>
+      <div class="mk-val">"Revealing Module Pattern works for vanilla JS under 500 LOC — beyond that, ES modules. Avoids global namespace collisions that caused rework on task #4."</div>
+      <div style="margin-top:.5rem"><div class="mk-key">mistake:design:css-naming</div>
+      <div class="mk-val">"Specifying CSS class names that differ from UX doc caused Sr Dev confusion — always align with UX Engineer before publishing design doc."</div></div>
     </div>
-    <div class="big-quote" style="margin-top:2rem; font-size:1.1rem; color:var(--muted)">
-      The talent pyramid doesn't scale. You can't hire enough senior engineers.<br>
-      <span style="color:var(--bright)">Team Claw inverts the pyramid.</span>
+    <div class="mk">
+      <div class="mk-role" style="color:var(--green)">💻 Senior Dev learns</div>
+      <div class="mk-key">pattern:code:fastapi-crud</div>
+      <div class="mk-val">"FastAPI CRUD pattern: router → service → repository. Never let routers touch the DB directly. Enforced in reviews — zero rework on last 3 tasks."</div>
+      <div style="margin-top:.5rem"><div class="mk-key">lesson:debug:pytest-conftest</div>
+      <div class="mk-val">"pytest collection errors from conftest.py conflicts in shared workspace — always scope test paths in pytest.ini and use -p no:cacheprovider."</div></div>
     </div>
-  </div>
-
-  <!-- ─────────────────────────────────── SLIDE 3 · What It Does -->
-  <div class="slide" id="slide-3">
-    <div class="eyebrow">End-to-End Workflow</div>
-    <h2 class="section-title center">One sentence in. Working code on GitHub out.</h2>
-    <div class="flow mt">
-      <div class="flow-step">
-        <div class="icon-wrap" style="background:rgba(99,102,241,.1);border-color:rgba(99,102,241,.3)">💬</div>
-        <div class="label">Human<br>submits task</div>
-      </div>
-      <div class="flow-arrow">→</div>
-      <div class="flow-step">
-        <div class="icon-wrap" style="background:rgba(16,185,129,.1);border-color:rgba(16,185,129,.3)">📋</div>
-        <div class="label">Product Owner<br>refines reqs</div>
-      </div>
-      <div class="flow-arrow">→</div>
-      <div class="flow-step">
-        <div class="icon-wrap" style="background:rgba(245,158,11,.1);border-color:rgba(245,158,11,.3)">🏛️</div>
-        <div class="label">Architect<br>+ UX design</div>
-      </div>
-      <div class="flow-arrow">→</div>
-      <div class="flow-step">
-        <div class="icon-wrap" style="background:rgba(139,92,246,.1);border-color:rgba(139,92,246,.3)">📊</div>
-        <div class="label">EM decomposes<br>assigns tasks</div>
-      </div>
-      <div class="flow-arrow">→</div>
-      <div class="flow-step">
-        <div class="icon-wrap" style="background:rgba(6,182,212,.1);border-color:rgba(6,182,212,.3)">💻</div>
-        <div class="label">Devs code +<br>commit in parallel</div>
-      </div>
-      <div class="flow-arrow">→</div>
-      <div class="flow-step">
-        <div class="icon-wrap" style="background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.3)">✅</div>
-        <div class="label">Auto-CI<br>pytest gate</div>
-      </div>
-      <div class="flow-arrow">→</div>
-      <div class="flow-step">
-        <div class="icon-wrap" style="background:rgba(16,185,129,.1);border-color:rgba(16,185,129,.3)">🚀</div>
-        <div class="label">GitHub<br>push + PR</div>
-      </div>
+    <div class="mk">
+      <div class="mk-role" style="color:var(--pink)">🎨 UX Engineer learns</div>
+      <div class="mk-key">pattern:ux:list-detail-layout</div>
+      <div class="mk-val">"For list+detail layouts: always spec empty state explicitly. No-selection, filtered-to-zero, and truly-empty-data are three distinct states devs miss."</div>
+      <div style="margin-top:.5rem"><div class="mk-key">mistake:design:select-vs-tabs</div>
+      <div class="mk-val">"Specifying 'filter tabs' as &lt;select&gt; caused dev to implement a dropdown — always say 'button group' or 'tab strip' explicitly."</div></div>
     </div>
-    <div class="code-block" style="margin-top:1.5rem">
-      <span class="cmt"># You type one line</span><br>
-      <span class="cmd">python3</span> cli.py submit <span class="str">"Build a task management API"</span> <span class="str">"FastAPI, pytest, auth. GitHub Repo: my-app"</span><br><br>
-      <span class="cmt"># Team Claw ships this — autonomously, in under 5 minutes:</span><br>
-      <span class="cmt"># ✓ Requirements doc   ✓ Architecture ADR   ✓ UX wireframes</span><br>
-      <span class="cmt"># ✓ Passing test suite  ✓ Clean commit history  ✓ GitHub repo</span>
+    <div class="mk">
+      <div class="mk-role" style="color:var(--accent)">📋 Product Owner learns</div>
+      <div class="mk-key">scope:pitfall:auth-creep</div>
+      <div class="mk-val">"Auth/login always gets requested as an add-on to web UI tasks — pre-emptively exclude it in every web UI story unless explicitly in scope."</div>
+      <div style="margin-top:.5rem"><div class="mk-key">ac:template:rest-crud</div>
+      <div class="mk-val">"REST CRUD AC pattern: 1) endpoint exists 2) correct status codes 3) persists to DB 4) validates input. Reuse on every API task."</div></div>
     </div>
-  </div>
-
-  <!-- ─────────────────────────────────── SLIDE 4 · The Team -->
-  <div class="slide" id="slide-4">
-    <div class="eyebrow">The Team</div>
-    <h2 class="section-title center">8 agents. Every SDLC role covered.</h2>
-    <div class="agent-row mt" style="max-width:1000px">
-      <div class="agent-pill"><span class="dot-online"></span>Product Owner<span class="model-badge">Opus 4</span></div>
-      <div class="agent-pill"><span class="dot-online"></span>Engineering Manager<span class="model-badge">Opus 4</span></div>
-      <div class="agent-pill"><span class="dot-online"></span>Architect<span class="model-badge">Sonnet 4</span></div>
-      <div class="agent-pill"><span class="dot-online"></span>UX Engineer<span class="model-badge">Sonnet 4</span></div>
-      <div class="agent-pill"><span class="dot-online"></span>Senior Dev 1<span class="model-badge">Sonnet 4</span></div>
-      <div class="agent-pill"><span class="dot-online"></span>Senior Dev 2<span class="model-badge">Sonnet 4</span></div>
-      <div class="agent-pill"><span class="dot-online"></span>Junior Dev 1<span class="model-badge">Haiku 4</span></div>
-      <div class="agent-pill"><span class="dot-online"></span>Junior Dev 2<span class="model-badge">Haiku 4</span></div>
+    <div class="mk">
+      <div class="mk-role" style="color:var(--purple)">📊 EM learns</div>
+      <div class="mk-key">delegation:parallel-ux-arch</div>
+      <div class="mk-val">"Always assign UX + Architect in parallel at task start — sequential assignment wasted 40% of task time on UI-heavy projects. Now standard."</div>
+      <div style="margin-top:.5rem"><div class="mk-key">team:observation:ux-skip</div>
+      <div class="mk-val">"EM (self) tends to skip UX assignment for internal tools — add explicit reminder: any feature with a UI needs UX spec first, always."</div></div>
     </div>
-    <div class="grid-2 mt" style="max-width:960px">
-      <div class="card">
-        <div class="card-title">Model tier strategy</div>
-        <div class="card-body">Expensive coordination (PO, EM) runs on Opus. Implementation (Sr Dev, UX) on Sonnet. Execution (Jr Dev) on Haiku. Cost is proportional to cognitive load — exactly like a real team.</div>
-      </div>
-      <div class="card cyan">
-        <div class="card-title">Real escalation paths</div>
-        <div class="card-body">Jr → Sr (max 3 rounds), Sr → EM on blocker, any agent → human via <code>ask_human</code>. Agents have persistent memory that evolves after every task. They get better over time.</div>
-      </div>
-      <div class="card purple">
-        <div class="card-title">25 specialized tools</div>
-        <div class="card-body">File ops, git (commit/push/branch/merge), code execution in sandbox, Kanban management, wiki, per-agent memory, token budget checks, HITL escalation.</div>
-      </div>
-      <div class="card green">
-        <div class="card-title">Human authority preserved</div>
-        <div class="card-body">Agents pause and ask when genuinely blocked. Humans can steer any live task mid-flight via the dashboard chat bar or CLI — no restart required.</div>
+    <div class="mk" style="background:rgba(16,185,129,.04);border-color:rgba(16,185,129,.2)">
+      <div class="mk-role" style="color:var(--green)">🔮 What this compounds into</div>
+      <div style="font-size:.78rem;color:var(--text);line-height:1.6;margin-top:.3rem">
+        By task 10, agents avoid the antipatterns they discovered in tasks 1–9.<br><br>
+        By task 50, each agent has a curated knowledge base of <strong style="color:var(--bright)">proven patterns, known failure modes, and team-specific conventions</strong> — persistent institutional memory no human team can match at scale.
       </div>
     </div>
   </div>
+</div>
 
-  <!-- ─────────────────────────────────── SLIDE 5 · Architecture -->
-  <div class="slide" id="slide-5">
-    <div class="eyebrow">Engineering Architecture</div>
-    <h2 class="section-title center">Built for production, not for demos.</h2>
-    <div class="grid-2 mt" style="max-width:980px">
+<!-- ══════════════════════════════════════════ S6 · WORKFLOW -->
+<div class="slide" id="s6">
+  <div class="eyebrow">End-to-End Workflow</div>
+  <h2 class="h2 center">From one sentence to GitHub — in under 5 minutes.</h2>
+
+  <div class="code-box mt">
+    <span class="k">python3</span> cli.py submit <span class="s">"Build a social feed API"</span> <span class="s">"FastAPI, follows, likes, feed. GitHub Repo: my-social-app"</span>
+  </div>
+
+  <div style="width:100%;max-width:980px;margin-top:1.2rem;display:grid;grid-template-columns:repeat(7,1fr) 0fr;gap:0;align-items:start">
+    <!-- Step blocks -->
+    <div style="text-align:center;padding:.5rem .3rem">
+      <div style="width:44px;height:44px;border-radius:10px;background:rgba(99,102,241,.12);border:1px solid rgba(99,102,241,.3);display:flex;align-items:center;justify-content:center;font-size:1.1rem;margin:0 auto">📋</div>
+      <div style="font-size:.65rem;color:var(--accent);font-weight:700;margin:.4rem 0 .15rem">PO</div>
+      <div style="font-size:.68rem;color:var(--muted);line-height:1.3">Refines requirements, writes AC</div>
+    </div>
+    <div style="display:flex;align-items:center;justify-content:center;padding-top:.5rem;color:var(--muted);font-size:.9rem">→</div>
+    <div style="text-align:center;padding:.5rem .3rem">
+      <div style="width:44px;height:44px;border-radius:10px;background:rgba(139,92,246,.12);border:1px solid rgba(139,92,246,.3);display:flex;align-items:center;justify-content:center;font-size:1.1rem;margin:0 auto">📊</div>
+      <div style="font-size:.65rem;color:var(--purple);font-weight:700;margin:.4rem 0 .15rem">EM</div>
+      <div style="font-size:.68rem;color:var(--muted);line-height:1.3">Assigns Arch + UX in parallel, creates Kanban tasks</div>
+    </div>
+    <div style="display:flex;align-items:center;justify-content:center;padding-top:.5rem;color:var(--muted);font-size:.9rem">→</div>
+    <div style="text-align:center;padding:.5rem .3rem">
+      <div style="display:flex;gap:.2rem;justify-content:center">
+        <div style="width:22px;height:44px;border-radius:6px;background:rgba(6,182,212,.1);border:1px solid rgba(6,182,212,.3);display:flex;align-items:center;justify-content:center;font-size:.7rem">🏛</div>
+        <div style="width:22px;height:44px;border-radius:6px;background:rgba(236,72,153,.1);border:1px solid rgba(236,72,153,.3);display:flex;align-items:center;justify-content:center;font-size:.7rem">🎨</div>
+      </div>
+      <div style="font-size:.65rem;color:var(--cyan);font-weight:700;margin:.4rem 0 .15rem">Arch + UX</div>
+      <div style="font-size:.68rem;color:var(--muted);line-height:1.3">ADR + schema + wireframes (parallel)</div>
+    </div>
+    <div style="display:flex;align-items:center;justify-content:center;padding-top:.5rem;color:var(--muted);font-size:.9rem">→</div>
+    <div style="text-align:center;padding:.5rem .3rem">
+      <div style="display:flex;gap:.2rem;justify-content:center">
+        <div style="width:22px;height:44px;border-radius:6px;background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.3);display:flex;align-items:center;justify-content:center;font-size:.7rem">💻</div>
+        <div style="width:22px;height:44px;border-radius:6px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);display:flex;align-items:center;justify-content:center;font-size:.7rem">⚙</div>
+      </div>
+      <div style="font-size:.65rem;color:var(--green);font-weight:700;margin:.4rem 0 .15rem">Sr + Jr Devs</div>
+      <div style="font-size:.68rem;color:var(--muted);line-height:1.3">Implement, commit, review, iterate</div>
+    </div>
+    <div style="display:flex;align-items:center;justify-content:center;padding-top:.5rem;color:var(--muted);font-size:.9rem">→</div>
+    <div style="text-align:center;padding:.5rem .3rem">
+      <div style="width:44px;height:44px;border-radius:10px;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.3);display:flex;align-items:center;justify-content:center;font-size:1.1rem;margin:0 auto">🔬</div>
+      <div style="font-size:.65rem;color:var(--red);font-weight:700;margin:.4rem 0 .15rem">CI Gate</div>
+      <div style="font-size:.68rem;color:var(--muted);line-height:1.3">pytest in isolated sandbox — blocks if tests fail</div>
+    </div>
+    <div style="display:flex;align-items:center;justify-content:center;padding-top:.5rem;color:var(--muted);font-size:.9rem">→</div>
+    <div style="text-align:center;padding:.5rem .3rem">
+      <div style="width:44px;height:44px;border-radius:10px;background:rgba(16,185,129,.12);border:1px solid rgba(16,185,129,.3);display:flex;align-items:center;justify-content:center;font-size:1.1rem;margin:0 auto">🚀</div>
+      <div style="font-size:.65rem;color:var(--green);font-weight:700;margin:.4rem 0 .15rem">GitHub</div>
+      <div style="font-size:.68rem;color:var(--muted);line-height:1.3">Auto-push, clean history, README</div>
+    </div>
+  </div>
+
+  <div class="g4 mt" style="max-width:980px">
+    <div class="card grn">
+      <div class="ct">Output: Architecture</div>
+      <div class="cb">ADR documenting every tech decision with context + trade-offs. Schema design. API contracts. Written to <code>/workspace/docs/</code> before devs start.</div>
+    </div>
+    <div class="card pnk">
+      <div class="ct">Output: UX Spec</div>
+      <div class="cb">ASCII wireframes for every screen. Component specs with states (hover, error, loading, empty). Written to <code>/workspace/designs/</code> — devs read it as their visual contract.</div>
+    </div>
+    <div class="card ind">
+      <div class="ct">Output: Code</div>
+      <div class="cb">Layered architecture (router → service → repository). Passing test suite. Per-role feature branches merged to main. Clean commit history referencing task IDs.</div>
+    </div>
+    <div class="card cyn">
+      <div class="ct">Output: Memory</div>
+      <div class="cb">Every agent writes 1–2 memories after task completion. Patterns, mistakes, observations. Persists across restarts. Team gets smarter with every delivery.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════ S7 · RESILIENCE -->
+<div class="slide" id="s7">
+  <div class="eyebrow">Production Resilience</div>
+  <h2 class="h2 center">Agents fail gracefully. Systems recover automatically.</h2>
+
+  <div class="g2 mt" style="max-width:1000px">
+    <div style="display:flex;flex-direction:column;gap:.9rem">
+      <div class="card ind">
+        <div class="ct">Exponential Backoff on API errors</div>
+        <div class="cb">RateLimitError → 5s / 10s / 20s retry. InternalServerError → 2s / 4s / 8s. ConnectionError → 3s / 6s / 12s. Agents survive Anthropic service blips without losing task context.</div>
+      </div>
+      <div class="card amb">
+        <div class="ct">Loop Detection Circuit Breaker</div>
+        <div class="cb">If the same tool with identical inputs runs 3× in the last 4 calls, the loop breaks and an alert is sent to EM. Prevents infinite retry spirals that waste tokens and time.</div>
+      </div>
+      <div class="card red">
+        <div class="ct">Exhaustion Rescue</div>
+        <div class="cb">When an agent exhausts its 25-iteration loop without naturally completing, an HTTP POST fires to the EM's inbox: <em>"Agent stuck — here's the last context — reassign or continue."</em> No task is ever silently abandoned.</div>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:.9rem">
+      <div class="card grn">
+        <div class="ct">Message Durability (XAUTOCLAIM)</div>
+        <div class="cb">On startup, every agent claims orphaned pending messages from any previous dead consumer. An agent that crashes mid-task and restarts picks up exactly where it left off — no message dropped.</div>
+      </div>
+      <div class="card cyn">
+        <div class="ct">Final-Stretch Warning</div>
+        <div class="cb">At iterations 23, 24, 25 of 25, agents receive a system hint: <em>"You have ~N steps remaining — wrap up, don't start new work."</em> Prevents half-finished commits.</div>
+      </div>
+      <div class="card pur">
+        <div class="ct">Thread Close Guard</div>
+        <div class="cb"><code>POST /threads/{id}/close</code> returns HTTP 409 if any tasks are still pending or in-progress. The team can't declare done while work is outstanding. Requires <code>?force=true</code> override.</div>
+      </div>
+    </div>
+  </div>
+
+  <div style="margin-top:1.2rem;background:var(--surf);border:1px solid var(--border);border-radius:12px;padding:.9rem 1.6rem;max-width:900px;display:flex;gap:2rem;justify-content:center;flex-wrap:wrap">
+    <div style="text-align:center"><div style="font-size:1.8rem;font-weight:900;color:var(--bright)">25</div><div style="font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:.1em">Max iterations per loop</div></div>
+    <div style="text-align:center"><div style="font-size:1.8rem;font-weight:900;color:var(--bright)">3</div><div style="font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:.1em">API retry attempts</div></div>
+    <div style="text-align:center"><div style="font-size:1.8rem;font-weight:900;color:var(--bright)">0</div><div style="font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:.1em">Silent message drops</div></div>
+    <div style="text-align:center"><div style="font-size:1.8rem;font-weight:900;color:var(--bright)">~95%</div><div style="font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:.1em">Task completion rate</div></div>
+    <div style="text-align:center"><div style="font-size:1.8rem;font-weight:900;color:var(--bright)">&lt;5min</div><div style="font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:.1em">Avg. time to GitHub push</div></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════ S8 · NUMBERS + WHAT WAS BUILT -->
+<div class="slide" id="s8">
+  <div class="eyebrow">Real Output</div>
+  <h2 class="h2 center">Not demos. Actual production apps shipped autonomously.</h2>
+
+  <div class="g2 mt" style="max-width:1040px">
+    <div>
+      <div class="g2" style="max-width:100%;gap:.8rem">
+        <div class="card grn">
+          <div class="ct">Facebook clone</div>
+          <div class="cv">61/61</div>
+          <div class="cs">tests passing · Node.js/Express + vanilla SPA · follows, likes, feed, suggestions</div>
+        </div>
+        <div class="card ind">
+          <div class="ct">Twitter clone</div>
+          <div class="cv">114</div>
+          <div class="cs">tests passing · full tweet, retweet, follow graph, timeline</div>
+        </div>
+        <div class="card cyn">
+          <div class="ct">Instagram clone</div>
+          <div class="cv">68</div>
+          <div class="cs">tests passing · photo feed, stories, explore, DMs</div>
+        </div>
+        <div class="card pur">
+          <div class="ct">Notes app</div>
+          <div class="cv">92</div>
+          <div class="cs">tests passing · CRUD, tagging, search, markdown preview</div>
+        </div>
+      </div>
+      <div style="margin-top:.8rem;background:var(--surf);border:1px solid var(--border);border-radius:10px;padding:.8rem 1rem;font-size:.78rem;color:var(--muted)">
+        Each app: architecture ADR + UX spec written <em>before</em> code. Feature branches per developer. CI gate enforced. Pushed to GitHub automatically. <strong style="color:var(--text)">335 total tests across all 4 apps — all passing.</strong>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:.8rem">
+      <div class="card" style="flex:1">
+        <div class="ct">By the numbers</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem .8rem;margin-top:.4rem">
+          <div><span style="font-size:1.6rem;font-weight:900;color:var(--bright)">8</span><div style="font-size:.65rem;color:var(--muted)">Specialized agents</div></div>
+          <div><span style="font-size:1.6rem;font-weight:900;color:var(--bright)">12</span><div style="font-size:.65rem;color:var(--muted)">Docker services</div></div>
+          <div><span style="font-size:1.6rem;font-weight:900;color:var(--bright)">25</span><div style="font-size:.65rem;color:var(--muted)">Agent tools</div></div>
+          <div><span style="font-size:1.6rem;font-weight:900;color:var(--bright)">38</span><div style="font-size:.65rem;color:var(--muted)">API endpoints</div></div>
+          <div><span style="font-size:1.6rem;font-weight:900;color:var(--bright)">19</span><div style="font-size:.65rem;color:var(--muted)">Engineering phases</div></div>
+          <div><span style="font-size:1.6rem;font-weight:900;color:var(--bright)">4,992</span><div style="font-size:.65rem;color:var(--muted)">Lines of Python</div></div>
+          <div><span style="font-size:1.6rem;font-weight:900;color:var(--bright)">9</span><div style="font-size:.65rem;color:var(--muted)">DB tables, 25+ indexes</div></div>
+          <div><span style="font-size:1.6rem;font-weight:900;color:var(--bright)">3</span><div style="font-size:.65rem;color:var(--muted)">OS platforms (Win/Mac/Linux)</div></div>
+        </div>
+      </div>
+      <div class="card grn">
+        <div class="ct">Observable in real time</div>
+        <div class="cb" style="font-size:.78rem">Live dashboard at <code>:8080</code> shows: which agent is thinking (pulsing dot), tool call latency (p95), token budget per thread, CI trend charts, Kanban board, and HITL question queue — all via SSE.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════ S9 · MICROSOFT -->
+<div class="slide" id="s9">
+  <div class="eyebrow">The Microsoft Opportunity</div>
+  <h2 class="h2 center">This is the agentic layer Copilot is missing.</h2>
+  <div class="ms-grid mt">
+    <div class="ms-card" style="border-color:rgba(6,182,212,.25)">
+      <div class="ms-icon">⎇</div>
       <div>
-        <table class="ptable">
-          <thead><tr><th>Layer</th><th>Technology</th><th>Why</th></tr></thead>
-          <tbody>
-            <tr><td>Message bus</td><td><span class="tag tag-blue">Redis Streams</span></td><td style="color:var(--muted);font-size:.8rem">Persistent, replayable, per-agent inboxes. XAUTOCLAIM recovers orphaned messages on restart — no silent drops.</td></tr>
-            <tr><td>State</td><td><span class="tag tag-purple">PostgreSQL 16</span></td><td style="color:var(--muted);font-size:.8rem">Full ACID. 9 tables — messages, tasks, CI, telemetry, memories.</td></tr>
-            <tr><td>Code execution</td><td><span class="tag tag-amber">Sandbox container</span></td><td style="color:var(--muted);font-size:.8rem">No network. 512 MB RAM cap. Read-only workspace. Agents can't break each other.</td></tr>
-            <tr><td>Git strategy</td><td><span class="tag tag-green">Per-task isolation</span></td><td style="color:var(--muted);font-size:.8rem">Each task gets its own subdirectory + repo. Zero cross-task contamination across parallel work.</td></tr>
-            <tr><td>Context mgmt</td><td><span class="tag tag-cyan">Three-tier</span></td><td style="color:var(--muted);font-size:.8rem">Last 5 verbatim → 6–20 summarized → older in DB. Infinite task length without blowing context windows.</td></tr>
-            <tr><td>API layer</td><td><span class="tag tag-blue">FastAPI + SSE</span></td><td style="color:var(--muted);font-size:.8rem">38 endpoints. Real-time event stream for dashboard + webhooks for external integrations.</td></tr>
-          </tbody>
-        </table>
+        <div class="ms-title">GitHub Native by Design</div>
+        <div class="ms-body">Every agent commits, branches, and pushes to GitHub already. The integration story writes itself: GitHub Issues → task, PR → code review, Actions → CI gate. Team Claw is the agentic backend that Copilot Workspace needs — not a competitor, a foundation layer.</div>
       </div>
-      <div style="display:flex;flex-direction:column;gap:1rem">
-        <div class="card">
-          <div class="card-title">Resilience built in</div>
-          <div class="card-body">
-            • Exponential backoff on API rate limits<br>
-            • Circuit-break loop detection (3× same tool)<br>
-            • Tool error streak recovery hints<br>
-            • Exhaustion rescue → EM inbox when stuck<br>
-            • Thread close guard — can't close with open tasks
-          </div>
-        </div>
-        <div class="card cyan">
-          <div class="card-title">Full observability</div>
-          <div class="card-body">
-            • Every tool call timed (p95 latency tracked)<br>
-            • Agent heartbeats every 30 seconds<br>
-            • Token budget bars (warn at 80%, block at 100%)<br>
-            • CI trend charts per thread<br>
-            • Standup report: who built what, when
-          </div>
-        </div>
+    </div>
+    <div class="ms-card" style="border-color:rgba(99,102,241,.25)">
+      <div class="ms-icon">☁️</div>
+      <div>
+        <div class="ms-title">Azure-Ready Architecture</div>
+        <div class="ms-body">Redis Streams → Azure Service Bus. PostgreSQL → Azure Database for PostgreSQL. 12 Docker services → Azure Container Apps with auto-scaling. The infra swap is configuration, not re-architecture. Scale to 1,000 concurrent agent teams per tenant.</div>
+      </div>
+    </div>
+    <div class="ms-card" style="border-color:rgba(16,185,129,.25)">
+      <div class="ms-icon">🔵</div>
+      <div>
+        <div class="ms-title">Azure DevOps Integration</div>
+        <div class="ms-body">Replace the custom Kanban with Azure Boards work items. Trigger Team Claw from an ADO sprint planning event. The SSE stream becomes Azure Event Grid. Agent memories become the org's institutional knowledge base in Azure Cosmos DB.</div>
+      </div>
+    </div>
+    <div class="ms-card" style="border-color:rgba(245,158,11,.25)">
+      <div class="ms-icon">🧠</div>
+      <div>
+        <div class="ms-title">The Compounding Advantage</div>
+        <div class="ms-body">Copilot makes individual developers faster. Team Claw makes every <em>senior engineer</em> an engineering manager — with a full AI team executing below them, learning with every task, getting better every sprint. The two products are complementary layers of the same future.</div>
       </div>
     </div>
   </div>
+  <div style="margin-top:1.4rem;background:rgba(99,102,241,.07);border:1px solid rgba(99,102,241,.25);border-radius:12px;padding:1rem 1.8rem;max-width:860px;text-align:center">
+    <span style="font-size:.95rem;color:var(--bright);font-weight:700">The question isn't whether autonomous AI engineering teams are coming. </span>
+    <span style="font-size:.9rem;color:var(--muted)">The question is whether </span>
+    <span style="font-size:.95rem;color:var(--bright);font-weight:700">Microsoft ships it first.</span>
+  </div>
+</div>
 
-  <!-- ─────────────────────────────────── SLIDE 6 · Numbers -->
-  <div class="slide" id="slide-6">
-    <div class="eyebrow">By the Numbers</div>
-    <h2 class="section-title center">4,992 lines. 19 phases. Built in weeks.</h2>
-    <div class="stat-row">
-      <div class="stat"><div class="stat-num">8<span></span></div><div class="stat-label">Agents</div></div>
-      <div class="stat"><div class="stat-num">12<span></span></div><div class="stat-label">Docker services</div></div>
-      <div class="stat"><div class="stat-num">25<span></span></div><div class="stat-label">Agent tools</div></div>
-      <div class="stat"><div class="stat-num">38<span></span></div><div class="stat-label">API endpoints</div></div>
-      <div class="stat"><div class="stat-num">19<span></span></div><div class="stat-label">Phases shipped</div></div>
+<!-- ══════════════════════════════════════════ S10 · ASK + CLOSE -->
+<div class="slide" id="s10">
+  <div class="eyebrow">The Ask</div>
+  <div class="ask-list" style="max-width:760px">
+    <div class="ask">
+      <div class="ask-n">1</div>
+      <div>
+        <div class="ask-t">A conversation with GitHub Next / Copilot Workspace</div>
+        <div class="ask-b">Team Claw is the agentic SDLC backend Copilot Workspace is missing. Fifteen minutes with that team could define a product roadmap that's already 80% built.</div>
+      </div>
     </div>
-    <div class="grid-4 mt" style="max-width:1100px">
-      <div class="card green">
-        <div class="card-title">Test pass rate</div>
-        <div class="card-value">61/61</div>
-        <div class="card-sub">Facebook app — 0 failures</div>
+    <div class="ask">
+      <div class="ask-n">2</div>
+      <div>
+        <div class="ask-t">Azure credits to run at production scale</div>
+        <div class="ask-b">The architecture already maps to Azure Container Apps + Service Bus + Postgres. We need infrastructure to benchmark 100 concurrent agent teams on real enterprise tasks.</div>
       </div>
-      <div class="card">
-        <div class="card-title">GitHub repos auto-created</div>
-        <div class="card-value">4+</div>
-        <div class="card-sub">Instagram, Twitter, Notes, Facebook</div>
-      </div>
-      <div class="card cyan">
-        <div class="card-title">DB tables</div>
-        <div class="card-value">9</div>
-        <div class="card-sub">25+ indexes, full ACID</div>
-      </div>
-      <div class="card purple">
-        <div class="card-title">Runs on</div>
-        <div class="card-value" style="font-size:1.3rem;margin-top:.3rem">Mac · Linux · Windows</div>
-        <div class="card-sub">Single Docker Compose file</div>
+    </div>
+    <div class="ask">
+      <div class="ask-n">3</div>
+      <div>
+        <div class="ask-t">One real Microsoft sprint as a design partner</div>
+        <div class="ask-b">Give Team Claw an internal engineering task. Measure output vs. a human team on velocity, test coverage, and code quality. One sprint generates the ROI data that matters to your leadership.</div>
       </div>
     </div>
   </div>
-
-  <!-- ─────────────────────────────────── SLIDE 7 · Phase History -->
-  <div class="slide" id="slide-7">
-    <div class="eyebrow">19 Phases of Engineering</div>
-    <h2 class="section-title center">From 2-agent loop to production-grade team.</h2>
-    <div class="timeline mt" style="max-height:68vh;overflow:auto">
-      <div class="tl-row"><div class="tl-phase">P 1–2</div><div class="tl-content"><strong>Foundation</strong> Redis + Postgres + Dockerfile. Full 8-agent team. Sandbox executor.</div></div>
-      <div class="tl-row"><div class="tl-phase">P 3–4</div><div class="tl-content"><strong>Infra</strong> Context summarization. Git tools. Shared /workspace volume. Wiki. Agent memory.</div></div>
-      <div class="tl-row"><div class="tl-phase">P 5–6</div><div class="tl-content"><strong>CI + Quality</strong> Kanban task board. Auto-CI (pytest in sandbox). CI gate blocks broken code. Webhooks.</div></div>
-      <div class="tl-row"><div class="tl-phase">P 7–8</div><div class="tl-content"><strong>Tooling</strong> search_code, find_files, check_budget. Tool telemetry (duration + p95). Thread idle alerts.</div></div>
-      <div class="tl-row"><div class="tl-phase">P 9</div><div class="tl-content"><strong>Human-in-the-Loop</strong> ask_human tool. Thread pauses. Human reply injects answer into agent inbox.</div></div>
-      <div class="tl-row"><div class="tl-phase">P 10</div><div class="tl-content"><strong>GitHub Integration</strong> Auto-create repos at task submission. Per-role branches. Auto-push on complete.</div></div>
-      <div class="tl-row"><div class="tl-phase">P 11</div><div class="tl-content"><strong>UX Engineer</strong> 8th agent. Wireframes + component specs before any code is written.</div></div>
-      <div class="tl-row"><div class="tl-phase">P 12–13</div><div class="tl-content"><strong>Live Dashboard</strong> Pulsing agent dots. ⟳ thinking indicator. Status tab with waiting queue.</div></div>
-      <div class="tl-row"><div class="tl-phase">P 14–16</div><div class="tl-content"><strong>Reliability</strong> Loop detection circuit-break. File ownership protocol. Status noise reduction.</div></div>
-      <div class="tl-row"><div class="tl-phase">P 17–18</div><div class="tl-content"><strong>Isolation + Durability</strong> Per-task git repos. XAUTOCLAIM message recovery. Zero silent message drops.</div></div>
-      <div class="tl-row"><div class="tl-phase">P 19</div><div class="tl-content"><strong>Resilience</strong> Exponential backoff. Exhaustion rescue. Thread close guard. Push reminders. Windows support.</div></div>
+  <div style="margin-top:1.8rem;text-align:center">
+    <div style="font-size:clamp(1.1rem,2.2vw,1.6rem);font-weight:800;color:var(--bright);line-height:1.4">
+      In weeks, one engineer built an autonomous development team<br>
+      with <span style="background:linear-gradient(135deg,var(--accent),var(--cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">memory, learning, resilience, and GitHub integration</span><br>
+      in a single Docker Compose file.
+    </div>
+    <div style="display:flex;gap:.7rem;margin-top:1.4rem;justify-content:center;flex-wrap:wrap">
+      <a class="pill" href="https://rhjrjl9w-8080.usw2.devtunnels.ms/dashboard" target="_blank" style="color:var(--bright);text-decoration:none">🌐 Live Dashboard</a>
+      <a class="pill" href="https://rhjrjl9w-8080.usw2.devtunnels.ms/pitch" target="_blank" style="color:var(--bright);text-decoration:none">📊 This Deck Online</a>
+      <a class="pill" href="https://github.com/RajuRoopani/team-claw" target="_blank" style="color:var(--bright);text-decoration:none">⎇ Source Code</a>
     </div>
   </div>
-
-  <!-- ─────────────────────────────────── SLIDE 8 · Microsoft Opportunity -->
-  <div class="slide" id="slide-8">
-    <div class="eyebrow">The Microsoft Opportunity</div>
-    <h2 class="section-title center">This is what Copilot Workspace becomes.</h2>
-    <div class="msft-grid mt">
-      <div class="msft-card">
-        <div class="ms-icon">⎇</div>
-        <div>
-          <div class="ms-title">GitHub Native</div>
-          <div class="ms-body">Every agent already commits, branches, and pushes to GitHub. The integration story maps directly: Issues → task, PR → review, Actions → CI gate. Team Claw is the agentic backend Copilot Workspace is missing.</div>
-        </div>
-      </div>
-      <div class="msft-card">
-        <div class="ms-icon">☁️</div>
-        <div>
-          <div class="ms-title">Azure Container Apps</div>
-          <div class="ms-body">12 Docker services already production-ready. Deploy to Azure Container Apps, swap Redis Streams for Azure Service Bus, Postgres for Azure Database. Scale from 1 to 1,000 agent teams per tenant.</div>
-        </div>
-      </div>
-      <div class="msft-card">
-        <div class="ms-icon">🔵</div>
-        <div>
-          <div class="ms-title">Azure DevOps Integration</div>
-          <div class="ms-body">Replace the custom Kanban with Azure Boards. Trigger from ADO work items. The SSE event stream becomes an Azure Event Grid topic. Fits the enterprise workflow with zero friction.</div>
-        </div>
-      </div>
-      <div class="msft-card">
-        <div class="ms-icon">🔑</div>
-        <div>
-          <div class="ms-title">The Insight</div>
-          <div class="ms-body">Copilot makes every developer 2× faster. Team Claw makes every <em>senior engineer</em> an EM — with a full team executing below them. These aren't competing products. They're complementary layers.</div>
-        </div>
-      </div>
-    </div>
-    <p class="subhead center" style="margin-top:1.5rem;font-size:.9rem">
-      The question isn't whether autonomous AI engineering teams are coming.<br>
-      The question is whether <strong style="color:var(--bright)">Microsoft ships it first.</strong>
-    </p>
-  </div>
-
-  <!-- ─────────────────────────────────── SLIDE 9 · The Ask -->
-  <div class="slide" id="slide-9">
-    <div class="eyebrow">The Ask</div>
-    <h2 class="section-title center">Three things.</h2>
-    <div class="ask-list">
-      <div class="ask-item">
-        <div class="ask-num">1</div>
-        <div>
-          <div class="ask-title">A conversation with GitHub Next / Copilot Workspace</div>
-          <div class="ask-body">This is the most natural integration point in Microsoft's portfolio. Team Claw is the agentic SDLC layer that Copilot Workspace needs. Fifteen minutes with that team could define a product roadmap.</div>
-        </div>
-      </div>
-      <div class="ask-item">
-        <div class="ask-num">2</div>
-        <div>
-          <div class="ask-title">Azure credits to run at production scale</div>
-          <div class="ask-body">The architecture already supports Azure Container Apps + Service Bus + Postgres. We need infrastructure to run a production-scale version — 100 concurrent agent teams, real enterprise tasks, real benchmarks.</div>
-        </div>
-      </div>
-      <div class="ask-item">
-        <div class="ask-num">3</div>
-        <div>
-          <div class="ask-title">A design partner relationship — one real Microsoft sprint</div>
-          <div class="ask-body">Give Team Claw a real internal engineering task. Measure the output against a human team. One sprint cycle is enough to prove the ROI story with data that matters to your leadership.</div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ─────────────────────────────────── SLIDE 10 · Closer -->
-  <div class="slide" id="slide-10">
-    <div class="closer">
-      In weeks, I built a system where<br>
-      <em>eight AI agents collaborate like a real engineering team</em> —<br>
-      with memory, escalation paths, CI, code review,<br>
-      and GitHub integration —<br>
-      in a single Docker Compose file that runs<br>
-      on a Windows laptop.<br><br>
-      <span style="color:var(--muted);font-size:.75em;font-weight:400">
-        The question isn't whether autonomous AI engineering teams are coming.
-      </span>
-    </div>
-    <div style="margin-top:1.5rem;font-size:clamp(1.2rem,2.5vw,2rem);font-weight:800;color:var(--bright)">
-      The question is whether <em>you</em> ship it.
-    </div>
-    <div class="links">
-      <a class="link-pill" href="https://rhjrjl9w-8080.usw2.devtunnels.ms" target="_blank">🌐 Live Demo</a>
-      <a class="link-pill" href="https://github.com/RajuRoopani/team-claw" target="_blank">⎇ GitHub</a>
-      <span class="link-pill" style="color:var(--muted)">📦 docker compose up --build</span>
-    </div>
-  </div>
+</div>
 
 </div><!-- /deck -->
 
 <script>
-  const slides = document.querySelectorAll('.slide');
-  const dotsEl = document.getElementById('dots');
-  const counter = document.getElementById('counter');
-  const progress = document.getElementById('progress-bar');
-  let cur = 0;
+const slides = [...document.querySelectorAll('.slide')];
+const dotsEl = document.getElementById('dots');
+let cur = 0;
 
-  // Build dots
-  slides.forEach((_, i) => {
-    const d = document.createElement('div');
-    d.className = 'dot' + (i === 0 ? ' active' : '');
-    d.addEventListener('click', () => goTo(i));
-    dotsEl.appendChild(d);
-  });
+slides.forEach((_,i) => {
+  const d = document.createElement('div');
+  d.className = 'dot' + (i===0?' active':'');
+  d.onclick = () => go(i);
+  dotsEl.appendChild(d);
+});
 
-  function updateUI() {
-    const pct = ((cur + 1) / slides.length) * 100;
-    progress.style.width = pct + '%';
-    counter.textContent = (cur + 1) + ' / ' + slides.length;
-    document.querySelectorAll('.dot').forEach((d, i) => d.classList.toggle('active', i === cur));
-  }
+function go(n) {
+  if (n===cur || n<0 || n>=slides.length) return;
+  slides[cur].classList.remove('active');
+  slides[cur].classList.add('exit');
+  const old = cur; cur = n;
+  setTimeout(() => slides[old].classList.remove('exit'), 500);
+  slides[cur].classList.add('active');
+  document.getElementById('progress').style.width = ((cur+1)/slides.length*100)+'%';
+  document.getElementById('counter').textContent = (cur+1)+' / '+slides.length;
+  dotsEl.querySelectorAll('.dot').forEach((d,i)=>d.classList.toggle('active',i===cur));
+}
 
-  function goTo(next) {
-    if (next === cur || next < 0 || next >= slides.length) return;
-    slides[cur].classList.remove('active');
-    slides[cur].classList.add('exit');
-    const prev = cur;
-    cur = next;
-    setTimeout(() => slides[prev].classList.remove('exit'), 500);
-    slides[cur].classList.add('active');
-    updateUI();
-  }
+document.getElementById('prev').onclick = () => go(cur-1);
+document.getElementById('next').onclick = () => go(cur+1);
+document.addEventListener('keydown', e => {
+  if(['ArrowRight','ArrowDown',' '].includes(e.key)){e.preventDefault();go(cur+1);}
+  if(['ArrowLeft','ArrowUp'].includes(e.key)){e.preventDefault();go(cur-1);}
+});
+let tx=0;
+document.addEventListener('touchstart',e=>tx=e.touches[0].clientX,{passive:true});
+document.addEventListener('touchend',e=>{const d=e.changedTouches[0].clientX-tx;if(Math.abs(d)>50)go(d<0?cur+1:cur-1);});
 
-  document.getElementById('nav-prev').addEventListener('click', () => goTo(cur - 1));
-  document.getElementById('nav-next').addEventListener('click', () => goTo(cur + 1));
-
-  document.addEventListener('keydown', e => {
-    if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ') { e.preventDefault(); goTo(cur + 1); }
-    if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')                    { e.preventDefault(); goTo(cur - 1); }
-  });
-
-  // Touch swipe
-  let tx = 0;
-  document.addEventListener('touchstart', e => tx = e.touches[0].clientX, { passive: true });
-  document.addEventListener('touchend', e => {
-    const dx = e.changedTouches[0].clientX - tx;
-    if (Math.abs(dx) > 50) goTo(dx < 0 ? cur + 1 : cur - 1);
-  });
-
-  updateUI();
+// init
+document.getElementById('progress').style.width = (1/slides.length*100)+'%';
+document.getElementById('counter').textContent = '1 / '+slides.length;
 </script>
 </body>
 </html>
