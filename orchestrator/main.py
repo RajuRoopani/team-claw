@@ -1421,6 +1421,307 @@ async def pitch_deck():
     return HTMLResponse("<h1>Pitch deck not found</h1>", status_code=404)
 
 
+@app.get("/report", response_class=HTMLResponse)
+async def report_page():
+    """Serve the Executive Dashboard."""
+    f = pathlib.Path(__file__).parent / "report.html"
+    if f.exists():
+        return FileResponse(str(f), media_type="text/html")
+    return HTMLResponse("<h1>Report page not found</h1>", status_code=404)
+
+
+@app.get("/report/summary")
+async def report_summary() -> dict:
+    """Single aggregation call for the executive dashboard."""
+    now = datetime.now(timezone.utc)
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    seven_days_ago = now - timedelta(days=7)
+
+    async with state.db.acquire() as conn:
+        # KPIs
+        active_count = await conn.fetchval(
+            "SELECT COUNT(*) FROM threads WHERE status='active'"
+        )
+        tasks_done_today = await conn.fetchval(
+            "SELECT COUNT(*) FROM tasks WHERE status='done' AND updated_at >= $1", today_start
+        )
+        tasks_in_progress = await conn.fetchval(
+            "SELECT COUNT(*) FROM tasks WHERE status='in_progress'"
+        )
+        ci_today = await conn.fetchrow(
+            "SELECT COALESCE(SUM(passed),0) AS tests_passed, COUNT(*) AS runs "
+            "FROM ci_results WHERE ran_at >= $1 AND exit_code=0", today_start
+        )
+        cost_today_row = await conn.fetch(
+            "SELECT model, SUM(input_tokens) AS inp, SUM(output_tokens) AS out "
+            "FROM agent_metrics WHERE recorded_at >= $1 GROUP BY model", today_start
+        )
+        avg_ship_row = await conn.fetchrow(
+            "SELECT AVG(EXTRACT(EPOCH FROM (updated_at - created_at))/60) AS avg_min "
+            "FROM threads WHERE status='complete'"
+        )
+
+        # Active projects
+        active_threads = await conn.fetch(
+            "SELECT id, title, status, created_at, github_repo FROM threads "
+            "WHERE status='active' ORDER BY created_at DESC LIMIT 20"
+        )
+        active_thread_ids = [str(r["id"]) for r in active_threads]
+
+        # Task counts per active thread
+        task_counts: dict = {}
+        if active_thread_ids:
+            tc_rows = await conn.fetch(
+                "SELECT thread_id, "
+                "  COUNT(*) AS total, "
+                "  COUNT(*) FILTER (WHERE status='done') AS done "
+                "FROM tasks WHERE thread_id = ANY($1) GROUP BY thread_id",
+                active_thread_ids,
+            )
+            for r in tc_rows:
+                task_counts[str(r["thread_id"])] = {"total": r["total"], "done": r["done"]}
+
+        # Last CI per active thread
+        ci_by_thread: dict = {}
+        if active_thread_ids:
+            ci_rows = await conn.fetch(
+                "SELECT DISTINCT ON (thread_id) thread_id, exit_code, passed, total, ran_at "
+                "FROM ci_results WHERE thread_id = ANY($1) ORDER BY thread_id, ran_at DESC",
+                active_thread_ids,
+            )
+            for r in ci_rows:
+                ci_by_thread[str(r["thread_id"])] = {
+                    "exit_code": r["exit_code"],
+                    "passed": r["passed"],
+                    "total": r["total"],
+                    "ran_at": r["ran_at"].isoformat(),
+                }
+
+        # Completed projects (last 20)
+        completed_threads = await conn.fetch(
+            "SELECT id, title, created_at, updated_at, github_repo FROM threads "
+            "WHERE status='complete' ORDER BY updated_at DESC LIMIT 20"
+        )
+        completed_ids = [str(r["id"]) for r in completed_threads]
+        completed_ci: dict = {}
+        completed_cost: dict = {}
+        if completed_ids:
+            comp_ci = await conn.fetch(
+                "SELECT DISTINCT ON (thread_id) thread_id, exit_code, passed, total "
+                "FROM ci_results WHERE thread_id = ANY($1) ORDER BY thread_id, ran_at DESC",
+                completed_ids,
+            )
+            for r in comp_ci:
+                completed_ci[str(r["thread_id"])] = {
+                    "exit_code": r["exit_code"],
+                    "passed": r["passed"],
+                    "total": r["total"],
+                }
+            cost_rows = await conn.fetch(
+                "SELECT thread_id, model, SUM(input_tokens) AS inp, SUM(output_tokens) AS out "
+                "FROM agent_metrics WHERE thread_id = ANY($1) GROUP BY thread_id, model",
+                completed_ids,
+            )
+            for r in cost_rows:
+                tid = str(r["thread_id"])
+                completed_cost[tid] = completed_cost.get(tid, 0.0) + _estimate_cost(
+                    r["model"], r["inp"], r["out"]
+                )
+
+        # Agent status with current thread
+        msgs_today: dict = {}
+        mt_rows = await conn.fetch(
+            "SELECT from_role, COUNT(*) AS cnt FROM messages WHERE created_at >= $1 "
+            "AND from_role != 'orchestrator' GROUP BY from_role", today_start
+        )
+        for r in mt_rows:
+            msgs_today[r["from_role"]] = r["cnt"]
+
+        # Velocity: tasks done per day last 7 days
+        velocity_rows = await conn.fetch(
+            "SELECT DATE(updated_at AT TIME ZONE 'UTC') AS day, COUNT(*) AS cnt "
+            "FROM tasks WHERE status='done' AND updated_at >= $1 "
+            "GROUP BY day ORDER BY day ASC", seven_days_ago
+        )
+
+        # Cost by role
+        cost_role_rows = await conn.fetch(
+            "SELECT agent_role, model, SUM(input_tokens) AS inp, SUM(output_tokens) AS out "
+            "FROM agent_metrics GROUP BY agent_role, model"
+        )
+
+        # Recent activity (last 30 audit messages as human-readable)
+        activity_rows = await conn.fetch(
+            "SELECT type, from_role, to_role, content, thread_id, created_at "
+            "FROM messages ORDER BY created_at DESC LIMIT 30"
+        )
+
+    # Compute cost today
+    cost_today = 0.0
+    for r in cost_today_row:
+        cost_today += _estimate_cost(r["model"], r["inp"], r["out"])
+
+    # Agent online status
+    agents_online = sum(
+        1 for role in ALL_AGENT_ROLES()
+        if role in state.agent_last_seen
+        and (now - state.agent_last_seen[role]).total_seconds() < 60
+    )
+
+    # Build active projects list
+    active_projects = []
+    for t in active_threads:
+        tid = str(t["id"])
+        tc = task_counts.get(tid, {"total": 0, "done": 0})
+        ci = ci_by_thread.get(tid)
+        last_act = state.thread_last_activity.get(tid, {})
+        elapsed_min = int((now - t["created_at"].replace(tzinfo=timezone.utc)).total_seconds() / 60)
+        active_projects.append({
+            "id": tid,
+            "title": t["title"] or "",
+            "elapsed_min": elapsed_min,
+            "tasks_total": tc["total"],
+            "tasks_done": tc["done"],
+            "ci": ci,
+            "github_repo": t["github_repo"] or "",
+            "active_agent": last_act.get("role", ""),
+        })
+
+    # Build completed projects list
+    completed_projects = []
+    for t in completed_threads:
+        tid = str(t["id"])
+        created = t["created_at"].replace(tzinfo=timezone.utc)
+        updated = t["updated_at"].replace(tzinfo=timezone.utc)
+        duration_min = int((updated - created).total_seconds() / 60)
+        completed_projects.append({
+            "id": tid,
+            "title": t["title"] or "",
+            "completed_at": updated.isoformat(),
+            "duration_min": duration_min,
+            "github_repo": t["github_repo"] or "",
+            "ci": completed_ci.get(tid),
+            "cost_usd": round(completed_cost.get(tid, 0.0), 4),
+        })
+
+    # Agent status list
+    dyn_meta: dict = {}
+    if state.dynamic_agents:
+        async with state.db.acquire() as conn:
+            dm_rows = await conn.fetch(
+                "SELECT role, display_name, model FROM dynamic_agents WHERE role = ANY($1)",
+                state.dynamic_agents,
+            )
+        dyn_meta = {r["role"]: dict(r) for r in dm_rows}
+
+    agent_status = []
+    for role in ALL_AGENT_ROLES():
+        last = state.agent_last_seen.get(role)
+        if last is None:
+            status = "offline"
+        elif (now - last).total_seconds() < 60:
+            status = "online"
+        elif (now - last).total_seconds() < 300:
+            status = "stale"
+        else:
+            status = "offline"
+        meta = dyn_meta.get(role, {})
+        current_thread_id = ""
+        for tid, act in state.thread_last_activity.items():
+            if act.get("role") == role:
+                current_thread_id = tid
+                break
+        agent_status.append({
+            "role": role,
+            "status": status,
+            "last_seen": last.isoformat() if last else None,
+            "display_name": meta.get("display_name", role.replace("_", " ").title()),
+            "model": meta.get("model", ""),
+            "messages_today": msgs_today.get(role, 0),
+            "current_thread": current_thread_id,
+        })
+
+    # Velocity by day (last 7 days)
+    velocity_map: dict = {}
+    for i in range(7):
+        day = (now - timedelta(days=6 - i)).date()
+        velocity_map[str(day)] = 0
+    for r in velocity_rows:
+        velocity_map[str(r["day"])] = r["cnt"]
+    velocity_by_day = [{"day": k, "count": v} for k, v in sorted(velocity_map.items())]
+
+    # Cost by role
+    role_cost_map: dict = {}
+    for r in cost_role_rows:
+        role = r["agent_role"]
+        role_cost_map[role] = role_cost_map.get(role, 0.0) + _estimate_cost(
+            r["model"], r["inp"], r["out"]
+        )
+    cost_by_role = sorted(
+        [{"role": k, "cost_usd": round(v, 4)} for k, v in role_cost_map.items()],
+        key=lambda x: x["cost_usd"],
+        reverse=True,
+    )
+
+    # Recent activity as human-readable strings
+    def _humanize(row) -> str:
+        t = row["type"]
+        fr = row["from_role"] or ""
+        content = (row["content"] or "")[:80]
+        name = fr.replace("_", " ").title()
+        if t == "task_complete":
+            return f"✅ {name} finished a task"
+        elif t == "ci_result":
+            return f"🧪 {content}"
+        elif t == "thread_complete":
+            return f"🚀 Shipped: {content[:60]}"
+        elif t == "blocker":
+            return f"⚠️ {name} is blocked"
+        elif t == "human_question":
+            return f"💬 {name} needs your input"
+        elif t == "agent_created":
+            return f"🤖 New agent joined"
+        elif t == "task_assignment":
+            return f"📋 {name} received a task"
+        elif t == "status_update":
+            return f"📊 {name}: {content[:60]}"
+        elif t == "budget_warning":
+            return f"🔶 {content[:60]}"
+        elif t == "budget_exceeded":
+            return f"🔴 {content[:60]}"
+        else:
+            return f"💬 {name}: {content[:60]}"
+
+    recent_activity = []
+    for row in activity_rows:
+        recent_activity.append({
+            "text": _humanize(row),
+            "type": row["type"],
+            "ts": row["created_at"].isoformat(),
+            "thread_id": str(row["thread_id"]) if row["thread_id"] else "",
+        })
+
+    avg_ship = avg_ship_row["avg_min"] if avg_ship_row and avg_ship_row["avg_min"] else 0
+
+    return {
+        "kpis": {
+            "active_threads": active_count or 0,
+            "agents_online": agents_online,
+            "tasks_done_today": tasks_done_today or 0,
+            "tasks_in_progress": tasks_in_progress or 0,
+            "tests_passed_today": int(ci_today["tests_passed"]) if ci_today else 0,
+            "cost_today_usd": round(cost_today, 4),
+            "avg_ship_time_minutes": round(float(avg_ship), 1),
+        },
+        "active_projects": active_projects,
+        "completed_projects": completed_projects,
+        "agent_status": agent_status,
+        "velocity": {"by_day": velocity_by_day},
+        "cost_by_role": cost_by_role,
+        "recent_activity": recent_activity,
+    }
+
+
 @app.get("/health")
 async def health() -> dict:
     return {"status": "ok", "service": "orchestrator"}

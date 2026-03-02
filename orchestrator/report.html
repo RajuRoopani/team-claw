@@ -1,0 +1,1027 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Team Claw — Executive Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,400&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════════════════════════
+   TOKENS — same as home.html
+═══════════════════════════════════════════════════════════════ */
+:root {
+  --bg:      #07070e;
+  --surf:    #0d0d1a;
+  --surf2:   #12121f;
+  --surf3:   #181828;
+  --border:  #1c1c32;
+  --border2: #252540;
+  --accent:  #6366f1;
+  --accent2: #818cf8;
+  --cyan:    #06b6d4;
+  --green:   #10b981;
+  --amber:   #f59e0b;
+  --red:     #ef4444;
+  --pink:    #ec4899;
+  --purple:  #8b5cf6;
+  --text:    #94a3b8;
+  --text2:   #cbd5e1;
+  --bright:  #f1f5f9;
+  --muted:   #334155;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--text2);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+  overflow-x: hidden;
+  min-height: 100vh;
+}
+a { color: inherit; text-decoration: none; }
+
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+
+/* ── Noise texture ── */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 128px 128px;
+  pointer-events: none;
+  z-index: 0;
+  opacity: .4;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   HEADER
+═══════════════════════════════════════════════════════════════ */
+.rpt-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: rgba(7,7,14,0.88);
+  backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--border);
+  padding: 0 32px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.rpt-logo {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--accent2);
+  letter-spacing: 1px;
+  white-space: nowrap;
+}
+.rpt-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+.hdr-spacer { flex: 1; }
+.live-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--border2);
+  transition: background 0.3s, box-shadow 0.3s;
+}
+.live-dot.live { background: var(--green); box-shadow: 0 0 6px var(--green); }
+.hdr-ts {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text);
+}
+.hdr-nav a {
+  font-size: 12px;
+  color: var(--text);
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  transition: border-color 0.2s, color 0.2s;
+  margin-left: 6px;
+}
+.hdr-nav a:hover { border-color: var(--accent); color: var(--accent2); }
+
+/* ═══════════════════════════════════════════════════════════════
+   LAYOUT
+═══════════════════════════════════════════════════════════════ */
+.rpt-body {
+  position: relative;
+  z-index: 1;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 32px 32px 64px;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+/* ── Section label ── */
+.section-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--text);
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.section-label::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   KPI HERO ROW
+═══════════════════════════════════════════════════════════════ */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 16px;
+}
+.kpi-card {
+  background: var(--surf);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  transition: border-color 0.2s, transform 0.2s;
+  opacity: 0;
+  transform: translateY(12px);
+}
+.kpi-card.revealed { opacity: 1; transform: translateY(0); transition: opacity 0.4s ease, transform 0.4s ease, border-color 0.2s; }
+.kpi-card:hover { border-color: var(--border2); }
+.kpi-icon { font-size: 22px; line-height: 1; }
+.kpi-value {
+  font-size: 32px;
+  font-weight: 800;
+  color: var(--bright);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.kpi-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+.kpi-sub { font-size: 11px; color: var(--text); margin-top: 2px; }
+
+/* ═══════════════════════════════════════════════════════════════
+   MAIN TWO-COL LAYOUT
+═══════════════════════════════════════════════════════════════ */
+.two-col {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 24px;
+  align-items: start;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   ACTIVE PROJECTS GRID
+═══════════════════════════════════════════════════════════════ */
+.projects-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 14px;
+}
+.project-card {
+  background: var(--surf);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  opacity: 0;
+  transform: translateY(8px);
+}
+.project-card.revealed { opacity: 1; transform: translateY(0); transition: opacity 0.35s ease, transform 0.35s ease; }
+.project-card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.project-title { font-size: 13px; font-weight: 600; color: var(--bright); line-height: 1.3; }
+.project-elapsed {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--text);
+  background: var(--surf2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px 6px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+/* Progress bar */
+.progress-wrap { display: flex; flex-direction: column; gap: 4px; }
+.progress-row { display: flex; justify-content: space-between; font-size: 11px; color: var(--text); }
+.progress-track {
+  height: 5px; background: var(--border); border-radius: 3px; overflow: hidden;
+}
+.progress-fill {
+  height: 100%; border-radius: 3px;
+  background: linear-gradient(90deg, var(--accent), var(--cyan));
+  transition: width 0.6s ease;
+}
+/* CI badge */
+.ci-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 11px; border-radius: 4px; padding: 2px 7px;
+  border: 1px solid;
+}
+.ci-badge.pass { color: var(--green); border-color: rgba(16,185,129,.3); background: rgba(16,185,129,.07); }
+.ci-badge.fail { color: var(--red);   border-color: rgba(239,68,68,.3);  background: rgba(239,68,68,.07); }
+.ci-badge.none { color: var(--text);  border-color: var(--border);        background: transparent; }
+/* Active agent */
+.agent-row { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text); }
+.agent-pulse {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--green); box-shadow: 0 0 5px var(--green);
+  animation: pulse 2s infinite;
+}
+.agent-pulse.idle { background: var(--border2); box-shadow: none; animation: none; }
+@keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:.4;} }
+/* Card footer */
+.project-footer { display: flex; align-items: center; justify-content: space-between; }
+.github-link { font-size: 11px; color: var(--accent2); }
+.github-link:hover { text-decoration: underline; }
+
+/* Empty state */
+.empty-state {
+  grid-column: 1 / -1;
+  text-align: center;
+  color: var(--text);
+  font-size: 13px;
+  padding: 40px;
+  background: var(--surf);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   LIVE ACTIVITY FEED
+═══════════════════════════════════════════════════════════════ */
+.activity-feed {
+  background: var(--surf);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  max-height: 420px;
+}
+.activity-feed-header {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.activity-list {
+  overflow-y: auto;
+  flex: 1;
+  padding: 4px 0;
+}
+.activity-item {
+  padding: 7px 14px;
+  font-size: 12px;
+  color: var(--text2);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  opacity: 0;
+  transform: translateX(8px);
+}
+.activity-item.revealed { opacity: 1; transform: translateX(0); transition: opacity 0.25s ease, transform 0.25s ease; }
+.activity-ts {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--text);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.activity-text { flex: 1; }
+
+/* ═══════════════════════════════════════════════════════════════
+   TEAM STATUS
+═══════════════════════════════════════════════════════════════ */
+.team-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+}
+.agent-card {
+  background: var(--surf);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  opacity: 0;
+  transform: translateY(8px);
+}
+.agent-card.revealed { opacity: 1; transform: translateY(0); transition: opacity 0.3s ease, transform 0.3s ease; }
+.agent-card-top { display: flex; align-items: center; justify-content: space-between; }
+.agent-name { font-size: 13px; font-weight: 600; color: var(--bright); }
+.status-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--border2);
+}
+.status-dot.online  { background: var(--green); box-shadow: 0 0 5px var(--green); }
+.status-dot.stale   { background: var(--amber); }
+.status-dot.offline { background: var(--border2); }
+.agent-model { font-size: 10px; color: var(--text); font-family: 'JetBrains Mono', monospace; }
+.agent-stats { font-size: 11px; color: var(--text); }
+.agent-project { font-size: 11px; color: var(--accent2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ═══════════════════════════════════════════════════════════════
+   DELIVERY HISTORY
+═══════════════════════════════════════════════════════════════ */
+.history-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.history-table th {
+  text-align: left;
+  padding: 8px 12px;
+  color: var(--text);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  border-bottom: 1px solid var(--border);
+}
+.history-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text2);
+  vertical-align: middle;
+}
+.history-table tr:last-child td { border-bottom: none; }
+.history-table tr:hover td { background: var(--surf2); }
+.thread-title { font-weight: 500; color: var(--bright); }
+.dur-badge {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text);
+  background: var(--surf2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 6px;
+}
+.cost-val { font-family: 'JetBrains Mono', monospace; font-size: 11px; }
+.gh-btn {
+  font-size: 11px;
+  color: var(--accent2);
+  border: 1px solid rgba(129,140,248,.3);
+  border-radius: 4px;
+  padding: 2px 8px;
+}
+.gh-btn:hover { background: rgba(129,140,248,.1); }
+
+/* ═══════════════════════════════════════════════════════════════
+   VELOCITY + COST PANELS
+═══════════════════════════════════════════════════════════════ */
+.charts-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+.chart-panel {
+  background: var(--surf);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 20px;
+}
+.chart-panel-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text2);
+  margin-bottom: 16px;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+
+/* CSS bar chart — velocity */
+.bar-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  height: 100px;
+}
+.bar-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  height: 100%;
+  justify-content: flex-end;
+}
+.bar-fill {
+  width: 100%;
+  background: linear-gradient(180deg, var(--accent), var(--purple));
+  border-radius: 4px 4px 0 0;
+  min-height: 2px;
+  transition: height 0.6s ease;
+}
+.bar-label {
+  font-size: 10px;
+  color: var(--text);
+  font-family: 'JetBrains Mono', monospace;
+  white-space: nowrap;
+}
+.bar-val {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text2);
+}
+
+/* Horizontal bars — cost by role */
+.hbar-list { display: flex; flex-direction: column; gap: 8px; }
+.hbar-row { display: flex; flex-direction: column; gap: 3px; }
+.hbar-top { display: flex; justify-content: space-between; font-size: 11px; }
+.hbar-role { color: var(--text2); }
+.hbar-cost { font-family: 'JetBrains Mono', monospace; color: var(--text); }
+.hbar-track { height: 5px; background: var(--border); border-radius: 3px; overflow: hidden; }
+.hbar-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: linear-gradient(90deg, var(--cyan), var(--accent));
+  transition: width 0.6s ease;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   BUDGET BADGES
+═══════════════════════════════════════════════════════════════ */
+.badge-warning { color: var(--amber); font-size: 10px; margin-left: 6px; }
+.badge-exceeded { color: var(--red); font-size: 10px; margin-left: 6px; }
+
+/* ═══════════════════════════════════════════════════════════════
+   RESPONSIVE
+═══════════════════════════════════════════════════════════════ */
+@media (max-width: 1100px) {
+  .two-col { grid-template-columns: 1fr; }
+  .kpi-grid { grid-template-columns: repeat(3, 1fr); }
+  .charts-row { grid-template-columns: 1fr; }
+}
+@media (max-width: 700px) {
+  .rpt-body { padding: 16px; gap: 24px; }
+  .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+  .rpt-header { padding: 0 16px; gap: 10px; }
+  .hdr-nav { display: none; }
+}
+</style>
+</head>
+<body>
+
+<!-- ─── HEADER ─── -->
+<header class="rpt-header">
+  <span class="rpt-logo">🦀 Team Claw</span>
+  <span class="rpt-title">Executive Dashboard</span>
+  <span class="hdr-spacer"></span>
+  <span class="live-dot" id="liveDot"></span>
+  <span class="hdr-ts" id="lastUpdated">Loading…</span>
+  <nav class="hdr-nav">
+    <a href="/dashboard">Engineering</a>
+    <a href="/pitch">Pitch Deck</a>
+    <a href="/">Home</a>
+  </nav>
+</header>
+
+<!-- ─── MAIN CONTENT ─── -->
+<main class="rpt-body">
+
+  <!-- KPI Hero Row -->
+  <section>
+    <div class="section-label">Key Performance Indicators</div>
+    <div class="kpi-grid" id="kpiGrid">
+      <div class="kpi-card" id="kpi-active">
+        <div class="kpi-icon">🚧</div>
+        <div class="kpi-value" id="kv-active">—</div>
+        <div class="kpi-label">Active Projects</div>
+      </div>
+      <div class="kpi-card" id="kpi-agents">
+        <div class="kpi-icon">🤖</div>
+        <div class="kpi-value" id="kv-agents">—</div>
+        <div class="kpi-label">Agents Online</div>
+      </div>
+      <div class="kpi-card" id="kpi-shipped">
+        <div class="kpi-icon">✅</div>
+        <div class="kpi-value" id="kv-shipped">—</div>
+        <div class="kpi-label">Tasks Shipped Today</div>
+      </div>
+      <div class="kpi-card" id="kpi-tests">
+        <div class="kpi-icon">🧪</div>
+        <div class="kpi-value" id="kv-tests">—</div>
+        <div class="kpi-label">Tests Passing</div>
+      </div>
+      <div class="kpi-card" id="kpi-cost">
+        <div class="kpi-icon">💸</div>
+        <div class="kpi-value" id="kv-cost">—</div>
+        <div class="kpi-label">Cost Today (USD)</div>
+      </div>
+      <div class="kpi-card" id="kpi-ship">
+        <div class="kpi-icon">⏱️</div>
+        <div class="kpi-value" id="kv-ship">—</div>
+        <div class="kpi-label">Avg Ship Time</div>
+        <div class="kpi-sub">minutes per project</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Active Projects + Live Activity (two-col) -->
+  <div class="two-col">
+    <!-- Active Projects -->
+    <section>
+      <div class="section-label">Active Projects</div>
+      <div class="projects-grid" id="projectsGrid">
+        <div class="empty-state" id="projectsEmpty">No active projects</div>
+      </div>
+    </section>
+
+    <!-- Live Activity Feed -->
+    <section>
+      <div class="section-label">Live Activity</div>
+      <div class="activity-feed">
+        <div class="activity-feed-header">
+          <span class="live-dot" id="feedDot"></span>
+          Real-time feed
+        </div>
+        <div class="activity-list" id="activityList">
+          <div style="padding:20px;text-align:center;color:var(--text);font-size:12px;">Loading…</div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- Team Status -->
+  <section>
+    <div class="section-label">Team Status</div>
+    <div class="team-grid" id="teamGrid">
+      <div class="empty-state">Loading agents…</div>
+    </div>
+  </section>
+
+  <!-- Delivery History -->
+  <section>
+    <div class="section-label">Delivery History</div>
+    <div style="background:var(--surf);border:1px solid var(--border);border-radius:10px;overflow:auto;">
+      <table class="history-table" id="historyTable">
+        <thead>
+          <tr>
+            <th>Project</th>
+            <th>Completed</th>
+            <th>Duration</th>
+            <th>Tests</th>
+            <th>Cost</th>
+            <th>Repo</th>
+          </tr>
+        </thead>
+        <tbody id="historyBody">
+          <tr><td colspan="6" style="text-align:center;padding:24px;color:var(--text)">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Velocity + Cost Charts -->
+  <div class="charts-row">
+    <!-- Velocity -->
+    <div class="chart-panel">
+      <div class="chart-panel-title">🚀 Tasks Shipped — Last 7 Days</div>
+      <div class="bar-chart" id="velocityChart">
+        <div style="color:var(--text);font-size:12px;">Loading…</div>
+      </div>
+    </div>
+    <!-- Cost by Role -->
+    <div class="chart-panel">
+      <div class="chart-panel-title">💸 Spend by Agent Role</div>
+      <div class="hbar-list" id="costByRole">
+        <div style="color:var(--text);font-size:12px;">Loading…</div>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+//  Helpers
+// ═══════════════════════════════════════════════════════════════
+function fmtTime(isoStr) {
+  if (!isoStr) return '';
+  const d = new Date(isoStr);
+  return d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+}
+function fmtDate(isoStr) {
+  if (!isoStr) return '';
+  return new Date(isoStr).toLocaleDateString([], {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'});
+}
+function fmtElapsed(minutes) {
+  if (minutes < 60) return `${minutes}m`;
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return m > 0 ? `${h}h ${m}m` : `${h}h`;
+}
+function slugToLabel(role) {
+  return role.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
+// Intersection Observer for reveal animations
+const io = new IntersectionObserver((entries) => {
+  entries.forEach((e, i) => {
+    if (e.isIntersecting) {
+      setTimeout(() => e.target.classList.add('revealed'), i * 40);
+      io.unobserve(e.target);
+    }
+  });
+}, { threshold: 0.1 });
+
+function observe(el) { io.observe(el); }
+
+// ═══════════════════════════════════════════════════════════════
+//  KPI Updates
+// ═══════════════════════════════════════════════════════════════
+function renderKPIs(kpis) {
+  document.getElementById('kv-active').textContent  = kpis.active_threads;
+  document.getElementById('kv-agents').textContent  = kpis.agents_online;
+  document.getElementById('kv-shipped').textContent = kpis.tasks_done_today;
+  document.getElementById('kv-tests').textContent   = kpis.tests_passed_today.toLocaleString();
+  document.getElementById('kv-cost').textContent    = '$' + kpis.cost_today_usd.toFixed(4);
+  document.getElementById('kv-ship').textContent    = kpis.avg_ship_time_minutes > 0
+    ? fmtElapsed(Math.round(kpis.avg_ship_time_minutes))
+    : '—';
+
+  // Animate KPI cards in
+  document.querySelectorAll('.kpi-card').forEach(observe);
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  Active Projects
+// ═══════════════════════════════════════════════════════════════
+function renderProjects(projects) {
+  const grid = document.getElementById('projectsGrid');
+  const empty = document.getElementById('projectsEmpty');
+
+  if (!projects.length) {
+    grid.innerHTML = '<div class="empty-state">No active projects — submit a task to get started</div>';
+    return;
+  }
+  if (empty) empty.remove();
+  grid.innerHTML = '';
+
+  projects.forEach(p => {
+    const total = p.tasks_total || 0;
+    const done  = p.tasks_done  || 0;
+    const pct   = total > 0 ? Math.round(done / total * 100) : 0;
+    const ci    = p.ci;
+    let ciBadge = '<span class="ci-badge none">⏳ No CI</span>';
+    if (ci) {
+      if (ci.exit_code === 0) {
+        ciBadge = `<span class="ci-badge pass">✅ ${ci.passed}/${ci.total}</span>`;
+      } else {
+        ciBadge = `<span class="ci-badge fail">❌ ${ci.passed}/${ci.total}</span>`;
+      }
+    }
+    const hasAgent = !!p.active_agent;
+    const card = document.createElement('div');
+    card.className = 'project-card';
+    card.id = `project-${p.id}`;
+    card.innerHTML = `
+      <div class="project-card-top">
+        <div class="project-title">${escHtml(p.title)}</div>
+        <div class="project-elapsed">${fmtElapsed(p.elapsed_min)}</div>
+      </div>
+      <div class="progress-wrap">
+        <div class="progress-row">
+          <span>${done}/${total} tasks</span>
+          <span>${pct}%</span>
+        </div>
+        <div class="progress-track">
+          <div class="progress-fill" style="width:${pct}%"></div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+        ${ciBadge}
+        <div class="agent-row">
+          <div class="agent-pulse ${hasAgent ? '' : 'idle'}"></div>
+          <span>${hasAgent ? slugToLabel(p.active_agent) : 'Idle'}</span>
+        </div>
+      </div>
+      <div class="project-footer">
+        ${p.github_repo
+          ? `<a class="github-link" href="${escHtml(p.github_repo)}" target="_blank">⎇ GitHub</a>`
+          : '<span></span>'}
+      </div>`;
+    grid.appendChild(card);
+    observe(card);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  Live Activity Feed
+// ═══════════════════════════════════════════════════════════════
+function renderActivity(items) {
+  const list = document.getElementById('activityList');
+  list.innerHTML = '';
+  items.forEach((item, i) => {
+    const el = document.createElement('div');
+    el.className = 'activity-item';
+    el.innerHTML = `<span class="activity-ts">${fmtTime(item.ts)}</span>
+                    <span class="activity-text">${escHtml(item.text)}</span>`;
+    list.appendChild(el);
+    setTimeout(() => observe(el), i * 20);
+  });
+}
+
+function prependActivity(item) {
+  const list = document.getElementById('activityList');
+  const el = document.createElement('div');
+  el.className = 'activity-item';
+  el.innerHTML = `<span class="activity-ts">${fmtTime(item.ts || new Date().toISOString())}</span>
+                  <span class="activity-text">${escHtml(item.text)}</span>`;
+  list.insertBefore(el, list.firstChild);
+  requestAnimationFrame(() => observe(el));
+  // Keep max 30 items
+  while (list.children.length > 30) list.removeChild(list.lastChild);
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  Team Status
+// ═══════════════════════════════════════════════════════════════
+function renderTeam(agents) {
+  const grid = document.getElementById('teamGrid');
+  grid.innerHTML = '';
+  agents.forEach(a => {
+    const card = document.createElement('div');
+    card.className = 'agent-card';
+    const modelShort = a.model ? a.model.replace('claude-', '').replace('-4-6', ' 4.6').replace('-4-5-20251001','4.5') : '—';
+    const display = a.display_name || slugToLabel(a.role);
+    card.innerHTML = `
+      <div class="agent-card-top">
+        <div class="agent-name">${escHtml(display)}</div>
+        <div class="status-dot ${a.status}" title="${a.status}"></div>
+      </div>
+      <div class="agent-model">${modelShort}</div>
+      <div class="agent-stats">${a.messages_today} msgs today</div>
+      ${a.current_thread ? `<div class="agent-project">● Active project</div>` : `<div class="agent-stats" style="color:var(--muted)">Idle</div>`}`;
+    grid.appendChild(card);
+    observe(card);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  Delivery History
+// ═══════════════════════════════════════════════════════════════
+function renderHistory(projects) {
+  const tbody = document.getElementById('historyBody');
+  if (!projects.length) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--text)">No completed projects yet</td></tr>';
+    return;
+  }
+  tbody.innerHTML = '';
+  projects.forEach(p => {
+    const ci = p.ci;
+    let testCell = '<span style="color:var(--text)">—</span>';
+    if (ci) {
+      const ok = ci.exit_code === 0;
+      testCell = `<span style="color:${ok ? 'var(--green)' : 'var(--red)'}">${ok ? '✅' : '❌'} ${ci.passed}/${ci.total}</span>`;
+    }
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="thread-title">${escHtml(p.title)}</td>
+      <td style="color:var(--text)">${fmtDate(p.completed_at)}</td>
+      <td><span class="dur-badge">${fmtElapsed(p.duration_min)}</span></td>
+      <td>${testCell}</td>
+      <td class="cost-val" style="color:var(--text)">$${p.cost_usd.toFixed(4)}</td>
+      <td>${p.github_repo ? `<a class="gh-btn" href="${escHtml(p.github_repo)}" target="_blank">⎇ View</a>` : '—'}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  Velocity Chart
+// ═══════════════════════════════════════════════════════════════
+function renderVelocity(byDay) {
+  const chart = document.getElementById('velocityChart');
+  if (!byDay || !byDay.length) {
+    chart.innerHTML = '<div style="color:var(--text);font-size:12px;">No data yet</div>';
+    return;
+  }
+  const max = Math.max(...byDay.map(d => d.count), 1);
+  chart.innerHTML = '';
+  byDay.forEach(d => {
+    const pct = Math.round(d.count / max * 100);
+    const col = document.createElement('div');
+    col.className = 'bar-col';
+    const dayLabel = d.day.slice(5); // MM-DD
+    col.innerHTML = `
+      <div class="bar-val">${d.count || ''}</div>
+      <div class="bar-fill" style="height:${Math.max(pct,2)}%"></div>
+      <div class="bar-label">${dayLabel}</div>`;
+    chart.appendChild(col);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  Cost by Role Chart
+// ═══════════════════════════════════════════════════════════════
+function renderCostByRole(roles) {
+  const container = document.getElementById('costByRole');
+  if (!roles || !roles.length) {
+    container.innerHTML = '<div style="color:var(--text);font-size:12px;">No cost data yet</div>';
+    return;
+  }
+  const max = Math.max(...roles.map(r => r.cost_usd), 0.0001);
+  container.innerHTML = '';
+  roles.slice(0, 10).forEach(r => {
+    const pct = Math.round(r.cost_usd / max * 100);
+    const row = document.createElement('div');
+    row.className = 'hbar-row';
+    row.innerHTML = `
+      <div class="hbar-top">
+        <span class="hbar-role">${slugToLabel(r.role)}</span>
+        <span class="hbar-cost">$${r.cost_usd.toFixed(4)}</span>
+      </div>
+      <div class="hbar-track">
+        <div class="hbar-fill" style="width:${pct}%"></div>
+      </div>`;
+    container.appendChild(row);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  XSS helper
+// ═══════════════════════════════════════════════════════════════
+function escHtml(str) {
+  return String(str || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  Full render from summary payload
+// ═══════════════════════════════════════════════════════════════
+function renderAll(data) {
+  renderKPIs(data.kpis);
+  renderProjects(data.active_projects || []);
+  renderActivity(data.recent_activity || []);
+  renderTeam(data.agent_status || []);
+  renderHistory(data.completed_projects || []);
+  renderVelocity(data.velocity?.by_day || []);
+  renderCostByRole(data.cost_by_role || []);
+  document.getElementById('lastUpdated').textContent = 'Updated ' + new Date().toLocaleTimeString();
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  Initial load
+// ═══════════════════════════════════════════════════════════════
+async function loadSummary() {
+  try {
+    const res = await fetch('/report/summary');
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    renderAll(data);
+  } catch (e) {
+    console.error('Failed to load report summary:', e);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  SSE Live Updates
+// ═══════════════════════════════════════════════════════════════
+let sseRetries = 0;
+
+function connectSSE() {
+  const es = new EventSource('/stream/all');
+  const liveDot  = document.getElementById('liveDot');
+  const feedDot  = document.getElementById('feedDot');
+
+  es.onopen = () => {
+    liveDot.classList.add('live');
+    feedDot.classList.add('live');
+    sseRetries = 0;
+  };
+
+  es.onmessage = (evt) => {
+    let msg;
+    try { msg = JSON.parse(evt.data); } catch { return; }
+    if (!msg || !msg.type) return;
+
+    const type = msg.type;
+    const ts = msg.timestamp || new Date().toISOString();
+    const fromRole = (msg.from_role || '').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
+    const content = (msg.content || '').slice(0, 80);
+
+    // Map to human-readable text
+    let text = null;
+    if (type === 'task_complete' || type === 'task_done') {
+      text = `✅ ${fromRole} finished a task`;
+    } else if (type === 'ci_result') {
+      text = `🧪 ${content}`;
+    } else if (type === 'thread_complete') {
+      text = `🚀 Shipped: ${content.slice(0,60)}`;
+    } else if (type === 'blocker') {
+      text = `⚠️ ${fromRole} is blocked`;
+    } else if (type === 'human_question') {
+      text = `💬 ${fromRole} needs your input`;
+    } else if (type === 'agent_created') {
+      text = `🤖 New agent joined the team`;
+    } else if (type === 'budget_warning') {
+      text = `🔶 ${content.slice(0,60)}`;
+    } else if (type === 'budget_exceeded') {
+      text = `🔴 ${content.slice(0,60)}`;
+    }
+
+    if (text) {
+      prependActivity({ text, ts, type });
+    }
+
+    // Update KPI counters for key events
+    if (type === 'task_complete' || type === 'task_done') {
+      const el = document.getElementById('kv-shipped');
+      el.textContent = parseInt(el.textContent || '0', 10) + 1;
+    }
+    if (type === 'ci_result') {
+      // re-fetch for accurate counts
+      setTimeout(loadSummary, 500);
+    }
+    if (type === 'thread_complete') {
+      setTimeout(loadSummary, 800);
+    }
+
+    // Update active agent pulse on project cards
+    if (type === 'agent_working' && msg.thread_id) {
+      const card = document.getElementById(`project-${msg.thread_id}`);
+      if (card) {
+        const pulse = card.querySelector('.agent-pulse');
+        const label = card.querySelector('.agent-row span');
+        if (pulse) pulse.classList.remove('idle');
+        if (label) label.textContent = slugToLabel(msg.from_role || '');
+      }
+    }
+
+    // Budget badge on project card
+    if ((type === 'budget_warning' || type === 'budget_exceeded') && msg.thread_id) {
+      const card = document.getElementById(`project-${msg.thread_id}`);
+      if (card) {
+        const cls = type === 'budget_warning' ? 'badge-warning' : 'badge-exceeded';
+        const txt = type === 'budget_warning' ? '⚠️ Budget warning' : '🔴 Budget exceeded';
+        if (!card.querySelector(`.${cls}`)) {
+          const badge = document.createElement('span');
+          badge.className = cls;
+          badge.textContent = txt;
+          card.appendChild(badge);
+        }
+      }
+    }
+  };
+
+  es.onerror = () => {
+    liveDot.classList.remove('live');
+    feedDot.classList.remove('live');
+    es.close();
+    sseRetries++;
+    const delay = Math.min(1000 * Math.pow(2, sseRetries), 30000);
+    setTimeout(connectSSE, delay);
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  Polling fallback (every 60s)
+// ═══════════════════════════════════════════════════════════════
+setInterval(loadSummary, 60_000);
+
+// ═══════════════════════════════════════════════════════════════
+//  Boot
+// ═══════════════════════════════════════════════════════════════
+loadSummary();
+connectSSE();
+</script>
+</body>
+</html>
