@@ -1434,7 +1434,7 @@ async def report_page():
 async def report_summary() -> dict:
     """Single aggregation call for the executive dashboard."""
     now = datetime.now(timezone.utc)
-    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    window_24h = now - timedelta(hours=24)
     seven_days_ago = now - timedelta(days=7)
 
     async with state.db.acquire() as conn:
@@ -1443,18 +1443,19 @@ async def report_summary() -> dict:
             "SELECT COUNT(*) FROM threads WHERE status='active'"
         )
         tasks_done_today = await conn.fetchval(
-            "SELECT COUNT(*) FROM tasks WHERE status='done' AND updated_at >= $1", today_start
+            "SELECT COUNT(*) FROM tasks WHERE status='done' AND updated_at >= $1", window_24h
         )
         tasks_in_progress = await conn.fetchval(
             "SELECT COUNT(*) FROM tasks WHERE status='in_progress'"
         )
         ci_today = await conn.fetchrow(
             "SELECT COALESCE(SUM(passed),0) AS tests_passed, COUNT(*) AS runs "
-            "FROM ci_results WHERE ran_at >= $1 AND exit_code=0", today_start
+            "FROM ci_results WHERE ran_at >= $1 AND exit_code=0", window_24h
         )
-        cost_today_row = await conn.fetch(
+        # Total all-time cost across all models
+        total_cost_row = await conn.fetch(
             "SELECT model, SUM(input_tokens) AS inp, SUM(output_tokens) AS out "
-            "FROM agent_metrics WHERE recorded_at >= $1 GROUP BY model", today_start
+            "FROM agent_metrics GROUP BY model"
         )
         avg_ship_row = await conn.fetchrow(
             "SELECT AVG(EXTRACT(EPOCH FROM (updated_at - created_at))/60) AS avg_min "
@@ -1532,7 +1533,7 @@ async def report_summary() -> dict:
         msgs_today: dict = {}
         mt_rows = await conn.fetch(
             "SELECT from_role, COUNT(*) AS cnt FROM messages WHERE created_at >= $1 "
-            "AND from_role != 'orchestrator' GROUP BY from_role", today_start
+            "AND from_role != 'orchestrator' GROUP BY from_role", window_24h
         )
         for r in mt_rows:
             msgs_today[r["from_role"]] = r["cnt"]
@@ -1556,9 +1557,9 @@ async def report_summary() -> dict:
             "FROM messages ORDER BY created_at DESC LIMIT 30"
         )
 
-    # Compute cost today
+    # Compute total all-time cost
     cost_today = 0.0
-    for r in cost_today_row:
+    for r in total_cost_row:
         cost_today += _estimate_cost(r["model"], r["inp"], r["out"])
 
     # Agent online status
