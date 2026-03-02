@@ -220,3 +220,18 @@ services:
       SANDBOX_URL: http://sandbox:8081
       ORCHESTRATOR_URL: http://orchestrator:8080
       GITHUB_USERNAME: ${GITHUB_USERNAME:-RajuRoopani}
+
+  security-engineer:
+    <<: *agent-base
+    volumes:
+      - ./agents/security_engineer:/agent
+      - workspace:/workspace
+    environment:
+      ROLE: security_engineer
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      REDIS_URL: redis://redis:6379
+      MODEL: ${SEC_MODEL:-claude-sonnet-4-6}
+      SANDBOX_URL: http://sandbox:8081
+      ORCHESTRATOR_URL: http://orchestrator:8080
+      GITHUB_USERNAME: ${GITHUB_USERNAME:-RajuRoopani}

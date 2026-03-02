@@ -39,6 +39,7 @@
   --c-sr2:   #3fb950;
   --c-jr1:   #ffa198;
   --c-jr2:   #ff7b72;
+  --c-sec:   #f43f5e;
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -840,6 +841,9 @@ section { position: relative; z-index: 1; }
 .tc-jr2::before { background: var(--c-jr2); }
 .tc-jr2 { color: var(--c-jr2); }
 .tc-jr2:hover { border-color: rgba(255,123,114,.3); }
+.tc-sec::before { background: var(--c-sec); }
+.tc-sec { color: var(--c-sec); }
+.tc-sec:hover { border-color: rgba(244,63,94,.3); }
 
 /* ═══════════════════════════════════════════════════════════════
    FEATURES BENTO
@@ -1196,7 +1200,7 @@ footer {
         <span class="grad">powered by AI</span>
       </h1>
       <p class="hero-sub reveal reveal-delay-2">
-        Submit a task in plain English. <strong>8+ specialized AI agents</strong> — Product Owner, Engineering Manager, Architect, UX Engineer, and 4 developers — collaborate through the full SDLC and ship <strong>production code to GitHub</strong> in minutes. Grow the team at runtime: add any specialist with one click, no files required.
+        Submit a task in plain English. <strong>9 specialized AI agents</strong> — Product Owner, Engineering Manager, Architect, UX Engineer, Security Engineer, and 4 developers — collaborate through the full SDLC and ship <strong>production code to GitHub</strong> in minutes. Grow the team at runtime: add any specialist with one click, no files required.
       </p>
       <div class="hero-actions reveal reveal-delay-3">
         <a class="btn btn-primary btn-lg" href="/dashboard">Open Dashboard →</a>
@@ -1267,7 +1271,7 @@ footer {
           <span class="step-num-label">2</span>
         </div>
         <div class="step-title">Agents collaborate</div>
-        <div class="step-desc">Eight specialized AI agents debate the design, write code, review each other's work, and run tests — just like a real team.</div>
+        <div class="step-desc">Nine specialized AI agents debate the design, write code, review each other's work, run security audits, and run tests — just like a real team.</div>
       </div>
       <div class="step-card reveal reveal-delay-2">
         <div class="step-num">
@@ -1310,7 +1314,7 @@ footer {
 <section id="arch">
   <div class="section-wrap">
     <div class="eyebrow reveal">Architecture</div>
-    <h2 class="section-title reveal reveal-delay-1">8+ agents, one mission</h2>
+    <h2 class="section-title reveal reveal-delay-1">9+ agents, one mission</h2>
     <p class="section-sub reveal reveal-delay-2">Each agent owns a distinct SDLC role, communicates via Redis Streams, and persists memory across tasks. Click any node to learn more.</p>
 
     <div class="arch-diagram reveal reveal-delay-2">
@@ -1502,7 +1506,7 @@ footer {
   <div class="section-wrap">
     <div class="eyebrow reveal">The Team</div>
     <h2 class="section-title reveal reveal-delay-1">Meet your AI engineering team</h2>
-    <p class="section-sub reveal reveal-delay-2">Each agent has a distinct role, persistent memory, and specialized system prompt — they're not just chat, they're collaborators.</p>
+    <p class="section-sub reveal reveal-delay-2">Nine specialized agents, each with a distinct role, persistent memory, and system prompt — they're not just chat, they're collaborators.</p>
 
     <div class="team-grid">
       <div class="team-card tc-po reveal">
@@ -1599,6 +1603,18 @@ footer {
           <li>Generates documentation</li>
           <li>Runs CI in sandbox and reports results</li>
           <li>Reports results to Senior Dev 2</li>
+        </ul>
+      </div>
+      <div class="team-card tc-sec reveal reveal-delay-1">
+        <div class="tc-emoji">🔐</div>
+        <div class="tc-role">Security Engineer</div>
+        <div class="tc-name">The Guardian</div>
+        <div class="tc-model">claude-sonnet-4-6</div>
+        <ul class="tc-responsibilities">
+          <li>Reviews code for OWASP Top 10 vulnerabilities</li>
+          <li>Audits auth flows, APIs, and data handling</li>
+          <li>Fixes critical findings before code ships</li>
+          <li>Writes security tests and threat reports</li>
         </ul>
       </div>
     </div>

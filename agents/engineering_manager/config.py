@@ -33,4 +33,5 @@ AVAILABLE_ROLES = [
     "senior_dev_2",
     "junior_dev_1",
     "junior_dev_2",
+    "security_engineer",
 ]

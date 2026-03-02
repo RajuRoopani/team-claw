@@ -60,6 +60,7 @@ AUDIT_CONSUMER  = "orchestrator-0"
 STATIC_AGENT_ROLES = [
     "product_owner", "engineering_manager", "architect", "ux_engineer",
     "senior_dev_1", "senior_dev_2", "junior_dev_1", "junior_dev_2",
+    "security_engineer",
 ]
 # Keep ALL_AGENT_ROLES as a function so dynamic agents are always included
 def ALL_AGENT_ROLES() -> list[str]:

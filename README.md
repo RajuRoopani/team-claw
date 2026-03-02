@@ -8,7 +8,7 @@
 
 **[Homepage](https://github.com/RajuRoopani/team-claw)** &nbsp;|&nbsp; **[Pitch Deck →  `/pitch`](https://github.com/RajuRoopani/team-claw)** &nbsp;|&nbsp; **[Live Dashboard →  `/dashboard`](https://github.com/RajuRoopani/team-claw)**
 
-`8+ agents` &nbsp;·&nbsp; `12 containers` &nbsp;·&nbsp; `25 tools` &nbsp;·&nbsp; `40 API endpoints` &nbsp;·&nbsp; `20 build phases` &nbsp;·&nbsp; `~5,000 LOC` &nbsp;·&nbsp; `∞ extensible`
+`9+ agents` &nbsp;·&nbsp; `13 containers` &nbsp;·&nbsp; `25 tools` &nbsp;·&nbsp; `40 API endpoints` &nbsp;·&nbsp; `20 build phases` &nbsp;·&nbsp; `~5,000 LOC` &nbsp;·&nbsp; `∞ extensible`
 
 </div>
 
@@ -93,7 +93,7 @@ Real apps, written autonomously, tests passing:
 
 ## The Team
 
-Eight Claude instances, each playing a real engineering role:
+Nine Claude instances, each playing a real engineering role:
 
 | Agent | Model | What They Do |
 |-------|-------|-------------|
@@ -101,6 +101,7 @@ Eight Claude instances, each playing a real engineering role:
 | **Engineering Manager** | claude-opus-4-6 | Decomposes the spec into tasks. Assigns work. Unblocks the team. Enforces git push. |
 | **Architect** | claude-sonnet-4-6 | Makes every design decision before a line of code is written. Writes ADRs. |
 | **UX Engineer** | claude-sonnet-4-6 | Produces wireframes, user flows, and component specs. Devs read this as their UI spec. |
+| **Security Engineer** | claude-sonnet-4-6 | Reviews code for OWASP Top 10, audits auth flows, fixes critical findings, writes security reports. |
 | **Senior Dev 1** | claude-sonnet-4-6 | Implements features. Reviews Junior Dev 1's work. Branches, commits, pushes. |
 | **Senior Dev 2** | claude-sonnet-4-6 | Implements features. Reviews Junior Dev 2's work. Branches, commits, pushes. |
 | **Junior Dev 1** | claude-haiku-4-5 | Handles well-scoped tasks. Escalates to Sr Dev 1 when blocked (max 3 round trips). |
