@@ -156,6 +156,11 @@
     white-space: nowrap; transition: all 0.12s;
   }
   .hdr-btn:hover { border-color: var(--accent); color: var(--text); }
+  #new-task-btn {
+    background: var(--accent); color: #fff; border-color: var(--accent);
+    font-weight: 600; padding: 4px 12px;
+  }
+  #new-task-btn:hover { background: #4f52d8; box-shadow: 0 0 14px rgba(99,102,241,.45); color: #fff; }
   #questions-bell { position: relative; }
   #questions-badge {
     display: none; position: absolute; top: -5px; right: -5px;
@@ -976,7 +981,7 @@
 <body>
 
 <!-- ══ HOME / LANDING VIEW ═════════════════════════════════════════════ -->
-<div id="home-view">
+<div id="home-view" class="hidden">
   <a class="home-dash-link" onclick="hidHomeView()">Dashboard →</a>
   <div class="home-logo">
     <span class="home-logo-dot"></span>
@@ -1053,7 +1058,7 @@
   </div>
 
   <div class="hdr-actions">
-    <button class="hdr-btn" id="new-task-btn" onclick="showHomeView()" style="border-color:var(--accent);color:var(--accent);font-weight:600">＋ New Task</button>
+    <button class="hdr-btn" id="new-task-btn" onclick="showHomeView()">＋ New Task</button>
     <button class="hdr-btn" onclick="openAddAgentModal()" style="border-color:var(--green);color:var(--green);font-weight:600">🤖 Add Agent</button>
     <button class="hdr-btn" onclick="openStandupModal()">📋 Standup</button>
     <button class="hdr-btn" id="questions-bell" onclick="openQuestionsModal()">
