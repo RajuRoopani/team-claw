@@ -247,9 +247,32 @@ nav {
 .hero-sub strong { color: var(--text2); font-weight: 600; }
 .hero-actions {
   display: flex;
-  gap: .75rem;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: .9rem;
+  align-items: flex-start;
 }
+.hero-task-form {
+  display: flex;
+  gap: .5rem;
+  width: 100%;
+  max-width: 540px;
+}
+.hero-task-input {
+  flex: 1;
+  padding: .72rem 1rem;
+  background: rgba(255,255,255,.06);
+  border: 1.5px solid rgba(255,255,255,.15);
+  border-radius: 10px;
+  color: var(--text2);
+  font-size: .95rem;
+  font-family: inherit;
+  outline: none;
+  transition: border-color .2s;
+}
+.hero-task-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(99,102,241,.15); }
+.hero-task-input::placeholder { color: rgba(255,255,255,.3); }
+.hero-task-hint { font-size: .8rem; color: #f43f5e; min-height: 1rem; margin-top: -.4rem; }
+.hero-secondary { display: flex; gap: .6rem; flex-wrap: wrap; }
 .hero-meta {
   display: flex;
   gap: 2rem;
@@ -1203,9 +1226,18 @@ footer {
         Submit a task in plain English. <strong>9 specialized AI agents</strong> — Product Owner, Engineering Manager, Architect, UX Engineer, Security Engineer, and 4 developers — collaborate through the full SDLC and ship <strong>production code to GitHub</strong> in minutes. Grow the team at runtime: add any specialist with one click, no files required.
       </p>
       <div class="hero-actions reveal reveal-delay-3">
-        <a class="btn btn-primary btn-lg" href="/dashboard">Open Dashboard →</a>
-        <a class="btn btn-ghost btn-lg" href="/report">📊 Exec Report</a>
-        <a class="btn btn-ghost btn-lg" href="https://github.com/RajuRoopani/team-claw" target="_blank" rel="noopener">⎇ View on GitHub</a>
+        <div class="hero-task-form">
+          <input class="hero-task-input" id="hero-task-input" type="text"
+            placeholder="e.g. Build a REST API for a todo app with auth"
+            autocomplete="off" />
+          <button class="btn btn-primary btn-lg" id="hero-launch-btn" onclick="heroLaunchTask()">Launch →</button>
+        </div>
+        <div class="hero-task-hint" id="hero-task-hint"></div>
+        <div class="hero-secondary">
+          <a class="btn btn-ghost" href="/dashboard">Open Dashboard</a>
+          <a class="btn btn-ghost" href="/report">📊 Exec Report</a>
+          <a class="btn btn-ghost" href="https://github.com/RajuRoopani/team-claw" target="_blank" rel="noopener">⎇ GitHub</a>
+        </div>
       </div>
       <div class="hero-meta reveal reveal-delay-4">
         <div>
@@ -1935,6 +1967,45 @@ function startTerminal() {
 new IntersectionObserver(entries => {
   if (entries[0].isIntersecting) startTerminal();
 }, { threshold: 0.3 }).observe(document.getElementById('hero'));
+
+/* ═══════════════════════════════════════════
+   HERO TASK LAUNCH
+═══════════════════════════════════════════ */
+document.getElementById('hero-task-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') heroLaunchTask();
+});
+
+async function heroLaunchTask() {
+  const input = document.getElementById('hero-task-input');
+  const hint  = document.getElementById('hero-task-hint');
+  const btn   = document.getElementById('hero-launch-btn');
+  const title = input.value.trim();
+
+  if (!title) {
+    input.style.borderColor = '#f43f5e';
+    input.focus();
+    setTimeout(() => { input.style.borderColor = ''; }, 1600);
+    return;
+  }
+
+  btn.disabled    = true;
+  btn.textContent = 'Launching…';
+  hint.textContent = '';
+
+  try {
+    const res = await fetch('/task', {
+      method:  'POST',
+      headers: {'Content-Type': 'application/json'},
+      body:    JSON.stringify({ title, description: title, priority: 'normal' }),
+    });
+    if (!res.ok) throw new Error(`Server error ${res.status}`);
+    window.location.href = '/dashboard';
+  } catch(e) {
+    hint.textContent = `❌ ${e.message}`;
+    btn.disabled    = false;
+    btn.textContent = 'Launch →';
+  }
+}
 
 /* ═══════════════════════════════════════════
    ARCHITECTURE PANEL
