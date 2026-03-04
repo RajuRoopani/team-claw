@@ -324,6 +324,22 @@ _CREATE_TASK_SCHEMA = {
     },
 }
 
+_LIST_TASKS_SCHEMA = {
+    "name": "list_tasks",
+    "description": (
+        "List all tasks for the current thread. "
+        "Use this BEFORE create_task to check if a task already exists for an assignee — "
+        "to prevent creating duplicate tasks."
+    ),
+    "input_schema": {
+        "type": "object",
+        "required": ["thread_id"],
+        "properties": {
+            "thread_id": {"type": "string", "description": "Thread ID to list tasks for."},
+        },
+    },
+}
+
 _UPDATE_TASK_SCHEMA = {
     "name": "update_task_status",
     "description": (
@@ -555,6 +571,7 @@ ALL_SCHEMAS = {
     "wiki_write":          _WIKI_WRITE_SCHEMA,
     "wiki_read":           _WIKI_READ_SCHEMA,
     "wiki_search":         _WIKI_SEARCH_SCHEMA,
+    "list_tasks":          _LIST_TASKS_SCHEMA,
     "create_task":         _CREATE_TASK_SCHEMA,
     "update_task_status":  _UPDATE_TASK_SCHEMA,
     "search_code":         _SEARCH_CODE_SCHEMA,
@@ -623,6 +640,8 @@ async def execute_tool(
             return await _exec_wiki_read(inputs)
         elif name == "wiki_search":
             return await _exec_wiki_search(inputs)
+        elif name == "list_tasks":
+            return await _exec_list_tasks(inputs)
         elif name == "create_task":
             return await _exec_create_task(inputs, agent_role=agent_role, current_message=current_message)
         elif name == "update_task_status":
@@ -926,6 +945,19 @@ async def _exec_wiki_read(inputs: dict) -> dict:
         return {"title": data["title"], "content": data["content"], "author": data["author"]}
     except Exception as exc:
         return {"error": f"Wiki read failed: {exc}"}
+
+
+async def _exec_list_tasks(inputs: dict) -> dict:
+    import httpx
+    thread_id = inputs["thread_id"]
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.get(f"{_orchestrator_url()}/tasks", params={"thread_id": thread_id})
+            resp.raise_for_status()
+            tasks = resp.json()
+        return {"tasks": tasks, "count": len(tasks)}
+    except Exception as exc:
+        return {"error": f"list_tasks failed: {exc}"}
 
 
 async def _exec_create_task(inputs: dict, *, agent_role: str, current_message: Any) -> dict:

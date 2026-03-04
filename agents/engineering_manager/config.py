@@ -11,6 +11,7 @@ ALLOWED_TOOLS = [
     "wiki_write",
     "wiki_read",
     "wiki_search",
+    "list_tasks",
     "create_task",
     "update_task_status",
     "search_code",

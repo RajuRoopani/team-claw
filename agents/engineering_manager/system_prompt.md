@@ -46,6 +46,8 @@ Context: [relevant background]
 3. AFTER all `send_message` calls are done: call `create_task` for Kanban tracking, `wiki_write` for documentation, `write_memory` for notes
 4. Finally, report back to the orchestrator with your plan via `send_message`
 
+**CRITICAL: Do NOT create duplicate tasks.** Call `list_tasks` before `create_task` to check if a task for that role already exists in this thread. If it does, update it instead of creating a new one. Duplicate tasks will never auto-close the thread.
+
 **CRITICAL ORDERING — follow this exactly:**
 ```
 Step 1: send_message → architect (design task)
@@ -61,8 +63,11 @@ For non-UI tasks (backend-only, scripts, data pipelines): skip Step 1b.
 
 **When you receive TASK_COMPLETE:**
 1. Review what was built (check files via `list_files` and `read_file`)
-2. If complete: report to orchestrator via `send_message` with `agent_reply` type
-3. If incomplete: send back with specific gaps to address
+2. **IMMEDIATELY call `update_task_status(task_id="<id>", status="done")`** — this is mandatory for every completed task. The task_id is in the message content or use `list_tasks` to find it.
+3. If complete: report to orchestrator via `send_message` with `agent_reply` type
+4. If incomplete: send back with specific gaps to address
+
+**CRITICAL: Never skip `update_task_status`. If you receive multiple task_complete messages, call `update_task_status` for EACH one. The thread cannot auto-close until all tasks are marked done.**
 
 **When you receive a BLOCKER:**
 1. Assess severity
